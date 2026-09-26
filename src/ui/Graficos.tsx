@@ -1,5 +1,5 @@
 import type { Movimiento } from "../tipos";
-import { DIAS_CORTOS, aFecha, diasEntre, hoy, mesCorto, sumarDias } from "../lib/fecha";
+import { DIAS_CORTOS, aFecha, diasEntre, fechaCorta, hoy, mesCorto, sumarDias } from "../lib/fecha";
 import { num } from "../lib/formato";
 
 /** Barras por día (semana, mes, período corto) o por mes (año, período largo),
@@ -31,22 +31,24 @@ export function PorTiempo({ movs, desde, hasta }: { movs: Movimiento[]; desde: s
   const pasados = tramos.filter(t => !t.futuro);
   const promedio = pasados.length ? pasados.reduce((s, t) => s + t.total, 0) / pasados.length : 0;
   const pocos = tramos.length <= 12;
+  const maxTramo = tramos.reduce<(typeof tramos)[number] | null>((a, t) => (t.total > (a?.total ?? 0) ? t : a), null);
   return (
-    <div className="caja" style={{ padding: "12px 12px 8px" }}>
-      <div className="fila mini tenue" style={{ padding: "0 0 8px" }}>
-        <span>{porMes ? "Por mes" : "Por día"}</span>
-        <span>promedio {num(promedio, 0)} USD {porMes ? "por mes" : "por día"}</span>
+    <div className="caja" style={{ padding: "10px 12px 6px" }}>
+      <div className="fila mini tenue" style={{ padding: "0 0 6px" }}>
+        <span>{porMes ? "Por mes" : "Por día"} · promedio {num(promedio, 0)} USD</span>
+        {maxTramo && <span>máx. {num(maxTramo.total, 0)} · {porMes ? mesCorto(maxTramo.clave) : fechaCorta(maxTramo.clave)}</span>}
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: pocos ? 8 : 2, height: 120, position: "relative", borderBottom: "1px solid var(--linea)" }}>
+      {/* Compacto: 64 px de alto. Las barras y la línea del promedio usan la misma escala. */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: pocos ? 6 : 2, height: 64, position: "relative", borderBottom: "1px solid var(--linea)" }}>
         {promedio > 0 && <div style={{ position: "absolute", left: 0, right: 0, bottom: `${(promedio / max) * 100}%`, borderTop: "1px dashed var(--tenue)" }} />}
         {tramos.map(t => (
-          <div key={t.clave} style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
-            {pocos && t.total > 0 && <span className="mini tenue num" style={{ fontSize: 10, marginBottom: 2 }}>{num(t.total, 0)}</span>}
-            <div style={{ width: "100%", height: `${Math.max(t.total ? 2 : 0, (t.total / max) * (pocos ? 82 : 100))}%`, background: t.clave === hoy() ? "var(--viol-claro)" : "var(--viol)", borderRadius: "3px 3px 0 0", opacity: t.futuro ? 0.3 : 1 }} />
-          </div>
+          <div key={t.clave} style={{
+            flex: 1, height: `${Math.max(t.total ? 3 : 0, (t.total / max) * 100)}%`,
+            background: t.clave === hoy() ? "var(--viol-claro)" : "var(--viol)", borderRadius: "2px 2px 0 0", opacity: t.futuro ? 0.3 : 1,
+          }} />
         ))}
       </div>
-      <div style={{ display: "flex", gap: pocos ? 8 : 2 }} className="mini tenue">
+      <div style={{ display: "flex", gap: pocos ? 6 : 2 }} className="mini tenue">
         {tramos.map((t, i) => <span key={t.clave} style={{ flex: 1, textAlign: "center", fontSize: 10, visibility: pocos || i % 5 === 0 ? "visible" : "hidden" }}>{t.etiqueta}</span>)}
       </div>
     </div>
