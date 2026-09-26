@@ -31,6 +31,11 @@ export default defineConfig({
         orientation: "portrait",
         background_color: "#07070B",
         theme_color: "#07070B",
+        // Mantener apretado el ícono: accesos directos.
+        shortcuts: [
+          { name: "Nuevo gasto", short_name: "Gasto", url: "./?accion=gasto", icons: [{ src: "icono-192.png", sizes: "192x192" }] },
+          { name: "Subir resumen de tarjeta", short_name: "Resumen", url: "./?accion=resumen", icons: [{ src: "icono-192.png", sizes: "192x192" }] },
+        ],
         icons: [
           { src: "icono-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
           { src: "icono-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

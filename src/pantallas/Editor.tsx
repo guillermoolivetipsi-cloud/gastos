@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
-import { MONEDAS, type Cuenta, type Moneda, type Tipo } from "../tipos";
+import { MONEDAS, type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
 import { eliminarMovimiento, guardarMovimiento } from "../lib/acciones";
 import { recurrentesDelMes } from "../lib/analisis";
 import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias, sumarMeses } from "../lib/fecha";
@@ -67,11 +67,14 @@ export function Editor(props: Props) {
       setTipo(rec.tipo); setCategoriaId(rec.categoriaId); setCuentaId(rec.cuentaId); setMoneda(rec.moneda); setComentario(rec.nombre);
       return;
     }
-    // Nuevo: arranca "sin tarjeta" (la cuenta de todos los días) y en la moneda
-    // del último gasto que cargaste.
-    const ultimo = [...d.movimientos].filter(m => m.tipo === (props.tipo ?? "gasto")).sort((a, b) => b.creado.localeCompare(a.creado))[0];
+    // Nuevo: arranca "sin tarjeta" (la cuenta de todos los días) y en la moneda que
+    // más usaste en el último mes.
+    const desde = sumarDias(hoy(), -30);
+    const uso = new Map<Moneda, number>();
+    for (const m of d.movimientos) if (m.tipo === (props.tipo ?? "gasto") && m.fecha >= desde) uso.set(m.moneda, (uso.get(m.moneda) ?? 0) + 1);
+    const masUsada = [...uso.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
     const c = cuentaDiaria(d.cuentas);
-    if (c) { setCuentaId(c.id); setMoneda(ultimo?.moneda ?? c.moneda); }
+    if (c) { setCuentaId(c.id); setMoneda(masUsada ?? c.moneda); }
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const monto = leerNumero(montoTxt);
@@ -91,6 +94,26 @@ export function Editor(props: Props) {
     const sel = cats.find(c => c.id === categoriaId);
     return sel && !top.includes(sel) ? [...top.slice(0, 6), sel] : top;
   })();
+
+  // Lo que más repetís (mismo comercio o categoría, mismo monto): se carga con un toque.
+  const frecuentes = useMemo(() => {
+    if (existente || props.recurrenteId) return [];
+    const desde = sumarDias(hoy(), -60);
+    const grupos = new Map<string, { m: Movimiento; n: number }>();
+    for (const m of d.movimientos) {
+      if (m.tipo !== "gasto" || m.fecha < desde || m.recurrenteId || (m.cuotas ?? 1) > 1) continue;
+      const k = [m.categoriaId, (m.comentario ?? "").toLowerCase(), m.monto, m.moneda, m.cuentaId].join("|");
+      const g = grupos.get(k);
+      grupos.set(k, { m: !g || m.fecha > g.m.fecha ? m : g.m, n: (g?.n ?? 0) + 1 });
+    }
+    return [...grupos.values()].filter(g => g.n >= 2).sort((a, b) => b.n - a.n).slice(0, 6).map(g => g.m);
+  }, [d.movimientos, existente, props.recurrenteId]);
+
+  async function repetir(m: Movimiento) {
+    const nuevo = await guardarMovimiento({ tipo: "gasto", fecha, monto: m.monto, moneda: m.moneda, cuentaId: m.cuentaId, categoriaId: m.categoriaId, etiquetas: m.etiquetas, comentario: m.comentario }, d.cuentas.find(c => c.id === m.cuentaId));
+    toast({ texto: `${m.comentario || d.categorias.find(c => c.id === m.categoriaId)?.nombre} guardado`, deshacer: () => { eliminarMovimiento(nuevo.id); } });
+    nav.volver();
+  }
 
   const etiquetasUsadas = useMemo(() => {
     const cuenta = new Map<string, number>();
@@ -156,6 +179,23 @@ export function Editor(props: Props) {
       </div>
 
       <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={tipo} cambiar={t => { setTipo(t); setCategoriaId(""); setVinculo(null); }} />
+
+      {tipo === "gasto" && frecuentes.length > 0 && !montoTxt && (
+        <div style={{ marginTop: 10 }}>
+          <div className="etq">Repetir con un toque{fecha !== hoy() ? ` (${fechaCorta(fecha, false)})` : ""}</div>
+          <div className="pills scroll">
+            {frecuentes.map(m => {
+              const c = d.categorias.find(x => x.id === m.categoriaId);
+              return (
+                <button key={m.id} className="pill" onClick={() => repetir(m)}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: c?.color ?? "#555", display: "inline-block" }} />
+                  {m.comentario || c?.nombre} · {num(m.monto)} {m.moneda === "EUR" ? "€" : m.moneda === "ARS" ? "$" : "USD"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="monto-grande">
         <input inputMode="decimal" placeholder="0" value={montoTxt} autoFocus={!existente && !props.monto}

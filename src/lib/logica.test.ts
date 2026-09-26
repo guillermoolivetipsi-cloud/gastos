@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
 import { cuotasDe, esDudosa, resumen, resumenDe, vencimiento } from "./tarjeta";
-import { estadoDe, instanciasDelMes } from "./recurrentes";
+import { estadoDe, instanciasDelMes, recurrenteDe } from "./recurrentes";
 import { detectarRecurrentes, sugerirClase, sugerirObjetivo } from "./analisis";
 import { fechaEnMes, rango, sumarMeses } from "./fecha";
 import { leerNumero } from "./formato";
@@ -127,5 +127,19 @@ describe("fechas y números", () => {
     expect(leerNumero("2,40")).toBe(2.4);
     expect(leerNumero("18500")).toBe(18500);
     expect(leerNumero("12.5")).toBe(12.5);
+  });
+});
+
+describe("vincular un cobro con su recurrente", () => {
+  const claude: Recurrente = { id: "cl", nombre: "Claude", tipo: "gasto", categoriaId: "sus", cuentaId: "mc", monto: 100, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 21, inicio: "2026-09-01", modo: "avisar", activo: true };
+  const gym: Recurrente = { ...claude, id: "gy", nombre: "Gym", categoriaId: "dep", monto: 35.9, moneda: "EUR", dia: 8 };
+  it("mismo mes, cuenta y categoría, con monto parecido; compara en USD si la moneda difiere", () => {
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 100, moneda: "USD", usd: 100, fecha: "2026-10-21" }), [claude, gym], [], () => 1)).toEqual({ recurrenteId: "cl", periodo: "2026-10" });
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "dep", monto: 41.84, moneda: "USD", usd: 41.84, fecha: "2026-10-08" }), [claude, gym], [], () => 0.86)).toEqual({ recurrenteId: "gy", periodo: "2026-10" });
+  });
+  it("no vincula si esa instancia ya está pagada o si el monto no se parece", () => {
+    const pagado = mov({ id: "ya", recurrenteId: "cl", periodo: "2026-10" });
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 100, moneda: "USD", usd: 100, fecha: "2026-10-21" }), [claude], [pagado], () => 1)).toBeNull();
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 20, moneda: "USD", usd: 20, fecha: "2026-10-21" }), [claude], [], () => 1)).toBeNull();
   });
 });

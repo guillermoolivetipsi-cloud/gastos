@@ -16,6 +16,9 @@ export function Movimientos() {
   const toast = useToast();
   const [q, setQ] = useState("");
   const [tipo, setTipo] = useState<"todos" | "gasto" | "ingreso">("todos");
+  // Filtros: por medio de pago ("sin" = sin tarjeta) y por categoría.
+  const [medio, setMedio] = useState<string>("todos");
+  const [catFiltro, setCatFiltro] = useState("");
   const [cuantos, setCuantos] = useState(150);
 
   const cat = useMemo(() => new Map(d.categorias.map(c => [c.id, c])), [d.categorias]);
@@ -26,9 +29,13 @@ export function Movimientos() {
     const t = normal(q.trim());
     return d.movimientos
       .filter(m => tipo === "todos" || m.tipo === tipo)
+      .filter(m => medio === "todos" || (medio === "sin" ? !cta.get(m.cuentaId)?.esTarjeta : m.cuentaId === medio))
+      .filter(m => !catFiltro || m.categoriaId === catFiltro)
       .filter(m => !t || normal([cat.get(m.categoriaId)?.nombre, cta.get(m.cuentaId)?.nombre, m.comentario, ...m.etiquetas, String(m.monto)].join(" ")).includes(t))
       .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
-  }, [d.movimientos, q, tipo, cat, cta]);
+  }, [d.movimientos, q, tipo, cat, cta, medio, catFiltro]);
+  const filtrando = medio !== "todos" || !!catFiltro || !!q.trim();
+  const totalFiltrado = lista.reduce((s, m) => s + (m.tipo === "gasto" ? 1 : -1) * usdDe(m), 0);
 
   const porDia: [string, typeof lista][] = [];
   for (const m of lista.slice(0, cuantos)) {
@@ -42,6 +49,16 @@ export function Movimientos() {
       <div className="enc"><h1>Movimientos</h1></div>
       <div className="buscar"><T.IconSearch size={18} className="tenue" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por categoría, cuenta, comentario…" />{q && <button onClick={() => setQ("")} aria-label="Borrar búsqueda"><T.IconX size={16} /></button>}</div>
       <Seg opciones={[["todos", "Todos"], ["gasto", "Gastos"], ["ingreso", "Ingresos"]]} valor={tipo} cambiar={setTipo} />
+      <div className="pills scroll" style={{ marginTop: 10 }}>
+        {[["todos", "Todas"], ["sin", "Sin tarjeta"], ...d.cuentas.filter(c => c.esTarjeta && !c.archivada).map(c => [c.id, c.nombre])].map(([v, t]) => (
+          <button key={v} className={`pill${medio === v ? " on" : ""}`} onClick={() => setMedio(v)}>{t}</button>
+        ))}
+        <select className={`pill${catFiltro ? " on" : ""}`} value={catFiltro} onChange={e => setCatFiltro(e.target.value)} aria-label="Categoría" style={{ appearance: "none" }}>
+          <option value="">Categoría ▾</option>
+          {d.categorias.filter(c => !c.archivada).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+      </div>
+      {filtrando && lista.length > 0 && <div className="mini tenue" style={{ marginTop: 8 }}>{lista.length} movimientos · {num(Math.abs(totalFiltrado))} USD</div>}
       {sinCotizar > 0 && <div className="mini ambar" style={{ marginTop: 10 }}><T.IconCloudOff size={13} /> {sinCotizar} sin convertir a USD: se completan al tener conexión.</div>}
 
       {!lista.length && <div className="vacio">{q ? "Nada coincide con la búsqueda." : "Todavía no cargaste nada. Tocá + para empezar."}</div>}

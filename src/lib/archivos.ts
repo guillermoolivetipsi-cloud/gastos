@@ -196,6 +196,8 @@ export interface Paquete {
   recurrentes?: (Omit<Recurrente, "categoriaId" | "cuentaId"> & { categoria: string; cuenta: string; pagos?: string[] })[];
   cuentas?: { nombre: string; cambios: Partial<Cuenta> }[];
   reglasComercio?: Record<string, string>; // comercio → nombre de categoría
+  /** Movimientos sueltos. `yaEnFinanzas`: se marcan exportados para no duplicarlos allá. */
+  movimientos?: { id: string; tipo: Tipo; fecha: string; monto: number; moneda: Moneda; usd: number; cuenta: string; categoria: string; comentario?: string; yaEnFinanzas?: boolean }[];
 }
 
 export async function sumarPaquete(archivo: File) {
@@ -204,7 +206,7 @@ export async function sumarPaquete(archivo: File) {
   const cats = await db.categorias.toArray(), cuentas = await db.cuentas.toArray();
   const cat = (n: string) => cats.find(c => c.nombre.toLowerCase() === n.toLowerCase());
   const cta = (n: string) => cuentas.find(c => c.nombre.toLowerCase() === n.toLowerCase());
-  const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, salteados: [] as string[] };
+  const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, movimientos: 0, salteados: [] as string[] };
   await db.transaction("rw", [db.recurrentes, db.movimientos, db.cuentas, db.ajustes], async () => {
     for (const r of p.recurrentes ?? []) {
       const c = cat(r.categoria), k = cta(r.cuenta);
@@ -218,9 +220,26 @@ export async function sumarPaquete(archivo: File) {
         if (m && !m.recurrenteId) { await db.movimientos.update(id, { recurrenteId: r.id, periodo: m.fecha.slice(0, 7) }); res.pagos++; }
       }
     }
+    const ahora = new Date().toISOString();
+    for (const m of p.movimientos ?? []) {
+      const c = cat(m.categoria), k = cta(m.cuenta);
+      if (!c || !k) { res.salteados.push(m.comentario ?? m.fecha); continue; }
+      if (await db.movimientos.get(m.id)) continue;
+      await db.movimientos.add({
+        id: m.id, tipo: m.tipo, fecha: m.fecha, monto: m.monto, moneda: m.moneda, usd: m.usd,
+        cotizacion: { tasa: m.usd ? m.monto / m.usd : 1, fuente: "resumen", fecha: m.fecha },
+        cuentaId: k.id, categoriaId: c.id, etiquetas: [], comentario: m.comentario,
+        creado: ahora, modificado: ahora, exportado: m.yaEnFinanzas ? ahora : undefined,
+      });
+      res.movimientos++;
+    }
     for (const { nombre, cambios } of p.cuentas ?? []) {
       const k = cta(nombre);
-      if (k) { await db.cuentas.update(k.id, cambios); res.cuentas++; }
+      if (!k) continue;
+      // Los cierres se suman a los que ya hay; un {} vacío los borra todos.
+      const cierres = cambios.cierres && Object.keys(cambios.cierres).length ? { ...(k.cierres ?? {}), ...cambios.cierres } : cambios.cierres;
+      await db.cuentas.update(k.id, { ...cambios, ...(cierres ? { cierres } : {}) });
+      res.cuentas++;
     }
     if (p.reglasComercio) {
       const actuales = ((await db.ajustes.get("reglasComercio"))?.valor ?? {}) as Record<string, string>;

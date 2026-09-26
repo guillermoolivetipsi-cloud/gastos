@@ -48,6 +48,15 @@ const SOLAPAS: [Solapa, string, typeof T.IconHome][] = [
 export function App() {
   const nav = useNav();
 
+  // Accesos directos del ícono (?accion=gasto | resumen): abren esa pantalla.
+  useEffect(() => {
+    const accion = new URLSearchParams(location.search).get("accion");
+    if (!accion) return;
+    history.replaceState(null, "", location.pathname);
+    if (accion === "gasto") nav.abrir({ p: "editor" });
+    if (accion === "resumen") nav.abrir({ p: "subir-resumen" });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Al abrir y al volver a la app: completar cotizaciones pendientes y cargar
   // los recurrentes automáticos que ya vencieron.
   useEffect(() => {

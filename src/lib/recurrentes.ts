@@ -116,3 +116,20 @@ export async function cargarAutomaticos() {
   }
   return n;
 }
+
+/** ¿Este movimiento es el pago de un recurrente? Mismo tipo, cuenta y categoría,
+ *  que caiga en una instancia todavía sin pagar y con un monto parecido (±25% si es
+ *  fijo, ±50% si es variable), comparando en USD si las monedas difieren. */
+export function recurrenteDe(m: Movimiento, recs: Recurrente[], movs: Movimiento[], tasa: (r: Recurrente) => number | null): { recurrenteId: string; periodo: string } | null {
+  for (const r of recs) {
+    if (!r.activo || r.tipo !== m.tipo || r.cuentaId !== m.cuentaId || r.categoriaId !== m.categoriaId) continue;
+    const inst = instanciasDelMes(r, periodoDe(m.fecha)).find(i => r.frecuencia !== "semanal" || Math.abs(Number(i.clave.slice(8)) - Number(m.fecha.slice(8))) <= 3);
+    if (!inst || movs.some(x => x.recurrenteId === r.id && x.periodo === inst.clave && x.id !== m.id)) continue;
+    const t = tasa(r);
+    const esperado = m.moneda === r.moneda ? r.monto : t && m.usd != null ? r.monto / t : null;
+    const real = m.moneda === r.moneda ? m.monto : m.usd;
+    if (esperado == null || real == null) continue;
+    if (Math.abs(real - esperado) / esperado <= (r.clase === "fijo" ? 0.25 : 0.5)) return { recurrenteId: r.id, periodo: inst.clave };
+  }
+  return null;
+}

@@ -5,6 +5,7 @@ import { useNav } from "../nav";
 import type { Cuenta, Movimiento } from "../tipos";
 import { aprender, conciliar, type Conciliacion, type Fila } from "../lib/conciliar";
 import { aUsd, cotizar } from "../lib/cotizaciones";
+import { recurrenteDe } from "../lib/recurrentes";
 import { fechaCorta, nombreMes, periodoDe, sumarDias } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import { textoDePdf } from "../lib/pdf";
@@ -69,7 +70,14 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
     // app anterior): se agrega marcado como exportado para no duplicarlo allá.
     const primera = d.movimientos.map(m => m.fecha).sort()[0] ?? "9999";
     let nuevos = 0, cambiados = 0;
+    const agregados: Movimiento[] = [];
+    const tasaRec = (r: Parameters<typeof d.tasas.rec>[0]) => d.tasas.rec(r, d.cuentas);
     for (const [i, f] of filas.entries()) {
+      // Un cobro que ya estaba en esta tarjeta y coincide con un recurrente (Claude, Gym…) queda como su pago.
+      if (f.tipo === "coincide" && f.mov && !f.mov.recurrenteId) {
+        const v = recurrenteDe(f.mov, d.recurrentes, [...d.movimientos, ...agregados], tasaRec);
+        if (v) { await db.movimientos.update(f.mov.id, v); Object.assign(f.mov, v); }
+      }
       if (!aplicar[i]) continue;
       if (f.tipo === "falta") {
         const c = f.consumo;
@@ -83,11 +91,17 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
           exportado: c.fecha < primera ? ahora : undefined,
         };
         if (!["USD", "EUR", "ARS"].includes(mov.moneda)) { mov.moneda = "USD"; mov.monto = c.usd ?? c.importe; }
+        Object.assign(mov, recurrenteDe(mov, d.recurrentes, [...d.movimientos, ...agregados], tasaRec) ?? {});
+        agregados.push(mov);
         await db.movimientos.add(mov); nuevos++;
       } else if (f.mov && (f.tipo === "otra-cuenta" || f.tipo === "moneda")) {
         const cambios: Partial<Movimiento> = { cuentaId: tarjeta.id, modificado: ahora };
         if (f.tipo === "moneda") Object.assign(cambios, { moneda: f.consumo.moneda, usd: f.consumo.usd, cotizacion: { tasa: redondear(f.consumo.importe / (f.consumo.usd ?? f.consumo.importe), 6), fuente: "resumen", fecha: f.consumo.fecha } });
         await db.movimientos.update(f.mov.id, cambios); cambiados++;
+      }
+      if (f.mov && !f.mov.recurrenteId && (f.tipo === "otra-cuenta" || f.tipo === "moneda")) {
+        const v = recurrenteDe({ ...f.mov, cuentaId: tarjeta.id }, d.recurrentes, [...d.movimientos, ...agregados], tasaRec);
+        if (v) await db.movimientos.update(f.mov.id, v);
       }
     }
     // Aprende los comercios: los que coincidieron y los que categorizaste.

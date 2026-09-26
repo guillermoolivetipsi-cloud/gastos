@@ -37,7 +37,9 @@ export function Resumen() {
 
   const tasa = (r: Parameters<typeof d.tasas.rec>[0]) => d.tasas.rec(r, d.cuentas);
   const instancias = esMes ? recurrentesDelMes(d.recurrentes, d.movimientos, periodo, tasa) : [];
-  const porCargar = instancias.filter(i => i.estado === "por-cargar" || (i.estado === "parcial" && i.fecha <= hoy()));
+  // Lo que va con tarjeta llega con el resumen: no se pide cargar a mano.
+  const conTarjeta = new Set(d.cuentas.filter(c => c.esTarjeta).map(c => c.id));
+  const porCargar = instancias.filter(i => !conTarjeta.has(i.rec.cuentaId) && (i.estado === "por-cargar" || (i.estado === "parcial" && i.fecha <= hoy())));
   const clase = useMemo(() => claseProvisoria(d.categorias, d.movimientos), [d.categorias, d.movimientos]);
   const b = esMes && tipo === "gasto" ? bloques(periodo, movs, d.categorias, d.recurrentes, instancias.filter(i => i.estado !== "cargado"), tasa, clase) : null;
   const extras = useExtras();
