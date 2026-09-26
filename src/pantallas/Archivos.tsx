@@ -66,6 +66,7 @@ export function Respaldo() {
   const [trabajando, setTrabajando] = useState<string | null>(null);
   const [res, setRes] = useState<ResultadoImport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCopia, setErrorCopia] = useState<string | null>(null);
   const [persistente, setPersistente] = useState<boolean | null>(null);
   const [yaEnFinanzas, setYaEnFinanzas] = useState(true);
   useEffect(() => { navigator.storage?.persisted?.().then(setPersistente); }, []);
@@ -80,8 +81,9 @@ export function Respaldo() {
   async function restaurarDe(f: File | undefined) {
     if (!f) return;
     if (!confirm("Esto reemplaza todo lo que hay en la app por lo del archivo. ¿Seguir?")) return;
+    setErrorCopia(null);
     try { const n = await restaurar(f); toast({ texto: `Restaurados ${n} movimientos` }); }
-    catch (e) { setError((e as Error).message); }
+    catch (e) { setErrorCopia(e instanceof SyntaxError ? "Ese archivo no es una copia de seguridad (.json) de la app." : (e as Error).message); }
   }
 
   return (
@@ -94,10 +96,13 @@ export function Respaldo() {
         <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(ultimo.slice(0, 10)) : "nunca"} · te aviso en "Para revisar" si pasa más de una semana.</div>
         {persistente === false && <div className="mini ambar" style={{ marginTop: 4 }}>Instalá la app en la pantalla de inicio para que Android no borre los datos si le falta espacio.</div>}
         <div className="botones"><button className="btn1" onClick={copiaDeSeguridad}>Hacer copia ahora</button></div>
-        <label className="btn2" style={{ display: "block", marginTop: 8 }}>
-          Restaurar desde una copia
-          <input type="file" accept="application/json,.json" hidden onChange={e => restaurarDe(e.target.files?.[0])} />
+        {/* Sin filtro de tipo: Android a veces no reconoce el .json que llega por
+            WhatsApp o Drive y lo muestra deshabilitado. El contenido se valida al leerlo. */}
+        <label className="btn1" style={{ display: "block", marginTop: 8 }}>
+          Restaurar desde una copia (.json)
+          <input type="file" hidden onChange={e => { restaurarDe(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
+        {errorCopia && <div className="mal chico" style={{ marginTop: 8 }}>{errorCopia}</div>}
       </div>
 
       <div className="titulo-sec"><span>Traer lo de la app anterior</span></div>
