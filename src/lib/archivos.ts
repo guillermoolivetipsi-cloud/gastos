@@ -77,7 +77,12 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
   const wb = XLSX.read(await archivo.arrayBuffer(), { cellDates: true });
   const cats = await db.categorias.toArray();
   const cuentas = await db.cuentas.toArray();
-  const existentes = new Set((await db.movimientos.toArray()).map(m => `${m.tipo}|${m.fecha}|${m.monto}|${m.moneda}|${m.comentario ?? ""}|${m.categoriaId}`));
+  // Cuántos iguales hay ya en la app. Dos cafés idénticos el mismo día son dos gastos:
+  // se saltea solo lo que ya estaba (reimportar no duplica, pero no se pierde ninguno).
+  const clavede = (m: Pick<Movimiento, "tipo" | "fecha" | "monto" | "moneda" | "comentario" | "categoriaId">) => `${m.tipo}|${m.fecha}|${m.monto}|${m.moneda}|${m.comentario ?? ""}|${m.categoriaId}`;
+  const existentes = new Map<string, number>();
+  for (const m of await db.movimientos.toArray()) existentes.set(clavede(m), (existentes.get(clavede(m)) ?? 0) + 1);
+  const vistos = new Map<string, number>();
   const res: ResultadoImport = { nuevos: 0, repetidos: 0, sinCotizar: 0, categoriasNuevas: [], cuentasNuevas: [] };
   const nuevos: Movimiento[] = [];
 
@@ -116,8 +121,9 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
       const cta = cuenta(String(f[2] ?? "Principal").trim() || "Principal", monedaCta);
       const comentario = f[8] ? String(f[8]).trim() : undefined;
       const clave = `${tipo}|${fecha}|${monto}|${moneda}|${comentario ?? ""}|${cat.id}`;
-      if (existentes.has(clave)) { res.repetidos++; continue; }
-      existentes.add(clave);
+      const n = (vistos.get(clave) ?? 0) + 1;
+      vistos.set(clave, n);
+      if (n <= (existentes.get(clave) ?? 0)) { res.repetidos++; continue; }
       const ahora = new Date().toISOString();
       nuevos.push({
         id: nuevoId(), tipo, fecha, monto, moneda, usd: moneda === "USD" ? monto : null,

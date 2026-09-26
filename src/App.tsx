@@ -17,6 +17,7 @@ import { Exportar, Respaldo } from "./pantallas/Archivos";
 import { Ajustes } from "./pantallas/Ajustes";
 import { SubirResumen } from "./pantallas/SubirResumen";
 import { Etiquetas } from "./pantallas/Etiquetas";
+import { ComoVenis } from "./pantallas/ComoVenis";
 import { T } from "./ui/Icono";
 
 function Encima({ p }: { p: Pantalla }) {
@@ -37,6 +38,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "ajustes": return <Ajustes />;
     case "subir-resumen": return <SubirResumen cuentaId={p.cuentaId} />;
     case "etiquetas": return <Etiquetas />;
+    case "como-venis": return <ComoVenis periodo={p.periodo} />;
   }
 }
 

@@ -5,11 +5,12 @@ import { db } from "../db";
 import { useNav } from "../nav";
 import type { Categoria, Movimiento, Tipo } from "../tipos";
 import { avanceDelMes, bloques, claseProvisoria, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
-import { fechaCorta, hoy, moverAncla, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
+import { fechaCorta, hoy, moverAncla, nombreMes, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
 import { num, usd } from "../lib/formato";
 import { pendientes, useExtras } from "../lib/revisar";
 import { Barra, Dona, Hoja, Punto } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
+import { useInsights } from "./ComoVenis";
 import { T } from "../ui/Icono";
 
 const VISTAS: [Vista, string][] = [["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"], ["anio", "Año"], ["periodo", "Período"]];
@@ -155,6 +156,8 @@ export function Resumen() {
         <div className="mini tenue centro">La marca blanca es donde deberías ir hoy</div>
       )}
 
+      {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
+
       <Hoja abierta={elegirPeriodo} cerrar={() => setElegirPeriodo(false)}>
         <h2>Elegir período</h2>
         <div className="campo"><label>Desde</label><input type="date" value={ancla} max={hasta} onChange={e => e.target.value && setAncla(e.target.value)} /></div>
@@ -187,5 +190,24 @@ function DetalleCategoria({ cat, movs, cerrar }: { cat: Categoria | null; movs: 
         </button>
       ))}
     </Hoja>
+  );
+}
+
+/** La tarjeta "Cómo venís" al pie del mes: tres datos y se abre al tocarla. No avisa nada. */
+function TarjetaComoVenis({ periodo }: { periodo: string }) {
+  const nav = useNav();
+  const x = useInsights(periodo);
+  if (!x) return null;
+  const partes = [
+    x.tarjeta.total > 0 && `Tarjeta ${x.tarjeta.pct}% del mes`,
+    x.comprometido.total > 0 && `${nombreMes(x.comprometido.periodo, false)} ya comprometido ~${num(x.comprometido.total, 0)} USD`,
+    x.suscripciones.total > 0 && `Suscripciones ${num(x.suscripciones.total, 0)} USD`,
+  ].filter(Boolean);
+  if (!partes.length) return null;
+  return (
+    <button className="caja" style={{ width: "100%", textAlign: "left", borderColor: "#3A2F5C", marginTop: 10 }} onClick={() => nav.abrir({ p: "como-venis", periodo })}>
+      <div className="fila" style={{ padding: 0 }}><span className="viol">✦ Cómo venís en {nombreMes(periodo, false)}</span><T.IconChevronRight size={16} className="tenue" /></div>
+      <div className="mini tenue" style={{ marginTop: 4, lineHeight: 1.5 }}>{partes.join(" · ")}</div>
+    </button>
   );
 }

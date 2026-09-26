@@ -39,3 +39,17 @@ describe("exportar a Finanzas", () => {
     expect((await db.movimientos.get("c"))!.exportado).toBeFalsy();
   });
 });
+
+describe("importar", () => {
+  it("dos gastos idénticos el mismo día son dos, y reimportar no duplica", async () => {
+    const { importarXlsx } = await import("./archivos");
+    const cab = ["Fecha", "Categoría", "Cuenta", "Importe", "Moneda", "Importe tx", "Moneda tx", "Etiquetas", "Comentario"];
+    const fila = ["2025-03-10", "Café", "Revolut", 3, "USD", 3, "USD", "", ""];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["x"], cab, fila, fila]), "Gastos");
+    const archivo = new File([XLSX.write(wb, { type: "array", bookType: "xlsx" })], "h.xlsx");
+    const r1 = await importarXlsx(archivo);
+    const r2 = await importarXlsx(archivo);
+    expect([r1.nuevos, r2.nuevos, r2.repetidos]).toEqual([2, 0, 2]);
+  });
+});
