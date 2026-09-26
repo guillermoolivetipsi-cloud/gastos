@@ -35,7 +35,7 @@ export function Resumen() {
   const periodo = periodoDe(desde);
   const avance = esMes ? avanceDelMes(periodo) : undefined;
 
-  const tasa = (r: Parameters<typeof d.tasas.rec>[0]) => d.tasas.rec(r, d.cuentas);
+  const tasa = d.tasaRec;
   const instancias = esMes ? recurrentesDelMes(d.recurrentes, d.movimientos, periodo, tasa) : [];
   // Lo que va con tarjeta llega con el resumen: no se pide cargar a mano.
   const conTarjeta = new Set(d.cuentas.filter(c => c.esTarjeta).map(c => c.id));

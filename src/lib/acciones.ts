@@ -2,7 +2,7 @@ import { db, nuevoId } from "../db";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
 import type { SugerenciaRecurrente } from "./analisis";
 import { aUsd, cotizar } from "./cotizaciones";
-import { diasDelMes, periodoHoy, sumarDias } from "./fecha";
+import { periodoHoy, sumarDias, ultimoDia } from "./fecha";
 import { sinAcentos } from "./formato";
 
 export type Borrador = Omit<Movimiento, "id" | "usd" | "cotizacion" | "creado" | "modificado" | "exportado"> & { id?: string };
@@ -66,7 +66,7 @@ export async function terminarRecurrente(r: Recurrente) {
   const antes = await db.recurrentes.get(r.id);
   const p = periodoHoy();
   const pagadoEsteMes = (await db.movimientos.where("recurrenteId").equals(r.id).toArray()).some(m => m.periodo?.startsWith(p));
-  const fin = pagadoEsteMes ? `${p}-${String(diasDelMes(p)).padStart(2, "0")}` : sumarDias(`${p}-01`, -1);
+  const fin = pagadoEsteMes ? ultimoDia(p) : sumarDias(`${p}-01`, -1);
   await db.recurrentes.update(r.id, { fin });
   return async () => { if (antes) await db.recurrentes.put(antes); };
 }

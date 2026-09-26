@@ -5,12 +5,12 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
 import { eliminarMovimiento, guardarMovimiento } from "../lib/acciones";
-import { recurrentesDelMes } from "../lib/analisis";
-import { esClaro, nombraA, parecido } from "../lib/recurrentes";
-import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias, sumarMeses } from "../lib/fecha";
-import { leerNumero, num, redondear } from "../lib/formato";
+import { esClaro } from "../lib/recurrentes";
+import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias } from "../lib/fecha";
+import { leerNumero, num, redondear, simbolo } from "../lib/formato";
 import { cuotasDe, esDudosa, resumenDe, vencimiento } from "../lib/tarjeta";
 import { Hoja, Interruptor, Punto, Seg, useToast } from "../ui/piezas";
+import { categoriasPorUso, etiquetasSugeridas, gastosFrecuentes, useRecurrenteSugerido } from "./editorLogica";
 import { T } from "../ui/Icono";
 
 type Props = Extract<Pantalla, { p: "editor" }>;
@@ -84,32 +84,15 @@ export function Editor(props: Props) {
   const enUsd = tasa ? redondear(monto / tasa) : null;
 
   // Categorías: primero las que más usás para este tipo en los últimos 90 días.
-  const cats = useMemo(() => {
-    const desde = sumarDias(hoy(), -90);
-    const uso = new Map<string, number>();
-    for (const m of d.movimientos) if (m.tipo === tipo && m.fecha >= desde) uso.set(m.categoriaId, (uso.get(m.categoriaId) ?? 0) + 1);
-    return d.categorias.filter(c => c.tipo === tipo && (!c.archivada || c.id === categoriaId))
-      .sort((a, b) => (uso.get(b.id) ?? 0) - (uso.get(a.id) ?? 0) || a.orden - b.orden);
-  }, [d.categorias, d.movimientos, tipo, categoriaId]);
+  const cats = useMemo(() => categoriasPorUso(d.movimientos, d.categorias, tipo, categoriaId), [d.categorias, d.movimientos, tipo, categoriaId]);
   const visibles = todas ? cats : (() => {
     const top = cats.slice(0, 7);
     const sel = cats.find(c => c.id === categoriaId);
     return sel && !top.includes(sel) ? [...top.slice(0, 6), sel] : top;
   })();
 
-  // Lo que más repetís (mismo comercio o categoría, mismo monto): se carga con un toque.
-  const frecuentes = useMemo(() => {
-    if (existente || props.recurrenteId) return [];
-    const desde = sumarDias(hoy(), -60);
-    const grupos = new Map<string, { m: Movimiento; n: number }>();
-    for (const m of d.movimientos) {
-      if (m.tipo !== "gasto" || m.fecha < desde || m.recurrenteId || (m.cuotas ?? 1) > 1) continue;
-      const k = [m.categoriaId, (m.comentario ?? "").toLowerCase(), m.monto, m.moneda, m.cuentaId].join("|");
-      const g = grupos.get(k);
-      grupos.set(k, { m: !g || m.fecha > g.m.fecha ? m : g.m, n: (g?.n ?? 0) + 1 });
-    }
-    return [...grupos.values()].filter(g => g.n >= 2).sort((a, b) => b.n - a.n).slice(0, 6).map(g => g.m);
-  }, [d.movimientos, existente, props.recurrenteId]);
+  // Lo que más repetís: se carga con un toque (no al editar ni al pagar un recurrente).
+  const frecuentes = useMemo(() => (existente || props.recurrenteId ? [] : gastosFrecuentes(d.movimientos)), [d.movimientos, existente, props.recurrenteId]);
 
   async function repetir(m: Movimiento) {
     if (guardando) return;
@@ -120,35 +103,10 @@ export function Editor(props: Props) {
   }
 
   const ocultas = useLiveQuery(() => leerAjuste<string[]>("etiquetasOcultas", []), []) ?? [];
-  const etiquetasUsadas = useMemo(() => {
-    const cuenta = new Map<string, number>();
-    for (const m of d.movimientos) for (const e of m.etiquetas) cuenta.set(e, (cuenta.get(e) ?? 0) + 1);
-    return [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([e]) => e).filter(e => !ocultas.includes(e)).slice(0, 14);
-  }, [d.movimientos, ocultas]);
+  const etiquetasUsadas = useMemo(() => etiquetasSugeridas(d.movimientos, ocultas), [d.movimientos, ocultas]);
 
-  // ¿Es parte de un recurrente que falta pagar? Mismo tipo y categoría, este mes o el anterior.
-  // Los recurrentes sin pagar de este mes y el anterior: se calculan una vez por mes
-  // elegido, no en cada tecla del monto.
-  const periodoFecha = periodoDe(fecha);
-  const pendientesDelMes = useMemo(() => [periodoFecha, sumarMeses(periodoFecha, -1)]
-    .flatMap(p => recurrentesDelMes(d.recurrentes, d.movimientos, p, d.tasaRec))
-    .filter(i => i.estado !== "cargado"), [d.recurrentes, d.movimientos, d.tasaRec, periodoFecha]);
-
-  // ¿Este gasto es el pago de un recurrente pendiente? Se busca el más parecido
-  // (lo nombra en el comentario, misma categoría, monto cercano), este mes o el anterior.
-  const candidato = useMemo(() => {
-    if (vinculo || existente || (!categoriaId && !comentario.trim())) return null;
-    const tasaR = d.tasaRec;
-    const borrador = { id: "", tipo, fecha, monto: monto || 0, moneda, usd: enUsd, cuentaId, categoriaId, etiquetas: [], comentario, creado: "", modificado: "" } as Movimiento;
-    const insts = pendientesDelMes.filter(i => !rechazados.includes(i.rec.id + i.clave));
-    let mejor: { i: (typeof insts)[number]; s: number } | null = null;
-    for (const i of insts) {
-      // Sin monto todavía, alcanza con la categoría o el nombre para sugerir.
-      const sc = monto > 0 ? parecido({ ...borrador, fecha: i.fecha }, i, tasaR(i.rec)) : (nombraA(borrador, i.rec) ? 0 : i.rec.categoriaId === categoriaId && i.estado !== "proximo" ? 1 : null);
-      if (sc != null && (!mejor || sc < mejor.s)) mejor = { i, s: sc };
-    }
-    return mejor?.i ?? null;
-  }, [vinculo, categoriaId, comentario, fecha, tipo, monto, moneda, enUsd, cuentaId, pendientesDelMes, rechazados, existente]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ¿Este gasto es el pago de un recurrente pendiente?
+  const candidato = useRecurrenteSugerido(d, { tipo, fecha, monto, moneda, usd: enUsd, cuentaId, categoriaId, comentario }, !vinculo && !existente, rechazados);
 
   const recVinculado = vinculo ? d.recurrentes.find(r => r.id === vinculo.recurrenteId) : undefined;
   const esTarjeta = !!cuenta?.esTarjeta && tipo === "gasto";
@@ -218,7 +176,7 @@ export function Editor(props: Props) {
               return (
                 <button key={m.id} className="pill" onClick={() => repetir(m)}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: c?.color ?? "#555", display: "inline-block" }} />
-                  {m.comentario || c?.nombre} · {num(m.monto)} {m.moneda === "EUR" ? "€" : m.moneda === "ARS" ? "$" : "USD"}
+                  {m.comentario || c?.nombre} · {num(m.monto)} {simbolo(m.moneda)}
                 </button>
               );
             })}

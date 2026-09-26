@@ -5,13 +5,12 @@ import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Clase, type Frecuencia, type Moneda, type Recurrente, type Tipo } from "../tipos";
 import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincular, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
-import { DIAS_CORTOS, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
+import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { candidatos, estadoDe } from "../lib/recurrentes";
 import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
-const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 export function cadaCuanto(r: Recurrente) {
   switch (r.frecuencia) {
@@ -205,7 +204,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
   const r = d.recurrentes.find(r => r.id === id);
   if (!r) return <div className="pantalla sin-tabs"><div className="vacio">Este recurrente ya no existe.</div></div>;
   const fecha = clave.length === 7 ? fechaEnMes(clave, r.dia) : clave;
-  const e = estadoDe({ rec: r, clave, fecha: r.frecuencia === "una-vez" ? r.inicio : fecha }, d.movimientos, d.tasas.rec(r, d.cuentas));
+  const e = estadoDe({ rec: r, clave, fecha: r.frecuencia === "una-vez" ? r.inicio : fecha }, d.movimientos, d.tasaRec(r));
   const cta = new Map(d.cuentas.map(c => [c.id, c.nombre]));
   const titulo = clave.length === 7 ? nombreMes(clave, false) : fechaCorta(clave, false);
 
@@ -265,7 +264,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
         <h2>¿Cuál es el pago de {r.nombre}?</h2>
         <div className="mini tenue" style={{ marginBottom: 6 }}>Gastos de {titulo} sin vincular, los más parecidos primero.</div>
         {(() => {
-          const tasaR = d.tasas.rec(r, d.cuentas);
+          const tasaR = d.tasaRec(r);
           const parecidos = candidatos(e, d.movimientos, tasaR);
           const resto = d.movimientos.filter(m => m.tipo === r.tipo && !m.recurrenteId && m.fecha.slice(0, 7) === e.fecha.slice(0, 7) && !parecidos.includes(m)).sort((a, b) => b.fecha.localeCompare(a.fecha));
           const lista = [...parecidos, ...resto].slice(0, 25);

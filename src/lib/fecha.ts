@@ -30,6 +30,8 @@ export const diasDelMes = (periodo: string) => {
   const [a, m] = periodo.split("-").map(Number);
   return new Date(a, m, 0).getDate();
 };
+/** "2026-09-30" */
+export const ultimoDia = (periodo: string) => `${periodo}-${pad(diasDelMes(periodo))}`;
 /** El día `dia` de ese mes, recortado si el mes es más corto (31 → 30 de sep). */
 export const fechaEnMes = (periodo: string, dia: number) =>
   `${periodo}-${pad(Math.min(dia, diasDelMes(periodo)))}`;
@@ -37,7 +39,7 @@ export const fechaEnMes = (periodo: string, dia: number) =>
 export const diasEntre = (desde: string, hasta: string) =>
   Math.round((aFecha(hasta).getTime() - aFecha(desde).getTime()) / 86400000);
 
-const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+export const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 export const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];

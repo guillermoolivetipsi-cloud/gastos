@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
-import { aPagarTarjeta, recurrentesDelMes } from "../lib/analisis";
+import { aPagarTarjeta, descartesSet, recurrentesDelMes } from "../lib/analisis";
 import { cuotasFuturas, resumenQueVence } from "../lib/tarjeta";
 import { fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
@@ -44,7 +44,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
   const d = useDatos();
   const nav = useNav();
   const [verPagados, setVerPagados] = useState(false);
-  const tasa = (r: EstadoInstancia["rec"]) => d.tasas.rec(r, d.cuentas);
+  const tasa = d.tasaRec;
   const enUsd = (i: EstadoInstancia, x: number) => { const t = tasa(i.rec); return t ? x / t : 0; };
   const cuenta = new Map(d.cuentas.map(c => [c.id, c]));
   const cat = new Map(d.categorias.map(c => [c.id, c]));
@@ -63,7 +63,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
   const pagado = redondear(deCuenta.reduce((s, i) => s + enUsd(i, Math.min(i.pagado, i.esperado)), 0));
 
   const toast = useToast();
-  const descartados = new Set(d.descartes.map(x => x.clave));
+  const descartados = descartesSet(d.descartes);
   const sugeridos = sugerirVinculos(insts, d.movimientos, tasa, (m, r) => descartados.has(`vinc|${m}|${r}`));
   async function esEste(m: (typeof d.movimientos)[number], i: EstadoInstancia) {
     const deshacer = await vincular(m.id, i.rec.id, i.clave);
@@ -198,7 +198,7 @@ function Tarjetas({ periodo }: { periodo: string }) {
   const d = useDatos();
   const nav = useNav();
   const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada);
-  const tasaR = (r: EstadoInstancia["rec"]) => d.tasas.rec(r, d.cuentas);
+  const tasaR = d.tasaRec;
   const aPagar = tarjetas.map(c => aPagarTarjeta(c, d.movimientos, d.recurrentes, periodo, tasaR));
   const total = redondear(aPagar.reduce((s, x) => s + x.total, 0));
   const hayEstimados = aPagar.some(x => (x.resumen.items.length || x.insts.length) && !x.resumen.confirmado);

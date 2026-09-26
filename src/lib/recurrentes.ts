@@ -1,8 +1,8 @@
 import { db } from "../db";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
 import { cotizar, aUsd } from "./cotizaciones";
-import { aFecha, diasDelMes, fechaEnMes, hoy, periodoDe, sumarMeses } from "./fecha";
-import { redondear, sinAcentos } from "./formato";
+import { aFecha, diasDelMes, fechaEnMes, hoy, periodoDe, sumarDias, sumarMeses } from "./fecha";
+import { agrupar, redondear, sinAcentos } from "./formato";
 
 /* Un recurrente es algo que se repite: el alquiler, las expensas, un ingreso.
    Cada vez que toca es una "instancia", con su clave:
@@ -24,7 +24,7 @@ export function instanciasDelMes(r: Recurrente, periodo: string): Instancia[] {
   const dentro = (f: string) => f >= r.inicio && (!r.fin || f <= r.fin);
   if (r.frecuencia === "semanal") {
     for (let d = 1; d <= diasDelMes(periodo); d++) {
-      const f = `${periodo}-${String(d).padStart(2, "0")}`;
+      const f = fechaEnMes(periodo, d);
       if (aFecha(f).getDay() === r.dia && dentro(f)) out.push({ rec: r, clave: f, fecha: f });
     }
   } else if (r.frecuencia === "una-vez") {
@@ -36,6 +36,15 @@ export function instanciasDelMes(r: Recurrente, periodo: string): Instancia[] {
     if (periodo >= periodoDe(r.inicio) && (!r.fin || f <= r.fin)) out.push({ rec: r, clave: periodo, fecha: f });
   }
   return out.filter(i => !r.saltear?.includes(i.clave));
+}
+
+/** Los pagos de cada recurrente. Se arma una vez por versión de los datos: el
+ *  arreglo de movimientos cambia de identidad cada vez que la base cambia. */
+const indices = new WeakMap<Movimiento[], Map<string, Movimiento[]>>();
+export function pagosPorRecurrente(movs: Movimiento[]) {
+  let m = indices.get(movs);
+  if (!m) { m = agrupar(movs.filter(x => x.recurrenteId), x => x.recurrenteId!); indices.set(movs, m); }
+  return m;
 }
 
 export type Estado = "cargado" | "parcial" | "por-cargar" | "proximo";
@@ -64,10 +73,7 @@ function pagadoEn(r: Recurrente, pagos: Movimiento[], tasaRec: number | null) {
 
 /** Para los variables: el promedio de las últimas 3 veces que se pagó. */
 function estimado(r: Recurrente, historia: Movimiento[], clave: string, tasaRec: number | null) {
-  const porClave = new Map<string, Movimiento[]>();
-  for (const m of historia) if (m.recurrenteId === r.id && m.periodo! < clave) {
-    porClave.set(m.periodo!, [...(porClave.get(m.periodo!) ?? []), m]);
-  }
+  const porClave = agrupar(historia.filter(m => m.recurrenteId === r.id && m.periodo! < clave), m => m.periodo!);
   const ultimas = [...porClave.keys()].sort().slice(-3).map(k => pagadoEn(r, porClave.get(k)!, tasaRec));
   if (!ultimas.length) return r.monto;
   return redondear(ultimas.reduce((a, b) => a + b, 0) / ultimas.length);
@@ -188,9 +194,14 @@ export function esClaro(m: Pick<Movimiento, "monto" | "moneda" | "comentario">, 
  *  la que más se parece, y cada instancia recibe como mucho uno. */
 export function sugerirVinculos(insts: EstadoInstancia[], movs: Movimiento[], tasa: (r: Recurrente) => number | null, descartado: (movId: string, recId: string) => boolean) {
   const pares: { inst: EstadoInstancia; mov: Movimiento; s: number }[] = [];
-  for (const inst of insts) {
-    if (inst.estado === "cargado") continue;
-    for (const mov of movs) {
+  const pendientes = insts.filter(i => i.estado !== "cargado");
+  if (!pendientes.length) return new Map<string, Movimiento>();
+  // Solo importan los gastos sueltos del mes de cada instancia (±3 días en las semanales).
+  const fechas = pendientes.map(i => i.fecha).sort();
+  const desde = sumarDias(`${periodoDe(fechas[0])}-01`, -3), hasta = sumarDias(fechaEnMes(periodoDe(fechas[fechas.length - 1]), 31), 3);
+  const cerca = movs.filter(m => !m.recurrenteId && m.fecha >= desde && m.fecha <= hasta);
+  for (const inst of pendientes) {
+    for (const mov of cerca) {
       const s = parecido(mov, inst, tasa(inst.rec));
       if (s != null && !descartado(mov.id, inst.rec.id)) pares.push({ inst, mov, s });
     }

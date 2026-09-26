@@ -32,4 +32,11 @@ export function leerNumero(s: string): number {
 /** "Categoría" y "categoria" son lo mismo al comparar. */
 export const sinAcentos = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
+/** Agrupa en un Map sin copiar arreglos en cada paso (lineal, no cuadrático). */
+export function agrupar<T, K>(xs: Iterable<T>, clave: (x: T) => K): Map<K, T[]> {
+  const m = new Map<K, T[]>();
+  for (const x of xs) { const k = clave(x); const g = m.get(k); if (g) g.push(x); else m.set(k, [x]); }
+  return m;
+}
+
 export const redondear = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d;

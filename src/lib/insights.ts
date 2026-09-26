@@ -1,15 +1,20 @@
 import type { Categoria, Cuenta, Movimiento, Recurrente } from "../tipos";
-import { aPagarTarjeta, recurrentesDelMes } from "./analisis";
+import { aPagarTarjeta, recurrentesDelMes, suma } from "./analisis";
 import { periodoDe, sumarMeses } from "./fecha";
-import { redondear } from "./formato";
+import { agrupar, redondear } from "./formato";
 import { cuotasFuturas } from "./tarjeta";
 import type { EstadoInstancia } from "./recurrentes";
 
 /* "Cómo venís": datos del mes para decidir algo, sin juicios. Todo en USD. */
 
 type Tasa = (r: Recurrente) => number | null;
-const gastosDe = (movs: Movimiento[], p: string) => movs.filter(m => m.tipo === "gasto" && periodoDe(m.fecha) === p);
-const suma = (ms: Movimiento[]) => redondear(ms.reduce((s, m) => s + (m.usd ?? 0), 0));
+/** Los gastos agrupados por mes, una vez por versión de los datos. */
+const porMes = new WeakMap<Movimiento[], Map<string, Movimiento[]>>();
+function gastosDe(movs: Movimiento[], p: string) {
+  let m = porMes.get(movs);
+  if (!m) { m = agrupar(movs.filter(x => x.tipo === "gasto"), x => periodoDe(x.fecha)); porMes.set(movs, m); }
+  return m.get(p) ?? [];
+}
 
 /** Un mes tiene la tarjeta completa si hay cobros de tarjeta desde los primeros días
  *  (antes de septiembre la app anterior no los registraba bien). */
@@ -77,9 +82,11 @@ export function calcularInsights(p: string, movs: Movimiento[], cats: Categoria[
 
   // 4 · Qué cambió contra el promedio de los 3 meses anteriores (con datos)
   const cambios: Insights["cambios"] = [];
+  const ahoraPorCat = agrupar(gastos, m => m.categoriaId);
+  const previosPorCat = [1, 2, 3].map(k => agrupar(gastosDe(movs, sumarMeses(p, -k)), m => m.categoriaId));
   for (const c of cats.filter(c => c.tipo === "gasto")) {
-    const ahora = suma(gastos.filter(m => m.categoriaId === c.id));
-    const prev = [1, 2, 3].map(k => suma(gastosDe(movs, sumarMeses(p, -k)).filter(m => m.categoriaId === c.id)));
+    const ahora = suma(ahoraPorCat.get(c.id) ?? []);
+    const prev = previosPorCat.map(g => suma(g.get(c.id) ?? []));
     if (!prev.some(x => x > 0) && !ahora) continue;
     const promedio = redondear(prev.reduce((a, b) => a + b, 0) / 3);
     const dif = redondear(ahora - promedio);

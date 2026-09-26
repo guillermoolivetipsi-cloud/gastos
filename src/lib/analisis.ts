@@ -1,8 +1,8 @@
 import type { Categoria, Clase, Cuenta, Descarte, Movimiento, Recurrente } from "../tipos";
-import { diasDelMes, diasEntre, hoy, periodoDe, periodoHoy, sumarDias, sumarMeses } from "./fecha";
-import { num, redondear, sinAcentos } from "./formato";
+import { diasDelMes, diasEntre, fechaEnMes, hoy, periodoDe, periodoHoy, sumarDias, sumarMeses } from "./fecha";
+import { agrupar, num, redondear, sinAcentos } from "./formato";
 import { esDudosa, fechaCierre, resumenQueVence } from "./tarjeta";
-import { estadoDe, instanciasDelMes, type EstadoInstancia } from "./recurrentes";
+import { estadoDe, instanciasDelMes, pagosPorRecurrente, type EstadoInstancia } from "./recurrentes";
 
 export const usdDe = (m: Movimiento) => m.usd ?? 0;
 export const suma = (ms: Movimiento[]) => redondear(ms.reduce((s, m) => s + usdDe(m), 0));
@@ -16,8 +16,7 @@ export interface PorCategoria {
 
 export function porCategoria(movs: Movimiento[], cats: Categoria[]): PorCategoria[] {
   const total = suma(movs);
-  const map = new Map<string, Movimiento[]>();
-  for (const m of movs) map.set(m.categoriaId, [...(map.get(m.categoriaId) ?? []), m]);
+  const map = agrupar(movs, m => m.categoriaId);
   const porId = new Map(cats.map(c => [c.id, c]));
   return [...map.entries()]
     .map(([id, ms]) => {
@@ -142,19 +141,13 @@ const normal = sinAcentos;
 export function detectarRecurrentes(movs: Movimiento[], cats: Categoria[], recs: Recurrente[], descartes: Set<string>): SugerenciaRecurrente[] {
   const desde = sumarMeses(periodoHoy(), -4);
   const recientes = movs.filter(m => !m.recurrenteId && periodoDe(m.fecha) >= desde && periodoDe(m.fecha) < periodoHoy());
-  const grupos = new Map<string, Movimiento[]>();
-  for (const m of recientes) {
-    const texto = normal(m.comentario || m.etiquetas[0] || "");
-    const k = `${m.tipo}|${m.categoriaId}|${texto}`;
-    grupos.set(k, [...(grupos.get(k) ?? []), m]);
-  }
+  const grupos = agrupar(recientes, m => `${m.tipo}|${m.categoriaId}|${normal(m.comentario || m.etiquetas[0] || "")}`);
   const yaHay = new Set(recs.map(r => `${r.categoriaId}|${normal(r.nombre)}`));
   const catNombre = new Map(cats.map(c => [c.id, c.nombre]));
   const out: SugerenciaRecurrente[] = [];
   for (const [k, ms] of grupos) {
     if (descartes.has(`rec|${k}`)) continue;
-    const porMes = new Map<string, Movimiento[]>();
-    for (const m of ms) porMes.set(periodoDe(m.fecha), [...(porMes.get(periodoDe(m.fecha)) ?? []), m]);
+    const porMes = agrupar(ms, m => periodoDe(m.fecha));
     if (porMes.size < 3 || [...porMes.values()].some(x => x.length > 1)) continue;
     const [, catId, texto] = k.split("|");
     const nombre = texto ? (ms[0].comentario || ms[0].etiquetas[0])! : catNombre.get(catId) ?? "Recurrente";
@@ -179,7 +172,7 @@ export interface CambioPrecio { rec: Recurrente; antes: number; ahora: number; c
 export function cambiosDePrecio(recs: Recurrente[], movs: Movimiento[], descartes: Set<string>): CambioPrecio[] {
   const out: CambioPrecio[] = [];
   for (const r of recs.filter(r => r.activo && r.clase === "fijo")) {
-    const pagos = movs.filter(m => m.recurrenteId === r.id && m.moneda === r.moneda);
+    const pagos = (pagosPorRecurrente(movs).get(r.id) ?? []).filter(m => m.moneda === r.moneda);
     const porClave = new Map<string, number>();
     for (const p of pagos) porClave.set(p.periodo!, (porClave.get(p.periodo!) ?? 0) + p.monto);
     const claves = [...porClave.keys()].sort();
@@ -204,16 +197,18 @@ export function cierresDudosos(cuentas: Cuenta[], movs: Movimiento[]): CierreDud
     for (const m of movs) if (m.cuentaId === c.id && esDudosa(c, m.fecha) && m.fecha <= hoy())
       porMes.set(periodoDe(m.fecha), (porMes.get(periodoDe(m.fecha)) ?? 0) + 1);
     for (const [periodo, compras] of porMes)
-      if (diasEntre(`${periodo}-${String(c.cierreDesde ?? 5).padStart(2, "0")}`, hoy()) >= 0) out.push({ cuenta: c, periodo, compras });
+      if (diasEntre(fechaEnMes(periodo, c.cierreDesde ?? 5), hoy()) >= 0) out.push({ cuenta: c, periodo, compras });
   }
   return out;
 }
 
 /** Todas las instancias de recurrentes del mes, con su estado. */
 export function recurrentesDelMes(recs: Recurrente[], movs: Movimiento[], periodo: string, tasa: (r: Recurrente) => number | null) {
+  // Cada instancia mira solo los pagos de su recurrente, no todos los movimientos.
+  const pagos = pagosPorRecurrente(movs);
   return recs
     .flatMap(r => instanciasDelMes(r, periodo))
-    .map(i => estadoDe(i, movs, tasa(i.rec)))
+    .map(i => estadoDe(i, pagos.get(i.rec.id) ?? [], tasa(i.rec)))
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 

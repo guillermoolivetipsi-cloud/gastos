@@ -26,7 +26,9 @@ const horaActual = () => { const d = new Date(); return `${String(d.getHours()).
 export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], resumenesCargados: Record<string, string>, ultimaExportacion: string | null, hechas: Set<string>): Tarea[] {
   const out: Tarea[] = [];
   const h = hoy(), dia = Number(h.slice(8)), anterior = sumarMeses(periodoHoy(), -1);
-  const primerMes = movs.length ? movs.map(m => periodoDe(m.fecha)).sort()[0] : periodoHoy();
+  let primera = hoy();
+  for (const m of movs) if (m.fecha < primera) primera = m.fecha;
+  const primerMes = periodoDe(primera);
 
   if (r.diario.activo && horaActual() >= r.diario.hora && !movs.some(m => diaLocal(m.creado) === h || m.fecha === h)) {
     const clave = `diario|${h}`;

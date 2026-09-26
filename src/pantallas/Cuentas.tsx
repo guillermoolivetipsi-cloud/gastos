@@ -3,7 +3,7 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav } from "../nav";
 import { MONEDAS, type Cuenta, type Dolar, type Moneda } from "../tipos";
-import { diasDelMes, fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
+import { fechaCorta, nombreMes, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
 import { num } from "../lib/formato";
 import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
 import { Interruptor, Seg, useToast } from "../ui/piezas";
@@ -121,7 +121,7 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
       <div className="caja">
         <div className="fila" style={{ padding: 0 }}>
           <span className="chico">{r.confirmado ? "Cierre confirmado" : "Cierre estimado"}</span>
-          <input type="date" value={r.cierre} min={`${periodo}-01`} max={`${periodo}-${String(diasDelMes(periodo)).padStart(2, "0")}`}
+          <input type="date" value={r.cierre} min={`${periodo}-01`} max={ultimoDia(periodo)}
             onChange={e => e.target.value && confirmarCierre(Number(e.target.value.slice(8)))} style={{ color: "var(--viol-claro)" }} aria-label="Día de cierre" />
         </div>
         {r.confirmado

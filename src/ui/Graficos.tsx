@@ -1,5 +1,5 @@
 import type { Movimiento } from "../tipos";
-import { DIAS_CORTOS, aFecha, diasEntre, hoy, mesCorto, sumarDias } from "../lib/fecha";
+import { DIAS_CORTOS, aFecha, diasEntre, hoy, mesCorto, sumarDias, sumarMeses } from "../lib/fecha";
 import { num } from "../lib/formato";
 
 /** Barras por día (semana, mes, período corto) o por mes (año, período largo),
@@ -12,8 +12,7 @@ export function PorTiempo({ movs, desde, hasta }: { movs: Movimiento[]; desde: s
     for (let f = desde; f <= hasta; ) {
       const p = f.slice(0, 7);
       tramos.push({ clave: p, etiqueta: mesCorto(p)[0].toUpperCase(), total: 0, futuro: `${p}-01` > hoy() });
-      const d = aFecha(f); d.setMonth(d.getMonth() + 1, 1);
-      f = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+      f = `${sumarMeses(p, 1)}-01`;
     }
   } else {
     for (let i = 0; i < dias; i++) {

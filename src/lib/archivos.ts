@@ -4,7 +4,7 @@ const xlsx = () => import("xlsx");
 import { db, guardarAjuste, nuevoId, sembrar } from "../db";
 import type { Categoria, Clase, Cuenta, Moneda, Movimiento, Recurrente, Tipo } from "../tipos";
 import { aTexto, periodoDe } from "./fecha";
-import { aUsd, precargarHistoria, cotizar } from "./cotizaciones";
+import { aUsd, cotizar, guardarCache, leerCache, precargarHistoria } from "./cotizaciones";
 
 /* ── Exportar a Finanzas ──────────────────────────────────────────────────
    Mismo formato que la app anterior, que es el que lee `lib/importar.ts` de
@@ -135,15 +135,18 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
   }
 
   avance?.("Buscando cotizaciones…");
-  await precargarHistoria(nuevos.map(m => m.fecha));
+  // Cotizaciones: se leen una vez, se completan en memoria y se guardan una vez.
+  const memo = await leerCache();
+  await precargarHistoria(nuevos.filter(m => m.moneda !== "USD").map(m => m.fecha), memo);
   let i = 0;
   for (const m of nuevos) {
     if (m.usd == null) {
-      const cot = await cotizar(m.moneda, m.fecha, cuentas.find(c => c.id === m.cuentaId)?.dolar ?? "blue");
+      const cot = await cotizar(m.moneda, m.fecha, cuentas.find(c => c.id === m.cuentaId)?.dolar ?? "blue", memo);
       if (cot) { m.usd = aUsd(m.monto, cot.tasa); m.cotizacion = cot; } else res.sinCotizar++;
     }
     if (++i % 200 === 0) avance?.(`Convirtiendo ${i} de ${nuevos.length}…`);
   }
+  await guardarCache(memo);
   // Categorías, cuentas y movimientos nuevos entran juntos: o todo, o nada.
   await db.transaction("rw", [db.categorias, db.cuentas, db.movimientos], async () => {
     await db.categorias.bulkAdd(catsNuevas);
