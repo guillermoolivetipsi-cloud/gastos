@@ -33,6 +33,9 @@ export function Mas() {
         {item({ p: "exportar" }, <T.IconFileExport size={20} />, "Exportar a Finanzas")}
         {item({ p: "respaldo" }, <T.IconDatabaseExport size={20} />, "Copia de seguridad e importar")}
       </div>
+      <div className="caja lista">
+        {item({ p: "ajustes" }, <T.IconSettings size={20} />, "Ajustes")}
+      </div>
       <div className="mini tenue centro" style={{ marginTop: 20 }}>Los totales se muestran en USD. Tus datos quedan solo en este celular.</div>
     </div>
   );

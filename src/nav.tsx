@@ -20,7 +20,8 @@ export type Pantalla =
   | { p: "objetivos" }
   | { p: "revisar" }
   | { p: "exportar" }
-  | { p: "respaldo" };
+  | { p: "respaldo" }
+  | { p: "ajustes" };
 
 type Nav = {
   solapa: Solapa;

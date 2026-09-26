@@ -9,6 +9,7 @@ import { fechaCorta, hoy, moverAncla, periodoDe, periodoHoy, rango, tituloRango,
 import { num, usd } from "../lib/formato";
 import { pendientes } from "../lib/revisar";
 import { Barra, Dona, Hoja, Punto } from "../ui/piezas";
+import { PorTiempo, Rectangulos, type TipoGrafico } from "../ui/Graficos";
 import { T } from "../ui/Icono";
 
 const VISTAS: [Vista, string][] = [["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"], ["anio", "Año"], ["periodo", "Período"]];
@@ -17,12 +18,14 @@ export function Resumen() {
   const d = useDatos();
   const nav = useNav();
   const [tipo, setTipo] = useState<Tipo>("gasto");
-  const [vista, setVista] = useState<Vista>("mes");
+  // Abre siempre en la semana: es lo que se mira todos los días.
+  const [vista, setVista] = useState<Vista>("semana");
   const [ancla, setAncla] = useState(hoy());
   const [hasta, setHasta] = useState(hoy());
   const [elegirPeriodo, setElegirPeriodo] = useState(false);
   const [detalle, setDetalle] = useState<Categoria | null>(null);
   const ultimoRespaldo = useLiveQuery(() => leerAjuste<string | null>("ultimoRespaldo", null), []);
+  const grafico = useLiveQuery(() => leerAjuste<TipoGrafico>("grafico", "dia"), []) ?? "dia";
 
   const [desde, fin] = rango(vista, ancla, hasta);
   const movs = useMemo(() => d.movimientos.filter(m => m.tipo === tipo && m.fecha >= desde && m.fecha <= fin), [d.movimientos, tipo, desde, fin]);
@@ -110,11 +113,16 @@ export function Resumen() {
         </div>
       )}
 
-      <Dona
-        partes={cats.map(c => ({ valor: c.total, color: c.cat.color }))}
-        centro={total ? `${num(total)} USD` : vacio}
-        sub={total ? undefined : enEsto}
-      />
+      {grafico === "torta" ? (
+        <Dona partes={cats.map(c => ({ valor: c.total, color: c.cat.color }))} centro={total ? `${num(total)} USD` : vacio} sub={total ? undefined : enEsto} />
+      ) : (
+        <div className="fila" style={{ padding: "4px 2px 10px" }}>
+          <span className="tenue chico">{total ? `Total ${enEsto}` : `${vacio} ${enEsto}`}</span>
+          {total > 0 && <span className="mediano num">{num(total)} <span className="chico tenue">USD</span></span>}
+        </div>
+      )}
+      {grafico === "dia" && vista !== "dia" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
+      {grafico === "rectangulos" && <Rectangulos cats={cats} tocar={c => setDetalle(c.cat)} />}
 
       {cats.length > 0 && (
         <div className="caja lista">
@@ -122,6 +130,7 @@ export function Resumen() {
             const obj = esMes && c.cat.objetivo ? c.cat.objetivo : null;
             const pasado = obj != null && c.total > obj;
             const ritmo = obj != null && avance != null && c.total > obj * avance * 1.05 && !pasado;
+            const ranking = obj == null && (grafico === "dia" || grafico === "barras");
             return (
               <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -134,6 +143,7 @@ export function Resumen() {
                   </span>
                 </div>
                 {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} marca={avance} /></div>}
+                {ranking && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / cats[0].total} color={c.cat.color} /></div>}
               </button>
             );
           })}

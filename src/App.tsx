@@ -13,6 +13,7 @@ import { EditorCuenta, ListaCuentas, Tarjeta } from "./pantallas/Cuentas";
 import { EditorRecurrente, Instancia, ListaRecurrentes } from "./pantallas/Recurrentes";
 import { Revisar } from "./pantallas/Revisar";
 import { Exportar, Respaldo } from "./pantallas/Archivos";
+import { Ajustes } from "./pantallas/Ajustes";
 import { T } from "./ui/Icono";
 
 function Encima({ p }: { p: Pantalla }) {
@@ -30,6 +31,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "revisar": return <Revisar />;
     case "exportar": return <Exportar />;
     case "respaldo": return <Respaldo />;
+    case "ajustes": return <Ajustes />;
   }
 }
 
