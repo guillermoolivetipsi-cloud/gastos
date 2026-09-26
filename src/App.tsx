@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNav, type Pantalla, type Solapa } from "./nav";
-import { sembrar } from "./db";
+import { leerAjuste, sembrar } from "./db";
+import { registrar } from "./lib/notificaciones";
 import { completarPendientes } from "./lib/cotizaciones";
 import { cargarAutomaticos } from "./lib/recurrentes";
 import { Resumen } from "./pantallas/Resumen";
@@ -53,6 +54,8 @@ export function App() {
     const ponerAlDia = async () => { await sembrar(); await cargarAutomaticos(); await completarPendientes(); };
     ponerAlDia();
     navigator.storage?.persist?.();
+    // Si los avisos están activados, se vuelve a registrar la revisión periódica.
+    leerAjuste<boolean>("notificaciones", false).then(on => { if (on) registrar(); });
     const alVolver = () => document.visibilityState === "visible" && ponerAlDia();
     document.addEventListener("visibilitychange", alVolver);
     window.addEventListener("online", ponerAlDia);

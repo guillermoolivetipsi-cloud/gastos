@@ -10,6 +10,15 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // Service worker propio (src/sw.ts): además de guardar la app para usarla sin
+      // conexión, revisa los pendientes cuando Android la despierta y avisa.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,png,woff2}"],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
       includeAssets: ["favicon.png", "apple-touch-icon.png"],
       manifest: {
         name: "Gastos",
@@ -27,10 +36,6 @@ export default defineConfig({
           { src: "icono-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
           { src: "icono-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
-      },
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,png,woff2}"],
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
     }),
   ],
