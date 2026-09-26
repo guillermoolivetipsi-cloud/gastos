@@ -97,5 +97,7 @@ export function resumenQueVence(c: Cuenta, movs: Movimiento[], periodo: string):
   for (const q of [sumarMeses(periodo, -1), periodo]) {
     if (vencimiento(c, q).slice(0, 7) === periodo) return resumen(c, movs, q);
   }
-  return resumen(c, movs, periodo);
+  // Ningún resumen vence este mes (por ejemplo, si un cierre confirmado lo corrió):
+  // no hay nada que pagar, en lugar de mostrar el del mes siguiente.
+  return resumen(c, [], periodo);
 }

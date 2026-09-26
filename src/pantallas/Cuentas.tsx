@@ -3,7 +3,7 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav } from "../nav";
 import { MONEDAS, type Cuenta, type Dolar, type Moneda } from "../tipos";
-import { fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
+import { diasDelMes, fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num } from "../lib/formato";
 import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
 import { Interruptor, Seg, useToast } from "../ui/piezas";
@@ -94,8 +94,11 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
   const cat = new Map(d.categorias.map(c => [c.id, c.nombre]));
   const porCompra = new Map<string, typeof futuras>();
   for (const q of futuras) porCompra.set(q.mov.id, [...(porCompra.get(q.mov.id) ?? []), q]);
-  const dias = Array.from({ length: (c.cierreHasta ?? 10) - (c.cierreDesde ?? 5) + 1 }, (_, i) => (c.cierreDesde ?? 5) + i);
 
+  async function borrarCierre() {
+    const { [periodo]: _, ...resto } = c!.cierres ?? {};
+    await db.cuentas.update(c!.id, { cierres: resto });
+  }
   async function confirmarCierre(dia: number) {
     await db.cuentas.update(c!.id, { cierres: { ...(c!.cierres ?? {}), [periodo]: dia } });
   }
@@ -118,12 +121,17 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
         {r.enCuotas > 0 && <div className="fila chico" style={{ paddingBottom: 0 }}><span className="tenue">en cuotas {num(r.enCuotas)}</span><span className="tenue">en un pago {num(r.enUnPago)}</span></div>}
       </div>
 
-      <div className={`caja${r.confirmado ? "" : " aviso"}`}>
-        <div className={r.confirmado ? "chico" : "ambar chico"} style={{ marginBottom: 6 }}>
-          <T.IconCalendarQuestion size={15} style={{ verticalAlign: -2 }} /> {r.confirmado ? `Cerró el ${c.cierres![periodo]} de ${nombreMes(periodo, false)}` : `¿Qué día cerró en ${nombreMes(periodo, false)}?`}
+      {/* El cierre real sale del resumen al subirlo; acá se puede corregir a mano
+          (cualquier día) o volver al estimado. */}
+      <div className="caja">
+        <div className="fila" style={{ padding: 0 }}>
+          <span className="chico">{r.confirmado ? "Cierre confirmado" : "Cierre estimado"}</span>
+          <input type="date" value={r.cierre} min={`${periodo}-01`} max={`${periodo}-${String(diasDelMes(periodo)).padStart(2, "0")}`}
+            onChange={e => e.target.value && confirmarCierre(Number(e.target.value.slice(8)))} style={{ color: "var(--viol-claro)" }} aria-label="Día de cierre" />
         </div>
-        <div className="pills">{dias.map(n => <button key={n} className={`pill${c.cierres?.[periodo] === n ? " on" : ""}`} onClick={() => confirmarCierre(n)}>{n}</button>)}</div>
-        {!r.confirmado && <div className="mini tenue">Lo sacás del resumen. Hasta que lo confirmes, uso el {c.cierreHasta}.</div>}
+        {r.confirmado
+          ? <button className="mini viol" onClick={borrarCierre}>Volver al estimado (día {c.cierreHasta ?? 31})</button>
+          : <div className="mini tenue">Se confirma solo al subir el resumen, o elegilo acá.</div>}
       </div>
 
       <button className="btn1" style={{ width: "100%", marginBottom: 10 }} onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: c.id })}>

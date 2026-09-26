@@ -45,3 +45,12 @@ describe("lo que se paga en un mes", () => {
     expect(r.total).toBe(10);
   });
 });
+
+describe("un cierre confirmado viejo", () => {
+  it("si ningún resumen vence en el mes, no muestra el del mes siguiente", () => {
+    const movs = [mov({ fecha: "2026-09-20", usd: 5 })];
+    // Septiembre confirmado el 10: ese resumen vence el 20/9 y el siguiente el 10/11.
+    const r = resumenQueVence({ ...visa, cierres: { "2026-09": 10 } }, movs, "2026-10");
+    expect(r.items).toEqual([]);
+  });
+});
