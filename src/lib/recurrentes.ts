@@ -1,0 +1,118 @@
+import { db, nuevoId } from "../db";
+import type { Cuenta, Movimiento, Recurrente } from "../tipos";
+import { cotizar, aUsd } from "./cotizaciones";
+import { aFecha, diasDelMes, fechaEnMes, hoy, periodoDe, sumarMeses } from "./fecha";
+import { redondear } from "./formato";
+
+/* Un recurrente es algo que se repite: el alquiler, las expensas, un ingreso.
+   Cada vez que toca es una "instancia", con su clave:
+   - mensual, anual o una vez → el período "2026-10"
+   - semanal → la fecha "2026-10-06"
+   Los pagos son movimientos comunes con `recurrenteId` y `periodo` = esa clave,
+   y puede haber varios (pagos parciales). "Una vez" sirve para un gasto que
+   pagás en partes y no se repite. */
+
+export interface Instancia {
+  rec: Recurrente;
+  clave: string;
+  fecha: string;
+}
+
+export function instanciasDelMes(r: Recurrente, periodo: string): Instancia[] {
+  if (!r.activo) return [];
+  const out: Instancia[] = [];
+  const dentro = (f: string) => f >= r.inicio && (!r.fin || f <= r.fin);
+  if (r.frecuencia === "semanal") {
+    for (let d = 1; d <= diasDelMes(periodo); d++) {
+      const f = `${periodo}-${String(d).padStart(2, "0")}`;
+      if (aFecha(f).getDay() === r.dia && dentro(f)) out.push({ rec: r, clave: f, fecha: f });
+    }
+  } else if (r.frecuencia === "una-vez") {
+    if (periodoDe(r.inicio) === periodo) out.push({ rec: r, clave: periodo, fecha: r.inicio });
+  } else {
+    if (r.frecuencia === "anual" && Number(periodo.slice(5)) !== r.mes) return [];
+    const f = fechaEnMes(periodo, r.dia);
+    // El mes de inicio cuenta aunque el día ya haya pasado.
+    if (periodo >= periodoDe(r.inicio) && (!r.fin || f <= r.fin)) out.push({ rec: r, clave: periodo, fecha: f });
+  }
+  return out.filter(i => !r.saltear?.includes(i.clave));
+}
+
+export type Estado = "cargado" | "parcial" | "por-cargar" | "proximo";
+
+export interface EstadoInstancia extends Instancia {
+  esperado: number; // en la moneda del recurrente
+  pagado: number;
+  falta: number;
+  estado: Estado;
+  pagos: Movimiento[];
+  /** Variable sin pagos: el monto es un estimado. */
+  estimado: boolean;
+}
+
+/** Lo pagado, en la moneda del recurrente. Si pagaste desde otra moneda se pasa
+ *  por USD con las cotizaciones de cada pago. */
+function pagadoEn(r: Recurrente, pagos: Movimiento[], tasaRec: number | null) {
+  return redondear(pagos.reduce((s, p) => {
+    if (p.moneda === r.moneda) return s + p.monto;
+    if (p.usd != null && tasaRec) return s + p.usd * tasaRec;
+    return s;
+  }, 0));
+}
+
+/** Para los variables: el promedio de las últimas 3 veces que se pagó. */
+function estimado(r: Recurrente, historia: Movimiento[], clave: string, tasaRec: number | null) {
+  const porClave = new Map<string, Movimiento[]>();
+  for (const m of historia) if (m.recurrenteId === r.id && m.periodo! < clave) {
+    porClave.set(m.periodo!, [...(porClave.get(m.periodo!) ?? []), m]);
+  }
+  const ultimas = [...porClave.keys()].sort().slice(-3).map(k => pagadoEn(r, porClave.get(k)!, tasaRec));
+  if (!ultimas.length) return r.monto;
+  return redondear(ultimas.reduce((a, b) => a + b, 0) / ultimas.length);
+}
+
+export function estadoDe(i: Instancia, movs: Movimiento[], tasaRec: number | null): EstadoInstancia {
+  const r = i.rec;
+  const pagos = movs.filter(m => m.recurrenteId === r.id && m.periodo === i.clave);
+  const pagado = pagadoEn(r, pagos, tasaRec);
+  const esperado = r.clase === "variable" ? estimado(r, movs, i.clave, tasaRec) : r.monto;
+  let estado: Estado;
+  if (pagos.length && (r.clase === "variable" || pagado >= esperado * 0.99)) estado = "cargado";
+  else if (pagos.length) estado = "parcial";
+  else estado = i.fecha <= hoy() ? "por-cargar" : "proximo";
+  const esperadoFinal = r.clase === "variable" && pagos.length ? pagado : esperado;
+  return {
+    ...i, pagos, pagado, estado,
+    esperado: esperadoFinal,
+    falta: redondear(Math.max(0, esperadoFinal - pagado)),
+    estimado: r.clase === "variable" && !pagos.length,
+  };
+}
+
+/** Los recurrentes en modo "se carga solo" que ya vencieron y no tienen pago. */
+export async function cargarAutomaticos() {
+  const recs = (await db.recurrentes.toArray()).filter(r => r.activo && r.modo === "auto");
+  if (!recs.length) return 0;
+  const cuentas = new Map((await db.cuentas.toArray()).map(c => [c.id, c] as [string, Cuenta]));
+  const h = hoy();
+  let n = 0;
+  for (const r of recs) {
+    for (let p = periodoDe(r.inicio); p <= periodoDe(h); p = sumarMeses(p, 1)) {
+      for (const i of instanciasDelMes(r, p)) {
+        if (i.fecha > h) continue;
+        const ya = await db.movimientos.where("[recurrenteId+periodo]").equals([r.id, i.clave]).count();
+        if (ya) continue;
+        const cot = await cotizar(r.moneda, i.fecha, cuentas.get(r.cuentaId)?.dolar ?? "blue");
+        const ahora = new Date().toISOString();
+        await db.movimientos.add({
+          id: nuevoId(), tipo: r.tipo, fecha: i.fecha, monto: r.monto, moneda: r.moneda,
+          usd: cot ? aUsd(r.monto, cot.tasa) : null, cotizacion: cot ?? undefined,
+          cuentaId: r.cuentaId, categoriaId: r.categoriaId, etiquetas: [], comentario: r.nombre,
+          recurrenteId: r.id, periodo: i.clave, creado: ahora, modificado: ahora,
+        });
+        n++;
+      }
+    }
+  }
+  return n;
+}
