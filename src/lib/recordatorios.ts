@@ -1,0 +1,53 @@
+import type { Cuenta, Movimiento } from "../tipos";
+import { hoy, nombreMes, periodoDe, periodoHoy, sumarMeses } from "./fecha";
+
+/* Recordatorios. Viven como tareas en "Para revisar" y no se van hasta que las
+   hacés; cuando haya notificaciones, estas mismas tareas son las que avisan. */
+
+export interface Recordatorios {
+  diario: { activo: boolean; hora: string };
+  resumen: { activo: boolean; dia: number };
+  exportar: { activo: boolean; dia: number };
+}
+
+export const RECORDATORIOS: Recordatorios = {
+  diario: { activo: true, hora: "21:00" },
+  resumen: { activo: true, dia: 1 },
+  exportar: { activo: true, dia: 1 },
+};
+
+export type Tarea =
+  | { tipo: "diario"; clave: string; titulo: string; detalle: string }
+  | { tipo: "resumen"; clave: string; titulo: string; detalle: string; cuenta: Cuenta; periodo: string }
+  | { tipo: "exportar"; clave: string; titulo: string; detalle: string; periodo: string };
+
+const horaActual = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
+export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], resumenesCargados: Record<string, string>, ultimaExportacion: string | null, hechas: Set<string>): Tarea[] {
+  const out: Tarea[] = [];
+  const h = hoy(), dia = Number(h.slice(8)), anterior = sumarMeses(periodoHoy(), -1);
+  const primerMes = movs.length ? movs.map(m => periodoDe(m.fecha)).sort()[0] : periodoHoy();
+
+  if (r.diario.activo && horaActual() >= r.diario.hora && !movs.some(m => m.creado.slice(0, 10) === h || m.fecha === h)) {
+    const clave = `diario|${h}`;
+    if (!hechas.has(clave)) out.push({ tipo: "diario", clave, titulo: "¿Cargaste los gastos de hoy?", detalle: "Todavía no anotaste nada hoy." });
+  }
+
+  // El resumen que cerró el mes pasado: se carga a principio de este mes.
+  if (r.resumen.activo && dia >= r.resumen.dia && anterior >= primerMes) {
+    for (const c of cuentas.filter(c => c.esTarjeta && !c.archivada)) {
+      const clave = `resumen|${c.id}|${anterior}`;
+      if (resumenesCargados[`${c.id}|${anterior}`] || hechas.has(clave)) continue;
+      out.push({ tipo: "resumen", clave, cuenta: c, periodo: anterior, titulo: `Subí el resumen de ${c.nombre}`, detalle: `El que cerró en ${nombreMes(anterior, false)}. Lo comparo con lo cargado y te pregunto lo que falte.` });
+    }
+  }
+
+  if (r.exportar.activo && dia >= r.exportar.dia && anterior >= primerMes) {
+    const clave = `exportar|${anterior}`;
+    const exportadoEsteMes = ultimaExportacion != null && ultimaExportacion.slice(0, 7) >= periodoHoy();
+    const quedan = movs.some(m => !m.exportado && periodoDe(m.fecha) <= anterior);
+    if (!exportadoEsteMes && quedan && !hechas.has(clave))
+      out.push({ tipo: "exportar", clave, periodo: anterior, titulo: `Exportá ${nombreMes(anterior, false)} a Finanzas`, detalle: "Hay movimientos del mes pasado que todavía no mandaste." });
+  }
+  return out;
+}

@@ -109,7 +109,7 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
       </div>
       <div className="navega">
         <button aria-label="Anterior" onClick={() => setPeriodo(sumarMeses(periodo, -1))}><T.IconChevronLeft size={20} /></button>
-        <span>Resumen de {nombreMes(periodo, false)}</span>
+        <span>Cierra en {nombreMes(periodo, false)}</span>
         <button aria-label="Siguiente" onClick={() => setPeriodo(sumarMeses(periodo, 1))}><T.IconChevronRight size={20} /></button>
       </div>
       <div className="caja">
@@ -125,6 +125,10 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
         <div className="pills">{dias.map(n => <button key={n} className={`pill${c.cierres?.[periodo] === n ? " on" : ""}`} onClick={() => confirmarCierre(n)}>{n}</button>)}</div>
         {!r.confirmado && <div className="mini tenue">Lo sacás del resumen. Hasta que lo confirmes, uso el {c.cierreHasta}.</div>}
       </div>
+
+      <button className="btn1" style={{ width: "100%", marginBottom: 10 }} onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: c.id })}>
+        <T.IconFileImport size={16} style={{ verticalAlign: -3 }} /> Subir el PDF del resumen
+      </button>
 
       <div className="titulo-sec"><span>Qué entra en este resumen</span><span>{r.items.length}</span></div>
       {!r.items.length && <div className="tenue chico">Nada todavía.</div>}

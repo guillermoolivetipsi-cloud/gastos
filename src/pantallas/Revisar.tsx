@@ -1,12 +1,11 @@
-import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos } from "../datos";
-import { db, leerAjuste } from "../db";
+import { db } from "../db";
 import { useNav } from "../nav";
 import { descartar } from "../lib/acciones";
 import { copiaDeSeguridad } from "../lib/archivos";
 import { mesCorto, nombreMes } from "../lib/fecha";
 import { num } from "../lib/formato";
-import { pendientes } from "../lib/revisar";
+import { pendientes, useExtras } from "../lib/revisar";
 import { EtiquetaClase, Punto } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -14,15 +13,30 @@ import { T } from "../ui/Icono";
 export function Revisar() {
   const d = useDatos();
   const nav = useNav();
-  const ultimoRespaldo = useLiveQuery(() => leerAjuste<string | null>("ultimoRespaldo", null), []);
-  if (!d.listo || ultimoRespaldo === undefined) return <div className="pantalla sin-tabs" />;
-  const p = pendientes(d, ultimoRespaldo);
+  const extras = useExtras();
+  if (!d.listo || !extras) return <div className="pantalla sin-tabs" />;
+  const ultimoRespaldo = extras.ultimoRespaldo;
+  const p = pendientes(d, extras);
   const cat = new Map(d.categorias.map(c => [c.id, c]));
 
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Para revisar</h1></div>
       {p.total === 0 && <div className="vacio"><T.IconCheck size={32} /><div>Nada para revisar.</div><div className="chico">Cuando tengas unos meses cargados, acá te voy a proponer qué es fijo, qué se repite y qué objetivos ponerte.</div></div>}
+
+      {p.tareas.length > 0 && <div className="titulo-sec"><span>Pendientes</span><span>{p.tareas.length}</span></div>}
+      {p.tareas.map(t => (
+        <div key={t.clave} className="caja aviso">
+          <div className="ambar">{t.titulo}</div>
+          <div className="mini tenue">{t.detalle}</div>
+          <div className="botones">
+            {t.tipo === "diario" && <button className="btn1" onClick={() => nav.abrir({ p: "editor" })}>Cargar un gasto</button>}
+            {t.tipo === "resumen" && <button className="btn1" onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: t.cuenta.id })}>Subir el resumen</button>}
+            {t.tipo === "exportar" && <button className="btn1" onClick={() => nav.abrir({ p: "exportar" })}>Exportar</button>}
+            <button className="btn2" onClick={() => descartar(t.clave)}>{t.tipo === "diario" ? "Hoy no gasté" : "Ya lo hice"}</button>
+          </div>
+        </div>
+      ))}
 
       {p.cierres.length > 0 && <div className="titulo-sec"><span>Cierres de tarjeta</span></div>}
       {p.cierres.map(c => (

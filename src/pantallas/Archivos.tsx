@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, leerAjuste } from "../db";
 import { useNav } from "../nav";
-import { copiaDeSeguridad, editadosDespues, exportar, importarXlsx, mesesSinExportar, restaurar, type ResultadoImport } from "../lib/archivos";
+import { copiaDeSeguridad, editadosDespues, exportar, importarXlsx, mesesSinExportar, restaurar, sumarPaquete, type ResultadoImport } from "../lib/archivos";
 import { fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
@@ -67,6 +67,7 @@ export function Respaldo() {
   const [res, setRes] = useState<ResultadoImport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorCopia, setErrorCopia] = useState<string | null>(null);
+  const [sumado, setSumado] = useState<Awaited<ReturnType<typeof sumarPaquete>> | null>(null);
   const [persistente, setPersistente] = useState<boolean | null>(null);
   const [yaEnFinanzas, setYaEnFinanzas] = useState(true);
   useEffect(() => { navigator.storage?.persisted?.().then(setPersistente); }, []);
@@ -80,10 +81,15 @@ export function Respaldo() {
   }
   async function restaurarDe(f: File | undefined) {
     if (!f) return;
-    if (!confirm("Esto reemplaza todo lo que hay en la app por lo del archivo. ¿Seguir?")) return;
-    setErrorCopia(null);
-    try { const n = await restaurar(f); toast({ texto: `Restaurados ${n} movimientos` }); }
-    catch (e) { setErrorCopia(e instanceof SyntaxError ? "Ese archivo no es una copia de seguridad (.json) de la app." : (e as Error).message); }
+    setErrorCopia(null); setSumado(null);
+    try {
+      // Un paquete suma sin borrar; una copia de seguridad reemplaza todo.
+      const tipo = JSON.parse(await f.text()).app;
+      if (tipo === "gastos-paquete") { setSumado(await sumarPaquete(f)); return; }
+      if (!confirm("Esto reemplaza todo lo que hay en la app por lo del archivo. ¿Seguir?")) return;
+      const n = await restaurar(f);
+      toast({ texto: `Restaurados ${n} movimientos` });
+    } catch (e) { setErrorCopia(e instanceof SyntaxError ? "Ese archivo no es un .json de la app." : (e as Error).message); }
   }
 
   return (
@@ -99,10 +105,16 @@ export function Respaldo() {
         {/* Sin filtro de tipo: Android a veces no reconoce el .json que llega por
             WhatsApp o Drive y lo muestra deshabilitado. El contenido se valida al leerlo. */}
         <label className="btn1" style={{ display: "block", marginTop: 8 }}>
-          Restaurar desde una copia (.json)
+          Restaurar o sumar desde archivo (.json)
           <input type="file" hidden onChange={e => { restaurarDe(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
         {errorCopia && <div className="mal chico" style={{ marginTop: 8 }}>{errorCopia}</div>}
+        {sumado && (
+          <div className="chico" style={{ marginTop: 8 }}>
+            <div className="ok">Sumado sin borrar nada: {sumado.recurrentes} recurrentes, {sumado.pagos} pagos vinculados, {sumado.cuentas} cuentas actualizadas, {sumado.reglas} comercios.</div>
+            {sumado.salteados.length > 0 && <div className="ambar">No encontré la categoría o cuenta de: {sumado.salteados.join(", ")}</div>}
+          </div>
+        )}
       </div>
 
       <div className="titulo-sec"><span>Traer lo de la app anterior</span></div>

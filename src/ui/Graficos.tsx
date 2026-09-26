@@ -1,9 +1,6 @@
 import type { Movimiento } from "../tipos";
-import type { PorCategoria } from "../lib/analisis";
 import { DIAS_CORTOS, aFecha, diasEntre, hoy, mesCorto, sumarDias } from "../lib/fecha";
 import { num } from "../lib/formato";
-
-export type TipoGrafico = "dia" | "barras" | "rectangulos" | "torta";
 
 /** Barras por día (semana, mes, período corto) o por mes (año, período largo),
  *  con una línea punteada en el promedio. */
@@ -52,53 +49,6 @@ export function PorTiempo({ movs, desde, hasta }: { movs: Movimiento[]; desde: s
       <div style={{ display: "flex", gap: pocos ? 8 : 2 }} className="mini tenue">
         {tramos.map((t, i) => <span key={t.clave} style={{ flex: 1, textAlign: "center", fontSize: 10, visibility: pocos || i % 5 === 0 ? "visible" : "hidden" }}>{t.etiqueta}</span>)}
       </div>
-    </div>
-  );
-}
-
-/** Mapa de rectángulos: cada categoría ocupa un área proporcional a lo gastado.
- *  Se parte en filas (algoritmo "squarified" simplificado) para que queden casi cuadrados. */
-export function Rectangulos({ cats, tocar }: { cats: PorCategoria[]; tocar: (c: PorCategoria) => void }) {
-  const W = 100, H = 70;
-  const total = cats.reduce((s, c) => s + c.total, 0);
-  if (!total) return null;
-  const items = cats.filter(c => c.total > 0).map(c => ({ c, area: (c.total / total) * W * H }));
-  const rects: { c: PorCategoria; x: number; y: number; w: number; h: number }[] = [];
-  let x = 0, y = 0, w = W, h = H;
-  const peor = (fila: typeof items, lado: number) => {
-    const s = fila.reduce((a, b) => a + b.area, 0);
-    return Math.max(...fila.map(r => Math.max((lado * lado * r.area) / (s * s), (s * s) / (lado * lado * r.area))));
-  };
-  let resto = [...items];
-  while (resto.length) {
-    const lado = Math.min(w, h);
-    let fila = [resto[0]];
-    let i = 1;
-    while (i < resto.length && peor([...fila, resto[i]], lado) <= peor(fila, lado)) { fila.push(resto[i]); i++; }
-    resto = resto.slice(i);
-    const s = fila.reduce((a, b) => a + b.area, 0);
-    if (w >= h) { // columna a la izquierda
-      const cw = s / h; let yy = y;
-      for (const r of fila) { const rh = r.area / cw; rects.push({ c: r.c, x, y: yy, w: cw, h: rh }); yy += rh; }
-      x += cw; w -= cw;
-    } else { // fila arriba
-      const rh = s / w; let xx = x;
-      for (const r of fila) { const rw = r.area / rh; rects.push({ c: r.c, x: xx, y, w: rw, h: rh }); xx += rw; }
-      y += rh; h -= rh;
-    }
-  }
-  return (
-    <div style={{ position: "relative", width: "100%", aspectRatio: `${W} / ${H}`, margin: "6px 0 10px" }}>
-      {rects.map(r => (
-        <button key={r.c.cat.id} onClick={() => tocar(r.c)} style={{
-          position: "absolute", left: `${(r.x / W) * 100}%`, top: `${(r.y / H) * 100}%`, width: `${(r.w / W) * 100}%`, height: `${(r.h / H) * 100}%`,
-          padding: 2, boxSizing: "border-box",
-        }}>
-          <div style={{ width: "100%", height: "100%", background: r.c.cat.color, borderRadius: 8, padding: "6px 8px", textAlign: "left", overflow: "hidden", color: "#fff" }}>
-            {r.w * r.h > 180 && <><div className="chico" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.c.cat.nombre}</div><div className="mini num" style={{ opacity: .85 }}>{num(r.c.total, 0)}</div></>}
-          </div>
-        </button>
-      ))}
     </div>
   );
 }

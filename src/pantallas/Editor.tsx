@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
-import { MONEDAS, type Moneda, type Tipo } from "../tipos";
+import { MONEDAS, type Cuenta, type Moneda, type Tipo } from "../tipos";
 import { eliminarMovimiento, guardarMovimiento } from "../lib/acciones";
 import { recurrentesDelMes } from "../lib/analisis";
 import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias, sumarMeses } from "../lib/fecha";
@@ -12,6 +12,12 @@ import { Hoja, Interruptor, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 type Props = Extract<Pantalla, { p: "editor" }>;
+
+/** La cuenta de todos los días, la que se usa cuando no pagás con tarjeta. */
+export function cuentaDiaria(cuentas: Cuenta[]) {
+  const activas = cuentas.filter(c => !c.archivada && !c.esTarjeta);
+  return activas.find(c => c.nombre === "Revolut") ?? activas[0];
+}
 
 export function Editor(props: Props) {
   const d = useDatos();
@@ -37,6 +43,7 @@ export function Editor(props: Props) {
   const [totalTxt, setTotalTxt] = useState("");
   const [nuevaEtq, setNuevaEtq] = useState<string | null>(null);
   const [otrasCuotas, setOtrasCuotas] = useState(false);
+  const [otrasCuentas, setOtrasCuentas] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   const cuentas = d.cuentas.filter(c => !c.archivada || c.id === cuentaId);
@@ -60,9 +67,11 @@ export function Editor(props: Props) {
       setTipo(rec.tipo); setCategoriaId(rec.categoriaId); setCuentaId(rec.cuentaId); setMoneda(rec.moneda); setComentario(rec.nombre);
       return;
     }
+    // Nuevo: arranca "sin tarjeta" (la cuenta de todos los días) y en la moneda
+    // del último gasto que cargaste.
     const ultimo = [...d.movimientos].filter(m => m.tipo === (props.tipo ?? "gasto")).sort((a, b) => b.creado.localeCompare(a.creado))[0];
-    const c = d.cuentas.find(c => c.id === ultimo?.cuentaId) ?? d.cuentas.find(c => !c.archivada);
-    if (c) { setCuentaId(c.id); setMoneda(c.moneda); }
+    const c = cuentaDiaria(d.cuentas);
+    if (c) { setCuentaId(c.id); setMoneda(ultimo?.moneda ?? c.moneda); }
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const monto = leerNumero(montoTxt);
@@ -159,13 +168,22 @@ export function Editor(props: Props) {
         {moneda === "USD" ? "" : monto > 0 ? (enUsd != null ? `≈ ${num(enUsd)} USD${moneda === "ARS" ? ` · dólar ${cuenta?.dolar ?? "blue"}` : ""}` : "se convierte al tener conexión") : ""}
       </div>
 
-      <div className="titulo-sec"><span>Cuenta</span></div>
-      <div className="pills scroll">
-        {cuentas.map(c => (
-          <button key={c.id} className={`pill${c.id === cuentaId ? " on" : ""}`} onClick={() => { setCuentaId(c.id); setMoneda(c.moneda); if (!c.esTarjeta) setCuotas(1); }}>
-            {c.esTarjeta && <T.IconCreditCard size={14} />}{c.nombre}
-          </button>
-        ))}
+      {/* Lo único que importa elegir es si fue con tarjeta: cambia cuándo lo pagás.
+          Las demás cuentas quedan en "otra cuenta". */}
+      <div className="titulo-sec"><span>{tipo === "gasto" ? "Pagaste con" : "Entró en"}</span></div>
+      <div className="pills">
+        {(() => {
+          const diaria = cuentaDiaria(d.cuentas);
+          const tarjetas = tipo === "gasto" ? cuentas.filter(c => c.esTarjeta) : [];
+          const otra = cuenta && !cuenta.esTarjeta && cuenta.id !== diaria?.id;
+          return <>
+            {diaria && <button className={`pill${cuentaId === diaria.id ? " on" : ""}`} onClick={() => { setCuentaId(diaria.id); setCuotas(1); }}>{tipo === "gasto" ? "Sin tarjeta" : diaria.nombre}</button>}
+            {tarjetas.map(c => (
+              <button key={c.id} className={`pill${c.id === cuentaId ? " on" : ""}`} onClick={() => setCuentaId(c.id)}><T.IconCreditCard size={14} />{c.nombre}</button>
+            ))}
+            <button className={`pill${otra ? " on" : ""}`} onClick={() => setOtrasCuentas(true)}>{otra ? cuenta!.nombre : "otra cuenta"}</button>
+          </>;
+        })()}
       </div>
 
       {esTarjeta && cuenta && (
@@ -280,6 +298,15 @@ export function Editor(props: Props) {
       )}
 
       <div className="pie-fijo"><button className="btn" disabled={!puedeGuardar} onClick={guardar}>{existente ? "Guardar cambios" : "Guardar"}</button></div>
+
+      <Hoja abierta={otrasCuentas} cerrar={() => setOtrasCuentas(false)}>
+        <h2>¿De qué cuenta?</h2>
+        {cuentas.filter(c => !c.esTarjeta).map(c => (
+          <button key={c.id} className="opcion" onClick={() => { setCuentaId(c.id); setMoneda(c.moneda); setCuotas(1); setOtrasCuentas(false); }}>
+            <div className="fila" style={{ padding: 0 }}><span>{c.nombre}</span><span className="viol chico">{c.moneda}</span></div>
+          </button>
+        ))}
+      </Hoja>
 
       <Hoja abierta={otrasCuotas} cerrar={() => setOtrasCuotas(false)}>
         <h2>¿En cuántas cuotas?</h2>

@@ -90,3 +90,12 @@ export function cuotasFuturas(c: Cuenta, movs: Movimiento[], periodo: string) {
     .flatMap(m => cuotasDe(c, m))
     .filter(q => q.periodo > periodo);
 }
+
+/** El resumen que se paga en `periodo`: el que vence ese mes. Con cierre a fin de
+ *  mes es el que cerró el mes anterior; con cierre a principio de mes, el del mismo mes. */
+export function resumenQueVence(c: Cuenta, movs: Movimiento[], periodo: string): Resumen {
+  for (const q of [sumarMeses(periodo, -1), periodo]) {
+    if (vencimiento(c, q).slice(0, 7) === periodo) return resumen(c, movs, q);
+  }
+  return resumen(c, movs, periodo);
+}

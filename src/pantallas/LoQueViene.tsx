@@ -4,7 +4,7 @@ import { useNav } from "../nav";
 import { recurrentesDelMes } from "../lib/analisis";
 import { fechaCorta, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
-import { cuotasFuturas, resumen } from "../lib/tarjeta";
+import { cuotasFuturas, resumenQueVence } from "../lib/tarjeta";
 import type { EstadoInstancia } from "../lib/recurrentes";
 import { Barra, Punto } from "../ui/piezas";
 import { T } from "../ui/Icono";
@@ -23,7 +23,8 @@ export function LoQueViene() {
   const aUsd = (i: EstadoInstancia, x: number) => { const t = tasa(i.rec); return t ? x / t : 0; };
 
   const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada);
-  const resumenes = tarjetas.map(c => resumen(c, d.movimientos, periodo)).filter(r => r.items.length);
+  // Lo que se paga este mes: el resumen de cada tarjeta que VENCE en este mes.
+  const resumenes = tarjetas.map(c => resumenQueVence(c, d.movimientos, periodo)).filter(r => r.items.length);
   const insts = recurrentesDelMes(d.recurrentes, d.movimientos, periodo, tasa);
   const cat = new Map(d.categorias.map(c => [c.id, c]));
 
@@ -36,10 +37,10 @@ export function LoQueViene() {
 
   const proximos = [0, 1, 2].map(i => {
     const p = sumarMeses(periodo, i);
-    return { p, total: redondear(tarjetas.reduce((s, c) => s + resumen(c, d.movimientos, p).total, 0)) };
+    return { p, total: redondear(tarjetas.reduce((s, c) => s + resumenQueVence(c, d.movimientos, p).total, 0)) };
   });
   const maxProx = Math.max(1, ...proximos.map(x => x.total));
-  const comprometido = redondear(tarjetas.flatMap(c => cuotasFuturas(c, d.movimientos, periodo)).reduce((s, q) => s + q.usd, 0));
+  const comprometido = redondear(tarjetas.flatMap(c => cuotasFuturas(c, d.movimientos, resumenQueVence(c, d.movimientos, periodo).periodo)).reduce((s, q) => s + q.usd, 0));
   const meses = Array.from({ length: 4 }, (_, i) => sumarMeses(periodoHoy(), i));
 
   return (
@@ -56,7 +57,7 @@ export function LoQueViene() {
 
       {resumenes.length > 0 && <div className="titulo-sec"><span>Tarjetas</span></div>}
       {resumenes.map(r => (
-        <button key={r.cuenta.id} className="caja" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "tarjeta", id: r.cuenta.id, periodo })}>
+        <button key={r.cuenta.id} className="caja" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "tarjeta", id: r.cuenta.id, periodo: r.periodo })}>
           <div className="fila" style={{ padding: 0 }}>
             <span className="izq"><T.IconCreditCard size={18} /><span>Resumen {r.cuenta.nombre}</span></span>
             <span className="num">{num(r.total)} USD</span>

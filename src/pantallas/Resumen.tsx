@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos } from "../datos";
-import { db, leerAjuste } from "../db";
+import { db } from "../db";
 import { useNav } from "../nav";
 import type { Categoria, Movimiento, Tipo } from "../tipos";
 import { avanceDelMes, bloques, claseProvisoria, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { fechaCorta, hoy, moverAncla, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
 import { num, usd } from "../lib/formato";
-import { pendientes } from "../lib/revisar";
+import { pendientes, useExtras } from "../lib/revisar";
 import { Barra, Dona, Hoja, Punto } from "../ui/piezas";
-import { PorTiempo, Rectangulos, type TipoGrafico } from "../ui/Graficos";
+import { PorTiempo } from "../ui/Graficos";
 import { T } from "../ui/Icono";
 
 const VISTAS: [Vista, string][] = [["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"], ["anio", "Año"], ["periodo", "Período"]];
@@ -24,8 +24,8 @@ export function Resumen() {
   const [hasta, setHasta] = useState(hoy());
   const [elegirPeriodo, setElegirPeriodo] = useState(false);
   const [detalle, setDetalle] = useState<Categoria | null>(null);
-  const ultimoRespaldo = useLiveQuery(() => leerAjuste<string | null>("ultimoRespaldo", null), []);
-  const grafico = useLiveQuery(() => leerAjuste<TipoGrafico>("grafico", "dia"), []) ?? "dia";
+  // El mes se ve en torta; la semana, el año y un período, en barras por día (o por mes).
+  const grafico: "torta" | "dia" = vista === "mes" || vista === "dia" ? "torta" : "dia";
 
   const [desde, fin] = rango(vista, ancla, hasta);
   const movs = useMemo(() => d.movimientos.filter(m => m.tipo === tipo && m.fecha >= desde && m.fecha <= fin), [d.movimientos, tipo, desde, fin]);
@@ -40,7 +40,8 @@ export function Resumen() {
   const porCargar = instancias.filter(i => i.estado === "por-cargar" || (i.estado === "parcial" && i.fecha <= hoy()));
   const clase = useMemo(() => claseProvisoria(d.categorias, d.movimientos), [d.categorias, d.movimientos]);
   const b = esMes && tipo === "gasto" ? bloques(periodo, movs, d.categorias, d.recurrentes, instancias.filter(i => i.estado !== "cargado"), tasa, clase) : null;
-  const revisar = d.listo ? pendientes(d, ultimoRespaldo ?? null).total : 0;
+  const extras = useExtras();
+  const revisar = d.listo && extras ? pendientes(d, extras).total : 0;
 
   const vacio = tipo === "gasto" ? "Sin gastos" : "Sin ingresos";
   const enEsto = { dia: "este día", semana: "esta semana", mes: "este mes", anio: "este año", periodo: "este período" }[vista];
@@ -122,7 +123,6 @@ export function Resumen() {
         </div>
       )}
       {grafico === "dia" && vista !== "dia" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
-      {grafico === "rectangulos" && <Rectangulos cats={cats} tocar={c => setDetalle(c.cat)} />}
 
       {cats.length > 0 && (
         <div className="caja lista">
@@ -130,7 +130,7 @@ export function Resumen() {
             const obj = esMes && c.cat.objetivo ? c.cat.objetivo : null;
             const pasado = obj != null && c.total > obj;
             const ritmo = obj != null && avance != null && c.total > obj * avance * 1.05 && !pasado;
-            const ranking = obj == null && (grafico === "dia" || grafico === "barras");
+            const ranking = obj == null && grafico === "dia";
             return (
               <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

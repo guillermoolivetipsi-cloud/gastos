@@ -1,8 +1,8 @@
 type XLSXMod = typeof import("xlsx");
 // La librería de Excel pesa: se carga solo al exportar o importar.
 const xlsx = () => import("xlsx");
-import { db, guardarAjuste, nuevoId } from "../db";
-import type { Categoria, Cuenta, Moneda, Movimiento, Tipo } from "../tipos";
+import { db, guardarAjuste, nuevoId, sembrar } from "../db";
+import type { Categoria, Cuenta, Moneda, Movimiento, Recurrente, Tipo } from "../tipos";
 import { aTexto, periodoDe } from "./fecha";
 import { aUsd, precargarHistoria, cotizar } from "./cotizaciones";
 
@@ -163,6 +163,9 @@ export async function copiaDeSeguridad() {
 export async function restaurar(archivo: File) {
   const d = JSON.parse(await archivo.text());
   if (d.app !== "gastos") throw new Error("Este archivo no es una copia de seguridad de Gastos.");
+  // Que la carga inicial de cuentas y categorías termine antes: si no, podría
+  // escribirse encima de lo restaurado y duplicar las cuentas.
+  await sembrar();
   await db.transaction("rw", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes], async () => {
     for (const t of [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes]) await t.clear();
     await db.cuentas.bulkAdd(d.cuentas);
@@ -181,4 +184,53 @@ function descargar(blob: Blob, nombre: string) {
   a.href = url; a.download = nombre;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/* ── Sumar desde archivo ───────────────────────────────────────────────────
+   Un "paquete" agrega cosas sin tocar lo que ya hay: recurrentes nuevos (con los
+   pagos ya cargados que les corresponden), cambios de configuración de cuentas y
+   comercios aprendidos. Es idempotente: sumarlo dos veces no duplica nada. */
+
+export interface Paquete {
+  app: "gastos-paquete";
+  recurrentes?: (Omit<Recurrente, "categoriaId" | "cuentaId"> & { categoria: string; cuenta: string; pagos?: string[] })[];
+  cuentas?: { nombre: string; cambios: Partial<Cuenta> }[];
+  reglasComercio?: Record<string, string>; // comercio → nombre de categoría
+}
+
+export async function sumarPaquete(archivo: File) {
+  const p = JSON.parse(await archivo.text()) as Paquete;
+  if (p.app !== "gastos-paquete") throw new Error("Este archivo no es un paquete para sumar.");
+  const cats = await db.categorias.toArray(), cuentas = await db.cuentas.toArray();
+  const cat = (n: string) => cats.find(c => c.nombre.toLowerCase() === n.toLowerCase());
+  const cta = (n: string) => cuentas.find(c => c.nombre.toLowerCase() === n.toLowerCase());
+  const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, salteados: [] as string[] };
+  await db.transaction("rw", [db.recurrentes, db.movimientos, db.cuentas, db.ajustes], async () => {
+    for (const r of p.recurrentes ?? []) {
+      const c = cat(r.categoria), k = cta(r.cuenta);
+      if (!c || !k) { res.salteados.push(r.nombre); continue; }
+      if (await db.recurrentes.get(r.id)) continue;
+      const { categoria: _c, cuenta: _k, pagos, ...resto } = r;
+      await db.recurrentes.add({ ...resto, categoriaId: c.id, cuentaId: k.id });
+      res.recurrentes++;
+      for (const id of pagos ?? []) {
+        const m = await db.movimientos.get(id);
+        if (m && !m.recurrenteId) { await db.movimientos.update(id, { recurrenteId: r.id, periodo: m.fecha.slice(0, 7) }); res.pagos++; }
+      }
+    }
+    for (const { nombre, cambios } of p.cuentas ?? []) {
+      const k = cta(nombre);
+      if (k) { await db.cuentas.update(k.id, cambios); res.cuentas++; }
+    }
+    if (p.reglasComercio) {
+      const actuales = ((await db.ajustes.get("reglasComercio"))?.valor ?? {}) as Record<string, string>;
+      const nuevas = { ...actuales };
+      for (const [comercio, nombreCat] of Object.entries(p.reglasComercio)) {
+        const c = cat(nombreCat);
+        if (c && !nuevas[comercio]) { nuevas[comercio] = c.id; res.reglas++; }
+      }
+      await db.ajustes.put({ clave: "reglasComercio", valor: nuevas });
+    }
+  });
+  return res;
 }

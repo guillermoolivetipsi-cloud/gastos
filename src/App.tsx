@@ -14,6 +14,7 @@ import { EditorRecurrente, Instancia, ListaRecurrentes } from "./pantallas/Recur
 import { Revisar } from "./pantallas/Revisar";
 import { Exportar, Respaldo } from "./pantallas/Archivos";
 import { Ajustes } from "./pantallas/Ajustes";
+import { SubirResumen } from "./pantallas/SubirResumen";
 import { T } from "./ui/Icono";
 
 function Encima({ p }: { p: Pantalla }) {
@@ -32,6 +33,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "exportar": return <Exportar />;
     case "respaldo": return <Respaldo />;
     case "ajustes": return <Ajustes />;
+    case "subir-resumen": return <SubirResumen cuentaId={p.cuentaId} />;
   }
 }
 
