@@ -7,7 +7,7 @@ import { eliminarRecurrente, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
-import { estadoDe } from "../lib/recurrentes";
+import { candidatos, estadoDe } from "../lib/recurrentes";
 import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -191,6 +191,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
   const nav = useNav();
   const toast = useToast();
   const [borrar, setBorrar] = useState(false);
+  const [elegir, setElegir] = useState(false);
   const r = d.recurrentes.find(r => r.id === id);
   if (!r) return <div className="pantalla sin-tabs"><div className="vacio">Este recurrente ya no existe.</div></div>;
   const fecha = clave.length === 7 ? fechaEnMes(clave, r.dia) : clave;
@@ -235,8 +236,35 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
       <button className="btn1" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "editor", recurrenteId: r.id, periodo: clave, monto: e.estimado ? undefined : e.falta || undefined, fecha: e.fecha <= hoy() ? hoy() : e.fecha })}>
         + {e.pagos.length ? "Agregar un pago" : e.estimado ? "Cargar el monto real" : "Cargar el pago"}
       </button>
+      {e.estado !== "cargado" && (
+        <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setElegir(true)}>Ya lo cargué como gasto: elegirlo</button>
+      )}
       <div className="espacio" />
       <button className="btn2" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>Editar el recurrente</button>
+
+      <Hoja abierta={elegir} cerrar={() => setElegir(false)}>
+        <h2>¿Cuál es el pago de {r.nombre}?</h2>
+        <div className="mini tenue" style={{ marginBottom: 6 }}>Gastos de {titulo} sin vincular, los más parecidos primero.</div>
+        {(() => {
+          const tasaR = d.tasas.rec(r, d.cuentas);
+          const parecidos = candidatos(e, d.movimientos, tasaR);
+          const resto = d.movimientos.filter(m => m.tipo === r.tipo && !m.recurrenteId && m.fecha.slice(0, 7) === e.fecha.slice(0, 7) && !parecidos.includes(m)).sort((a, b) => b.fecha.localeCompare(a.fecha));
+          const lista = [...parecidos, ...resto].slice(0, 25);
+          if (!lista.length) return <div className="tenue chico">No hay gastos sin vincular ese mes.</div>;
+          return lista.map(m => (
+            <button key={m.id} className="opcion" onClick={async () => {
+              await db.movimientos.update(m.id, { recurrenteId: r.id, periodo: clave, modificado: new Date().toISOString() });
+              setElegir(false); toast({ texto: `Vinculado como pago de ${r.nombre}` });
+            }}>
+              <div className="fila" style={{ padding: 0 }}>
+                <span>{fechaCorta(m.fecha, false)} · {d.categorias.find(c => c.id === m.categoriaId)?.nombre}{m.comentario ? ` · ${m.comentario}` : ""}</span>
+                <span className="num">{num(m.monto)} {m.moneda}</span>
+              </div>
+              {parecidos.includes(m) && <div className="mini viol">parecido</div>}
+            </button>
+          ));
+        })()}
+      </Hoja>
       <div className="mini tenue centro" style={{ marginTop: 10 }}>{cadaCuanto(r)}</div>
 
       <Hoja abierta={borrar} cerrar={() => setBorrar(false)}>

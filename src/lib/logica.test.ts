@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
 import { cuotasDe, esDudosa, resumen, resumenDe, vencimiento } from "./tarjeta";
-import { estadoDe, instanciasDelMes, recurrenteDe } from "./recurrentes";
+import { candidatos, esClaro, estadoDe, instanciasDelMes, recurrenteDe, sugerirVinculos } from "./recurrentes";
 import { detectarRecurrentes, sugerirClase, sugerirObjetivo } from "./analisis";
 import { fechaEnMes, rango, sumarMeses } from "./fecha";
 import { leerNumero } from "./formato";
@@ -142,4 +142,38 @@ describe("vincular un cobro con su recurrente", () => {
     expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 100, moneda: "USD", usd: 100, fecha: "2026-10-21" }), [claude], [pagado], () => 1)).toBeNull();
     expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 20, moneda: "USD", usd: 20, fecha: "2026-10-21" }), [claude], [], () => 1)).toBeNull();
   });
+});
+
+describe("un recurrente cargado como gasto común", () => {
+  const base: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 20972, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
+  const luz: Recurrente = { ...base, id: "luz", nombre: "Luz", monto: 28716, dia: 8 };
+  const insts = [base, luz].map(r => estadoDe(instanciasDelMes(r, "2026-10")[0], [], 1545));
+
+  it("sugiere cada gasto para el recurrente al que más se parece, uno por recurrente", () => {
+    const gas = mov({ id: "g", categoriaId: "casa", cuentaId: "revolut", monto: 21000, moneda: "ARS", usd: 13.6, fecha: "2026-10-09" });
+    const luzPago = mov({ id: "l", categoriaId: "casa", cuentaId: "galicia", monto: 29500, moneda: "ARS", usd: 19, fecha: "2026-10-08" });
+    const s = sugerirVinculos(insts, [gas, luzPago], () => 1545, () => false);
+    expect([s.get("gas2026-10")?.id, s.get("luz2026-10")?.id]).toEqual(["g", "l"]);
+  });
+  it("si el comentario lo nombra, lo reconoce aunque esté en otra categoría", () => {
+    const m = mov({ categoriaId: "otros", comentario: "pago gas", monto: 25000, moneda: "ARS", usd: 16, fecha: "2026-10-10" });
+    expect(candidatos(insts[0], [m], 1545)).toHaveLength(1);
+    expect(esClaro(m, insts[0])).toBe(true);
+  });
+  it("no sugiere gastos de otro mes, ya vinculados o descartados", () => {
+    const otroMes = mov({ categoriaId: "casa", monto: 20972, moneda: "ARS", fecha: "2026-11-09" });
+    const vinculado = mov({ categoriaId: "casa", monto: 20972, moneda: "ARS", fecha: "2026-10-09", recurrenteId: "x" });
+    const libre = mov({ id: "d", categoriaId: "casa", monto: 20972, moneda: "ARS", fecha: "2026-10-09" });
+    expect(sugerirVinculos(insts, [otroMes, vinculado, libre], () => 1545, (m, r) => m === "d" && r === "gas").get("gas2026-10")).toBeUndefined();
+  });
+});
+
+it("prefiere la misma moneda aunque la cuenta sea otra", () => {
+  const gas: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 20972, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
+  const celular: Recurrente = { ...gas, id: "cel", nombre: "Celular", cuentaId: "revolut", monto: 10, moneda: "EUR", clase: "fijo", dia: 7 };
+  const tasas: Record<string, number> = { gas: 1545, cel: 0.878 };
+  const insts = [gas, celular].map(r => estadoDe(instanciasDelMes(r, "2026-10")[0], [], tasas[r.id]));
+  const m = mov({ id: "x", categoriaId: "casa", cuentaId: "revolut", monto: 21000, moneda: "ARS", usd: 13.6, fecha: "2026-10-09" });
+  const s = sugerirVinculos(insts, [m], r => tasas[r.id], () => false);
+  expect([s.get("gas2026-10")?.id, s.get("cel2026-10")]).toEqual(["x", undefined]);
 });

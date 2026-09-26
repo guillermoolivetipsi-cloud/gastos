@@ -3,7 +3,7 @@ import { db } from "../db";
 import { useNav } from "../nav";
 import { descartar } from "../lib/acciones";
 import { copiaDeSeguridad } from "../lib/archivos";
-import { mesCorto, nombreMes } from "../lib/fecha";
+import { fechaCorta, mesCorto, nombreMes } from "../lib/fecha";
 import { num } from "../lib/formato";
 import { pendientes, useExtras } from "../lib/revisar";
 import { EtiquetaClase, Punto } from "../ui/piezas";
@@ -34,6 +34,23 @@ export function Revisar() {
             {t.tipo === "resumen" && <button className="btn1" onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: t.cuenta.id })}>Subir el resumen</button>}
             {t.tipo === "exportar" && <button className="btn1" onClick={() => nav.abrir({ p: "exportar" })}>Exportar</button>}
             <button className="btn2" onClick={() => descartar(t.clave)}>{t.tipo === "diario" ? "Hoy no gasté" : "Ya lo hice"}</button>
+          </div>
+        </div>
+      ))}
+
+      {p.vinculos.length > 0 && <div className="titulo-sec"><span>¿Es el pago de un recurrente?</span><span>{p.vinculos.length}</span></div>}
+      {p.vinculos.map(({ inst, mov }) => (
+        <div key={mov.id + inst.rec.id} className="caja sug">
+          <div className="fila" style={{ padding: 0 }}>
+            <span className="izq"><Punto cat={cat.get(mov.categoriaId)} chico /><span>
+              <div>{cat.get(mov.categoriaId)?.nombre}{mov.comentario ? ` · ${mov.comentario}` : ""}</div>
+              <div className="mini tenue">{fechaCorta(mov.fecha, false)} · {num(mov.monto)} {mov.moneda}</div>
+            </span></span>
+          </div>
+          <div className="mini tenue" style={{ margin: "4px 0 0 38px" }}>¿Es el pago de <span className="viol">{inst.rec.nombre}</span> de {inst.clave.length === 7 ? nombreMes(inst.clave, false) : fechaCorta(inst.fecha, false)}? (esperado ~{num(inst.esperado)} {inst.rec.moneda})</div>
+          <div className="botones">
+            <button className="btn1" onClick={() => db.movimientos.update(mov.id, { recurrenteId: inst.rec.id, periodo: inst.clave, modificado: new Date().toISOString() })}>Sí, vincular</button>
+            <button className="btn2" onClick={() => descartar(`vinc|${mov.id}|${inst.rec.id}`)}>No</button>
           </div>
         </div>
       ))}

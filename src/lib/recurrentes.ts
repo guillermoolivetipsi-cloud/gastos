@@ -133,3 +133,63 @@ export function recurrenteDe(m: Movimiento, recs: Recurrente[], movs: Movimiento
   }
   return null;
 }
+
+const sinAcentos = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+/** El comentario del gasto nombra al recurrente ("gas", "Pago expensas"). */
+export const nombraA = (m: Movimiento, r: Recurrente) => !!m.comentario && sinAcentos(m.comentario).includes(sinAcentos(r.nombre));
+
+/** Qué tan parecido es un gasto al pago esperado de una instancia: 0 = idéntico.
+ *  null si no puede ser (otro tipo, otro mes, ya vinculado, monto muy distinto). */
+export function parecido(m: Movimiento, i: EstadoInstancia, tasa: number | null): number | null {
+  const r = i.rec;
+  if (m.tipo !== r.tipo || m.recurrenteId) return null;
+  const mismoPeriodo = r.frecuencia === "semanal" ? Math.abs(aFecha(m.fecha).getTime() - aFecha(i.fecha).getTime()) <= 3 * 864e5 : periodoDe(m.fecha) === periodoDe(i.fecha);
+  if (!mismoPeriodo) return null;
+  const nombre = nombraA(m, r);
+  if (!nombre && m.categoriaId !== r.categoriaId) return null;
+  const esperado = i.estado === "parcial" ? i.falta : i.esperado;
+  const real = m.moneda === r.moneda ? m.monto : tasa && m.usd != null ? m.usd * tasa : null;
+  if (real == null || !esperado) return nombre ? 0.5 : null;
+  const err = Math.abs(real - esperado) / esperado;
+  if (!nombre && err > (r.clase === "fijo" ? 0.2 : 0.6)) return null;
+  // Comparar entre monedas es aproximado (cotizaciones): pesa más que la cuenta.
+  return (nombre ? 0 : 1) + err + (m.moneda === r.moneda ? 0 : 0.5) + (m.cuentaId === r.cuentaId ? 0 : 0.1);
+}
+
+/** Gastos ya cargados que podrían ser el pago de esta instancia, del más probable al menos. */
+export function candidatos(i: EstadoInstancia, movs: Movimiento[], tasa: number | null): Movimiento[] {
+  if (i.estado === "cargado") return [];
+  return movs
+    .map(m => ({ m, s: parecido(m, i, tasa) }))
+    .filter((x): x is { m: Movimiento; s: number } => x.s != null)
+    .sort((a, b) => a.s - b.s)
+    .map(x => x.m);
+}
+
+/** Vincular sin preguntar solo si es claro: lo nombra, o misma moneda y monto a ±10%. */
+export function esClaro(m: Pick<Movimiento, "monto" | "moneda" | "comentario">, i: EstadoInstancia) {
+  const esperado = i.estado === "parcial" ? i.falta : i.esperado;
+  return nombraA(m as Movimiento, i.rec) || (m.moneda === i.rec.moneda && esperado > 0 && Math.abs(m.monto - esperado) / esperado <= 0.1);
+}
+
+/** Empareja gastos sueltos con instancias pendientes: cada gasto va a la instancia a
+ *  la que más se parece, y cada instancia recibe como mucho uno. */
+export function sugerirVinculos(insts: EstadoInstancia[], movs: Movimiento[], tasa: (r: Recurrente) => number | null, descartado: (movId: string, recId: string) => boolean) {
+  const pares: { inst: EstadoInstancia; mov: Movimiento; s: number }[] = [];
+  for (const inst of insts) {
+    if (inst.estado === "cargado") continue;
+    for (const mov of movs) {
+      const s = parecido(mov, inst, tasa(inst.rec));
+      if (s != null && !descartado(mov.id, inst.rec.id)) pares.push({ inst, mov, s });
+    }
+  }
+  pares.sort((a, b) => a.s - b.s);
+  const usadosM = new Set<string>(), usadosI = new Set<string>();
+  const out = new Map<string, Movimiento>(); // clave de instancia → gasto
+  for (const p of pares) {
+    const ki = p.inst.rec.id + p.inst.clave;
+    if (usadosM.has(p.mov.id) || usadosI.has(ki)) continue;
+    usadosM.add(p.mov.id); usadosI.add(ki); out.set(ki, p.mov);
+  }
+  return out;
+}

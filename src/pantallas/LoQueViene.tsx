@@ -7,7 +7,10 @@ import { fechaCorta, nombreMes, periodoHoy, sumarDias, sumarMeses } from "../lib
 import { num, redondear } from "../lib/formato";
 import type { EstadoInstancia } from "../lib/recurrentes";
 import type { Cuenta } from "../tipos";
-import { Barra, Punto } from "../ui/piezas";
+import { Barra, Punto, useToast } from "../ui/piezas";
+import { db } from "../db";
+import { descartar } from "../lib/acciones";
+import { sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
 
 /* Lo que está por salir o entrar, en dos pestañas:
@@ -57,8 +60,17 @@ function Recurrentes({ periodo }: { periodo: string }) {
   const pagados = deCuenta.filter(i => i.estado === "cargado");
 
   const total = redondear(deCuenta.reduce((s, i) => s + enUsd(i, i.esperado), 0));
+  const totalTarjeta = redondear(aTarjeta.reduce((s, i) => s + enUsd(i, i.estado === "cargado" ? i.pagado : i.esperado), 0));
+  const tarjetaPendientes = aTarjeta.filter(i => i.estado !== "cargado").length;
   const pagado = redondear(deCuenta.reduce((s, i) => s + enUsd(i, Math.min(i.pagado, i.esperado)), 0));
 
+  const toast = useToast();
+  const descartados = new Set(d.descartes.map(x => x.clave));
+  const sugeridos = sugerirVinculos(insts, d.movimientos, tasa, (m, r) => descartados.has(`vinc|${m}|${r}`));
+  async function vincular(m: (typeof d.movimientos)[number], i: EstadoInstancia) {
+    await db.movimientos.update(m.id, { recurrenteId: i.rec.id, periodo: i.clave, modificado: new Date().toISOString() });
+    toast({ texto: `Vinculado como pago de ${i.rec.nombre}`, deshacer: () => { db.movimientos.update(m.id, { recurrenteId: undefined, periodo: undefined }); } });
+  }
   const monto = (i: EstadoInstancia) => `${i.estimado ? "~" : ""}${num(i.estado === "parcial" ? i.falta : i.esperado)} ${i.rec.moneda}`;
   const cargar = (i: EstadoInstancia) => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: i.fecha });
 
@@ -76,14 +88,23 @@ function Recurrentes({ periodo }: { periodo: string }) {
           <div className="fila" style={{ padding: 0 }}><span className="tenue chico">De tus cuentas en {nombreMes(periodo, false)}</span><span className="mediano num">{num(total, 0)} <span className="chico tenue">USD</span></span></div>
           <Barra valor={total ? pagado / total : 0} color="#60A5FA" />
           <div className="fila mini" style={{ padding: 0 }}><span className="tenue">pagado {num(pagado, 0)}</span>{porPagar.length > 0 ? <span className="ambar">{porPagar.length === 1 ? "falta 1" : `faltan ${porPagar.length}`}</span> : <span className="ok">todo pagado</span>}</div>
+          {aTarjeta.length > 0 && (
+            <div className="fila chico sep" style={{ paddingBottom: 0, marginTop: 6 }}>
+              <span className="tenue"><T.IconCreditCard size={13} style={{ verticalAlign: -2 }} /> Con tarjeta: {aTarjeta.length} {tarjetaPendientes ? `(${tarjetaPendientes} por cobrar)` : "(ya cobrados)"}</span>
+              <span className="num">~{num(totalTarjeta, 0)} USD</span>
+            </div>
+          )}
         </div>
       )}
 
       {porPagar.length > 0 && <div className="titulo-sec"><span>Por pagar de tus cuentas</span><span>{porPagar.length}</span></div>}
       {porPagar.length > 0 && (
         <div className="caja lista">
-          {porPagar.map(i => (
-            <div key={i.rec.id + i.clave} className="fila">
+          {porPagar.map(i => {
+            const ya = sugeridos.get(i.rec.id + i.clave);
+            return (
+            <div key={i.rec.id + i.clave}>
+            <div className="fila">
               <button className="izq" style={{ textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
                 <Punto cat={cat.get(i.rec.categoriaId)} chico />
                 <span>
@@ -96,7 +117,17 @@ function Recurrentes({ periodo }: { periodo: string }) {
                 <button className="btn1" style={{ padding: "3px 10px", fontSize: 12, marginTop: 3 }} onClick={() => cargar(i)}>Cargar</button>
               </span>
             </div>
-          ))}
+            {ya && (
+              <div className="caja sug" style={{ margin: "0 0 8px", padding: "8px 10px" }}>
+                <div className="mini">¿Ya lo cargaste? <span className="tenue">{fechaCorta(ya.fecha, false)} · {cat.get(ya.categoriaId)?.nombre}{ya.comentario ? ` · ${ya.comentario}` : ""} · {num(ya.monto)} {ya.moneda}</span></div>
+                <div className="botones" style={{ marginTop: 6 }}>
+                  <button className="btn1" style={{ padding: "4px 8px" }} onClick={() => vincular(ya, i)}>Es este</button>
+                  <button className="btn2" style={{ padding: "4px 8px" }} onClick={() => descartar(`vinc|${ya.id}|${i.rec.id}`)}>No</button>
+                </div>
+              </div>
+            )}
+            </div>
+          );})}
         </div>
       )}
 
@@ -162,14 +193,24 @@ function Tarjetas({ periodo }: { periodo: string }) {
   const d = useDatos();
   const nav = useNav();
   const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada);
-  const resumenes = tarjetas.map(c => resumenQueVence(c, d.movimientos, periodo));
-  const conConsumos = resumenes.filter(r => r.items.length);
-  const total = redondear(conConsumos.reduce((s, r) => s + r.total, 0));
-  const hayEstimados = conConsumos.some(r => !r.confirmado);
-  const siguiente = sumarMeses(periodo, 1);
-  const juntando = redondear(tarjetas.reduce((s, c) => s + resumenQueVence(c, d.movimientos, siguiente).total, 0));
-  const recs = d.recurrentes.filter(r => r.activo);
   const desde = (c: Cuenta, p: string) => sumarDias(fechaCierre(c, sumarMeses(p, -1)), 1);
+  const tasaR = (r: EstadoInstancia["rec"]) => d.tasas.rec(r, d.cuentas);
+  /** Los recurrentes de esta tarjeta que caen en el período del resumen: cobrados o previstos. */
+  const recurrentesDe = (c: Cuenta, p: string, desdeF: string, hastaF: string) => {
+    const insts = [p, sumarMeses(p, -1)].flatMap(q => recurrentesDelMes(d.recurrentes.filter(r => r.cuentaId === c.id && r.tipo === "gasto"), d.movimientos, q, tasaR))
+      .filter(i => i.fecha >= desdeF && i.fecha <= hastaF);
+    const previsto = redondear(insts.filter(i => i.estado !== "cargado").reduce((s, i) => { const t = tasaR(i.rec); return s + (t ? i.esperado / t : 0); }, 0));
+    return { insts, previsto };
+  };
+  const resumenes = tarjetas.map(c => resumenQueVence(c, d.movimientos, periodo));
+  const conPrevistos = resumenes.map(r => ({ r, ...recurrentesDe(r.cuenta, r.periodo, desde(r.cuenta, r.periodo), r.cierre) }));
+  const total = redondear(conPrevistos.reduce((s, x) => s + x.r.total + (x.r.confirmado ? 0 : x.previsto), 0));
+  const hayEstimados = conPrevistos.some(x => (x.r.items.length || x.insts.length) && !x.r.confirmado);
+  const siguiente = sumarMeses(periodo, 1);
+  const juntando = redondear(tarjetas.reduce((s, c) => {
+    const r = resumenQueVence(c, d.movimientos, siguiente);
+    return s + r.total + recurrentesDe(c, r.periodo, desde(c, r.periodo), r.cierre).previsto;
+  }, 0));
 
   if (!tarjetas.length) return <div className="vacio">No tenés tarjetas cargadas.</div>;
   return (
@@ -180,22 +221,32 @@ function Tarjetas({ periodo }: { periodo: string }) {
         {hayEstimados && <div className="mini tenue">Estimado con lo que cargaste. Se confirma al subir cada resumen.</div>}
       </div>
 
-      {resumenes.map(r => {
-        const incluidos = recs.filter(x => x.cuentaId === r.cuenta.id && r.items.some(q => q.mov.recurrenteId === x.id)).map(x => x.nombre);
+      {conPrevistos.map(({ r, insts, previsto }) => {
+        const totalR = r.total + (r.confirmado ? 0 : previsto);
         return (
           <div key={r.cuenta.id} className="caja">
             <div className="fila" style={{ padding: 0 }}>
               <span className="izq"><T.IconCreditCard size={18} /><span>{r.cuenta.nombre}</span></span>
               {r.items.length > 0 && <span className={`etiq ${r.confirmado ? "e-ok" : "e-pend"}`}>{r.confirmado ? "confirmado" : "estimado"}</span>}
             </div>
-            {r.items.length === 0 ? <div className="tenue chico" style={{ marginTop: 6 }}>Nada para pagar en {nombreMes(periodo, false)}.</div> : (
+            {r.items.length === 0 && !insts.length ? <div className="tenue chico" style={{ marginTop: 6 }}>Nada para pagar en {nombreMes(periodo, false)}.</div> : (
               <>
                 <div className="fila" style={{ paddingBottom: 0 }}>
-                  <span className="mediano num">{r.confirmado ? "" : "~"}{num(r.total)} <span className="chico tenue">USD</span></span>
+                  <span className="mediano num">{r.confirmado ? "" : "~"}{num(totalR)} <span className="chico tenue">USD</span></span>
                   <span className="tenue chico">vence ~{fechaCorta(r.vence, false)}</span>
                 </div>
                 <div className="mini tenue">compras del {fechaCorta(desde(r.cuenta, r.periodo), false)} al {fechaCorta(r.cierre, false)} · {r.items.length} consumos{r.enCuotas > 0 ? ` · ${num(r.enCuotas)} en cuotas` : ""}</div>
-                {incluidos.length > 0 && <div className="mini tenue" style={{ marginTop: 4 }}>Incluye {incluidos.join(", ")}</div>}
+                {insts.length > 0 && (
+                  <div className="sep" style={{ marginTop: 8, paddingTop: 6 }}>
+                    <div className="mini tenue" style={{ marginBottom: 2 }}>Recurrentes de este resumen{previsto > 0 && !r.confirmado ? ` · ${num(previsto, 0)} USD previstos incluidos` : ""}</div>
+                    {insts.map(i => (
+                      <div key={i.rec.id + i.clave} className="fila mini" style={{ padding: "2px 0" }}>
+                        <span>{i.estado === "cargado" ? <span className="ok"><T.IconCheck size={12} style={{ verticalAlign: -2 }} /> </span> : <span className="ambar">◷ </span>}{i.rec.nombre} <span className="tenue">· {fechaCorta(i.fecha, false)}</span></span>
+                        <span className={`num ${i.estado === "cargado" ? "" : "tenue"}`}>{i.estado === "cargado" ? `${num(i.pagado)} ${i.rec.moneda}` : `previsto ~${num(i.esperado)} ${i.rec.moneda}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
             <div className="botones">

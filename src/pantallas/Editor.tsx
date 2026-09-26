@@ -5,6 +5,7 @@ import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
 import { eliminarMovimiento, guardarMovimiento } from "../lib/acciones";
 import { recurrentesDelMes } from "../lib/analisis";
+import { esClaro, nombraA, parecido } from "../lib/recurrentes";
 import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias, sumarMeses } from "../lib/fecha";
 import { leerNumero, num, redondear } from "../lib/formato";
 import { cuotasDe, esDudosa, resumenDe, vencimiento } from "../lib/tarjeta";
@@ -122,14 +123,23 @@ export function Editor(props: Props) {
   }, [d.movimientos]);
 
   // ¿Es parte de un recurrente que falta pagar? Mismo tipo y categoría, este mes o el anterior.
+  // ¿Este gasto es el pago de un recurrente pendiente? Se busca el más parecido
+  // (lo nombra en el comentario, misma categoría, monto cercano), este mes o el anterior.
   const candidato = useMemo(() => {
-    if (vinculo || !categoriaId || existente) return null;
+    if (vinculo || existente || (!categoriaId && !comentario.trim())) return null;
     const tasaR = (r: Parameters<typeof d.tasas.rec>[0]) => d.tasas.rec(r, d.cuentas);
     const p = periodoDe(fecha);
-    return [...recurrentesDelMes(d.recurrentes, d.movimientos, p, tasaR), ...recurrentesDelMes(d.recurrentes, d.movimientos, sumarMeses(p, -1), tasaR)]
-      .find(i => i.rec.tipo === tipo && i.rec.categoriaId === categoriaId && i.estado !== "cargado" && i.estado !== "proximo" && !rechazados.includes(i.rec.id + i.clave))
-      ?? null;
-  }, [vinculo, categoriaId, fecha, tipo, d.recurrentes, d.movimientos, rechazados, existente]); // eslint-disable-line react-hooks/exhaustive-deps
+    const borrador = { id: "", tipo, fecha, monto: monto || 0, moneda, usd: enUsd, cuentaId, categoriaId, etiquetas: [], comentario, creado: "", modificado: "" } as Movimiento;
+    const insts = [...recurrentesDelMes(d.recurrentes, d.movimientos, p, tasaR), ...recurrentesDelMes(d.recurrentes, d.movimientos, sumarMeses(p, -1), tasaR)]
+      .filter(i => i.estado !== "cargado" && !rechazados.includes(i.rec.id + i.clave));
+    let mejor: { i: (typeof insts)[number]; s: number } | null = null;
+    for (const i of insts) {
+      // Sin monto todavía, alcanza con la categoría o el nombre para sugerir.
+      const sc = monto > 0 ? parecido({ ...borrador, fecha: i.fecha }, i, tasaR(i.rec)) : (nombraA(borrador, i.rec) ? 0 : i.rec.categoriaId === categoriaId && i.estado !== "proximo" ? 1 : null);
+      if (sc != null && (!mejor || sc < mejor.s)) mejor = { i, s: sc };
+    }
+    return mejor?.i ?? null;
+  }, [vinculo, categoriaId, comentario, fecha, tipo, monto, moneda, enUsd, cuentaId, d.recurrentes, d.movimientos, rechazados, existente]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recVinculado = vinculo ? d.recurrentes.find(r => r.id === vinculo.recurrenteId) : undefined;
   const esTarjeta = !!cuenta?.esTarjeta && tipo === "gasto";
@@ -139,6 +149,12 @@ export function Editor(props: Props) {
     if (!puedeGuardar) return;
     setGuardando(true);
     let v = vinculo;
+    // Si no contestaste la pregunta pero la coincidencia es clara, se vincula igual.
+    let autoVinculado: string | null = null;
+    if (!v && candidato && monto > 0 && esClaro({ monto, moneda, comentario }, candidato)) {
+      v = { recurrenteId: candidato.rec.id, periodo: candidato.clave };
+      autoVinculado = `${candidato.rec.nombre} de ${candidato.clave.length === 7 ? nombreMes(candidato.clave, false) : fechaCorta(candidato.fecha)}`;
+    }
     // "Pago en partes" de algo que no es recurrente: se crea un recurrente de una
     // sola vez con el total, y este es el primer pago.
     const total = leerNumero(totalTxt);
@@ -157,7 +173,7 @@ export function Editor(props: Props) {
       cuotas: esTarjeta && cuotas > 1 ? cuotas : undefined,
       recurrenteId: v?.recurrenteId, periodo: v?.periodo,
     }, cuenta);
-    toast({ texto: existente ? "Cambios guardados" : tipo === "gasto" ? "Gasto guardado" : "Ingreso guardado" });
+    toast({ texto: autoVinculado ? `Guardado como pago de ${autoVinculado}` : existente ? "Cambios guardados" : tipo === "gasto" ? "Gasto guardado" : "Ingreso guardado" });
     nav.volver();
   }
 
