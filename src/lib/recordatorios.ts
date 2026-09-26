@@ -33,9 +33,12 @@ export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], 
     if (!hechas.has(clave)) out.push({ tipo: "diario", clave, titulo: "¿Cargaste los gastos de hoy?", detalle: "Todavía no anotaste nada hoy." });
   }
 
-  // El resumen que cerró el mes pasado: se carga a principio de este mes.
-  if (r.resumen.activo && dia >= r.resumen.dia && anterior >= primerMes) {
+  // El resumen que cerró el mes pasado: se carga a principio de este mes. Solo desde
+  // que la tarjeta se registra completa (el historial de la app anterior no cuenta).
+  if (r.resumen.activo && dia >= r.resumen.dia) {
     for (const c of cuentas.filter(c => c.esTarjeta && !c.archivada)) {
+      const dias = movs.filter(m => m.cuentaId === c.id && periodoDe(m.fecha) === anterior).map(m => Number(m.fecha.slice(8)));
+      if (dias.length < 3 || Math.min(...dias) > 10) continue;
       const clave = `resumen|${c.id}|${anterior}`;
       if (resumenesCargados[`${c.id}|${anterior}`] || hechas.has(clave)) continue;
       out.push({ tipo: "resumen", clave, cuenta: c, periodo: anterior, titulo: `Subí el resumen de ${c.nombre}`, detalle: `El que cerró en ${nombreMes(anterior, false)}. Lo comparo con lo cargado y te pregunto lo que falte.` });
