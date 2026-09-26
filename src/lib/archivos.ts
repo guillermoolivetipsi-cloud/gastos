@@ -200,7 +200,11 @@ export interface Paquete {
   movimientos?: { id: string; tipo: Tipo; fecha: string; monto: number; moneda: Moneda; usd: number; cuenta: string; categoria: string; comentario?: string; yaEnFinanzas?: boolean }[];
   /** Corregir lo que ya hay, por id: nombre o categoría de un recurrente; categoría o
    *  comentario de un movimiento. Lo que no existe se ignora. */
+  /** Categorías nuevas: se crean si no hay una con ese nombre y tipo. */
+  categorias?: { nombre: string; tipo: Tipo; icono: string; color: string }[];
   actualizar?: {
+    /** Renombrar o archivar categorías existentes (se buscan por nombre y tipo). */
+    categorias?: { nombre: string; tipo: Tipo; nuevoNombre?: string; archivar?: boolean }[];
     recurrentes?: { id: string; nombre?: string; categoria?: string }[];
     movimientos?: { id: string; comentario?: string; categoria?: string }[];
     /** Estas reglas pisan a las que haya. */
@@ -214,8 +218,23 @@ export async function sumarPaquete(archivo: File) {
   const cats = await db.categorias.toArray(), cuentas = await db.cuentas.toArray();
   const cat = (n: string) => cats.find(c => c.nombre.toLowerCase() === n.toLowerCase());
   const cta = (n: string) => cuentas.find(c => c.nombre.toLowerCase() === n.toLowerCase());
-  const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, movimientos: 0, corregidos: 0, salteados: [] as string[] };
-  await db.transaction("rw", [db.recurrentes, db.movimientos, db.cuentas, db.ajustes], async () => {
+  const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, movimientos: 0, corregidos: 0, categorias: 0, salteados: [] as string[] };
+  await db.transaction("rw", [db.recurrentes, db.movimientos, db.cuentas, db.ajustes, db.categorias], async () => {
+    for (const u of p.actualizar?.categorias ?? []) {
+      const c = cats.find(x => x.nombre.toLowerCase() === u.nombre.toLowerCase() && x.tipo === u.tipo);
+      if (!c) continue;
+      const cambios = { ...(u.nuevoNombre ? { nombre: u.nuevoNombre } : {}), ...(u.archivar != null ? { archivada: u.archivar } : {}) };
+      await db.categorias.update(c.id, cambios);
+      Object.assign(c, cambios);
+      res.corregidos++;
+    }
+    for (const n of p.categorias ?? []) {
+      if (cats.some(x => x.nombre.toLowerCase() === n.nombre.toLowerCase() && x.tipo === n.tipo)) continue;
+      const c = { id: nuevoId(), ...n, orden: cats.length };
+      await db.categorias.add(c);
+      cats.push(c);
+      res.categorias++;
+    }
     for (const r of p.recurrentes ?? []) {
       const c = cat(r.categoria), k = cta(r.cuenta);
       if (!c || !k) { res.salteados.push(r.nombre); continue; }

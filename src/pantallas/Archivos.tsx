@@ -118,7 +118,7 @@ export function Respaldo() {
         {sumado && (
           <div className="chico" style={{ marginTop: 8 }}>
             <div className="ok">Sumado sin borrar nada: {[
-              sumado.movimientos && `${sumado.movimientos} movimientos`, sumado.recurrentes && `${sumado.recurrentes} recurrentes`,
+              sumado.categorias && `${sumado.categorias} categorías`, sumado.movimientos && `${sumado.movimientos} movimientos`, sumado.recurrentes && `${sumado.recurrentes} recurrentes`,
               sumado.pagos && `${sumado.pagos} pagos vinculados`, sumado.corregidos && `${sumado.corregidos} corregidos`, sumado.cuentas && `${sumado.cuentas} cuentas actualizadas`, sumado.reglas && `${sumado.reglas} comercios`,
             ].filter(Boolean).join(", ") || "ya estaba todo"}.</div>
             {sumado.salteados.length > 0 && <div className="ambar">No encontré la categoría o cuenta de: {sumado.salteados.join(", ")}</div>}
