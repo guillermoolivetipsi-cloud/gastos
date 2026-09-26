@@ -32,13 +32,6 @@ export function gastosFrecuentes(movs: Movimiento[]) {
   return [...grupos.values()].filter(g => g.n >= 2).sort((a, b) => b.n - a.n).slice(0, 6).map(g => g.m);
 }
 
-/** Las etiquetas más usadas, sin las que pediste dejar de sugerir. */
-export function etiquetasSugeridas(movs: Movimiento[], ocultas: string[]) {
-  const uso = new Map<string, number>();
-  for (const m of movs) for (const e of m.etiquetas) uso.set(e, (uso.get(e) ?? 0) + 1);
-  return [...uso.entries()].sort((a, b) => b[1] - a[1]).map(([e]) => e).filter(e => !ocultas.includes(e)).slice(0, 14);
-}
-
 export interface Borrador {
   tipo: Tipo; fecha: string; monto: number; moneda: Moneda; usd: number | null;
   cuentaId: string; categoriaId: string; comentario: string;
@@ -69,4 +62,33 @@ export function useRecurrenteSugerido(d: Datos, b: Borrador, activa: boolean, re
     if (!activa || (!b.categoriaId && !b.comentario.trim())) return null;
     return recurrenteParecido(b, pendientes.filter(i => !rechazados.includes(i.rec.id + i.clave)), d.tasaRec);
   }, [activa, b.tipo, b.fecha, b.monto, b.moneda, b.usd, b.cuentaId, b.categoriaId, b.comentario, pendientes, rechazados, d.tasaRec]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** Categorías de cada etiqueta: las que elegiste a mano (en Etiquetas) o, si no, las
+ *  categorías donde la usaste. */
+export function categoriasDeEtiquetas(movs: Movimiento[], asignadas: Record<string, string[]>) {
+  const usadas = new Map<string, Map<string, number>>();
+  for (const m of movs) for (const e of m.etiquetas) {
+    const porCat = usadas.get(e) ?? new Map<string, number>();
+    porCat.set(m.categoriaId, (porCat.get(m.categoriaId) ?? 0) + 1);
+    usadas.set(e, porCat);
+  }
+  const todas = new Set([...usadas.keys(), ...Object.keys(asignadas)]);
+  const out = new Map<string, { cats: string[]; usos: number }>();
+  for (const e of todas) {
+    const u = usadas.get(e);
+    const usos = u ? [...u.values()].reduce((a, b) => a + b, 0) : 0;
+    out.set(e, { cats: asignadas[e]?.length ? asignadas[e] : u ? [...u.keys()] : [], usos });
+  }
+  return out;
+}
+
+/** Para la carga: las etiquetas de la categoría elegida (las más usadas primero) y el
+ *  resto aparte, para "+ otras etiquetas". Sin las que dejaste de sugerir. */
+export function etiquetasParaCategoria(mapa: Map<string, { cats: string[]; usos: number }>, categoriaId: string, ocultas: string[]) {
+  const visibles = [...mapa.entries()].filter(([e]) => !ocultas.includes(e)).sort((a, b) => b[1].usos - a[1].usos || a[0].localeCompare(b[0]));
+  return {
+    propias: visibles.filter(([, v]) => v.cats.includes(categoriaId)).map(([e]) => e),
+    otras: visibles.filter(([, v]) => !v.cats.includes(categoriaId)).map(([e]) => e),
+  };
 }

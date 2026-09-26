@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDatos } from "../datos";
-import { db, leerAjuste, nuevoId } from "../db";
+import { db, guardarAjuste, leerAjuste, nuevoId } from "../db";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
@@ -10,7 +10,7 @@ import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias } from "../lib/fecha";
 import { leerNumero, num, redondear, simbolo } from "../lib/formato";
 import { cuotasDe, esDudosa, resumenDe, vencimiento } from "../lib/tarjeta";
 import { Hoja, Interruptor, Punto, Seg, useToast } from "../ui/piezas";
-import { categoriasPorUso, etiquetasSugeridas, gastosFrecuentes, useRecurrenteSugerido } from "./editorLogica";
+import { categoriasDeEtiquetas, categoriasPorUso, etiquetasParaCategoria, gastosFrecuentes, useRecurrenteSugerido } from "./editorLogica";
 import { T } from "../ui/Icono";
 
 type Props = Extract<Pantalla, { p: "editor" }>;
@@ -103,7 +103,11 @@ export function Editor(props: Props) {
   }
 
   const ocultas = useLiveQuery(() => leerAjuste<string[]>("etiquetasOcultas", []), []) ?? [];
-  const etiquetasUsadas = useMemo(() => etiquetasSugeridas(d.movimientos, ocultas), [d.movimientos, ocultas]);
+  // Etiquetas de la categoría elegida; el resto, en "+ otras etiquetas".
+  const asignadas = useLiveQuery(() => leerAjuste<Record<string, string[]>>("etiquetasCategorias", {}), []) ?? {};
+  const mapaEtiquetas = useMemo(() => categoriasDeEtiquetas(d.movimientos, asignadas), [d.movimientos, asignadas]);
+  const { propias, otras } = useMemo(() => etiquetasParaCategoria(mapaEtiquetas, categoriaId, ocultas), [mapaEtiquetas, categoriaId, ocultas]);
+  const [verOtras, setVerOtras] = useState(false);
 
   // ¿Este gasto es el pago de un recurrente pendiente?
   const candidato = useRecurrenteSugerido(d, { tipo, fecha, monto, moneda, usd: enUsd, cuentaId, categoriaId, comentario }, !vinculo && !existente, rechazados);
@@ -141,7 +145,13 @@ export function Editor(props: Props) {
         cuotas: esTarjeta && cuotas > 1 ? cuotas : undefined,
         recurrenteId: v?.recurrenteId, periodo: v?.periodo,
       }, cuenta);
-      toast({ texto: autoVinculado ? `Guardado como pago de ${autoVinculado}` : existente ? "Cambios guardados" : tipo === "gasto" ? "Gasto guardado" : "Ingreso guardado" });
+      const sumar = etiquetas.filter(e => asignadas[e]?.length && !asignadas[e].includes(categoriaId));
+    if (sumar.length) await db.transaction("rw", db.ajustes, async () => {
+      const actual = await leerAjuste<Record<string, string[]>>("etiquetasCategorias", {});
+      for (const e of sumar) actual[e] = [...new Set([...(actual[e] ?? []), categoriaId])];
+      await guardarAjuste("etiquetasCategorias", actual);
+    });
+    toast({ texto: autoVinculado ? `Guardado como pago de ${autoVinculado}` : existente ? "Cambios guardados" : tipo === "gasto" ? "Gasto guardado" : "Ingreso guardado" });
       nav.volver();
     } finally {
       setGuardando(false);
@@ -250,21 +260,26 @@ export function Editor(props: Props) {
         )}
       </div>
 
-      {/* Etiquetas siempre a mano: las más usadas, y "+" para una nueva. */}
+      {/* Etiquetas de la categoría elegida; "+ otras" muestra el resto. Una nueva queda en esta categoría. */}
       <div className="titulo-sec"><span>Etiquetas</span></div>
-      <div className="pills">
-        {[...new Set([...etiquetas, ...etiquetasUsadas])].map(e => (
-          <button key={e} className={`pill${etiquetas.includes(e) ? " on" : ""}`} onClick={() => setEtiquetas(x => x.includes(e) ? x.filter(y => y !== e) : [...x, e])}>{e}</button>
-        ))}
-        {nuevaEtq == null ? (
-          <button className="pill" onClick={() => setNuevaEtq("")}><T.IconPlus size={14} /> etiqueta</button>
-        ) : (
-          <input className="pill" autoFocus value={nuevaEtq} placeholder="Nueva" style={{ width: 120 }}
-            onChange={e => setNuevaEtq(e.target.value)}
-            onBlur={() => { const t = nuevaEtq.trim(); if (t) setEtiquetas(x => [...new Set([...x, t])]); setNuevaEtq(null); }}
-            onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
-        )}
-      </div>
+      {!categoriaId ? <div className="mini tenue">Elegí una categoría para ver sus etiquetas.</div> : (
+        <>
+          <div className="pills">
+            {[...new Set([...etiquetas, ...propias, ...(verOtras ? otras : [])])].map(e => (
+              <button key={e} className={`pill${etiquetas.includes(e) ? " on" : ""}`} onClick={() => setEtiquetas(x => x.includes(e) ? x.filter(y => y !== e) : [...x, e])}>{e}</button>
+            ))}
+            {nuevaEtq == null ? (
+              <button className="pill" onClick={() => setNuevaEtq("")}><T.IconPlus size={14} /> etiqueta</button>
+            ) : (
+              <input className="pill" autoFocus value={nuevaEtq} placeholder="Nueva" style={{ width: 120 }}
+                onChange={e => setNuevaEtq(e.target.value)}
+                onBlur={() => { const t = nuevaEtq.trim(); if (t) setEtiquetas(x => [...new Set([...x, t])]); setNuevaEtq(null); }}
+                onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
+            )}
+          </div>
+          {otras.length > 0 && <button className="mini viol" style={{ marginTop: 2 }} onClick={() => setVerOtras(!verOtras)}>{verOtras ? "− ocultar otras etiquetas" : `+ otras etiquetas (${otras.length})`}</button>}
+        </>
+      )}
 
       {candidato && (
         <div className="caja sug">

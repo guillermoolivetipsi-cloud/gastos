@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Categoria, Movimiento, Recurrente } from "../tipos";
-import { categoriasPorUso, etiquetasSugeridas, gastosFrecuentes, recurrenteParecido } from "./editorLogica";
+import { categoriasDeEtiquetas, categoriasPorUso, etiquetasParaCategoria, gastosFrecuentes, recurrenteParecido } from "./editorLogica";
 import { estadoDe, instanciasDelMes } from "../lib/recurrentes";
 
 let n = 0;
@@ -19,9 +19,12 @@ it("categorías: primero las más usadas; las archivadas no, salvo la elegida", 
   expect(categoriasPorUso(movs, cats, "gasto", "c").map(c => c.id)).toEqual(["b", "a", "c"]);
 });
 
-it("etiquetas: las más usadas, sin las que dejaste de sugerir", () => {
-  const movs = [mov({ etiquetas: ["Padel", "Gym"] }), mov({ etiquetas: ["Padel"] }), mov({ etiquetas: ["Viejo"] })];
-  expect(etiquetasSugeridas(movs, ["Viejo"])).toEqual(["Padel", "Gym"]);
+it("etiquetas: las de la categoría elegida primero, el resto aparte; las asignadas a mano mandan", () => {
+  const movs = [mov({ categoriaId: "dep", etiquetas: ["Padel", "Gym"] }), mov({ categoriaId: "dep", etiquetas: ["Padel"] }), mov({ categoriaId: "super", etiquetas: ["Verduleria"] }), mov({ categoriaId: "super", etiquetas: ["Viejo"] })];
+  const mapa = categoriasDeEtiquetas(movs, { Mallorca: ["trip", "ocio"], Gym: ["dep", "salud"] });
+  expect(etiquetasParaCategoria(mapa, "dep", ["Viejo"])).toEqual({ propias: ["Padel", "Gym"], otras: ["Verduleria", "Mallorca"] });
+  expect(etiquetasParaCategoria(mapa, "ocio", []).propias).toEqual(["Mallorca"]);
+  expect(etiquetasParaCategoria(mapa, "salud", []).propias).toEqual(["Gym"]);
 });
 
 it("sugiere el recurrente pendiente más parecido", () => {
