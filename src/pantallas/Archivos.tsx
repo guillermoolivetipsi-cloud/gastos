@@ -42,7 +42,7 @@ export function Exportar() {
           : <>{delMes} movimientos de {nombreMes(mes)}.</>}
       </div>
       <div className="tenue chico" style={{ lineHeight: 1.5 }}>
-        Un Excel con hojas Gastos e Ingresos: fecha, categoría, cuenta, monto en su moneda, etiquetas y comentario. El mismo formato que la app anterior: se importa en Finanzas igual que siempre.
+        Un Excel con hojas Gastos e Ingresos: fecha, categoría, cuenta, monto en su moneda, etiquetas y comentario. El mismo formato que la app anterior: se importa en Finanzas igual que siempre. También se baja una copia de seguridad de la app: guardala en Drive.
       </div>
       {editados && editados.length > 0 && (
         <div className="caja aviso" style={{ marginTop: 10 }}>
@@ -51,7 +51,13 @@ export function Exportar() {
         </div>
       )}
       <div className="pie-fijo">
-        <button className="btn" disabled={!cantidad} onClick={async () => { const n = await exportar(elegidos); toast({ texto: `Exportados ${n} movimientos` }); }}>
+        <button className="btn" disabled={!cantidad} onClick={async () => {
+          const n = await exportar(elegidos);
+          // Una vez por mes se exporta: se aprovecha para bajar también la copia de seguridad.
+          await new Promise(r => setTimeout(r, 800));
+          await copiaDeSeguridad();
+          toast({ texto: `Exportados ${n} movimientos · copia de seguridad descargada` });
+        }}>
           Exportar {cantidad ? `${cantidad} movimientos` : ""}
         </button>
       </div>
@@ -113,7 +119,7 @@ export function Respaldo() {
           <div className="chico" style={{ marginTop: 8 }}>
             <div className="ok">Sumado sin borrar nada: {[
               sumado.movimientos && `${sumado.movimientos} movimientos`, sumado.recurrentes && `${sumado.recurrentes} recurrentes`,
-              sumado.pagos && `${sumado.pagos} pagos vinculados`, sumado.cuentas && `${sumado.cuentas} cuentas actualizadas`, sumado.reglas && `${sumado.reglas} comercios`,
+              sumado.pagos && `${sumado.pagos} pagos vinculados`, sumado.corregidos && `${sumado.corregidos} corregidos`, sumado.cuentas && `${sumado.cuentas} cuentas actualizadas`, sumado.reglas && `${sumado.reglas} comercios`,
             ].filter(Boolean).join(", ") || "ya estaba todo"}.</div>
             {sumado.salteados.length > 0 && <div className="ambar">No encontré la categoría o cuenta de: {sumado.salteados.join(", ")}</div>}
           </div>

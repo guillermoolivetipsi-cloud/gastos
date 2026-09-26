@@ -198,6 +198,14 @@ export interface Paquete {
   reglasComercio?: Record<string, string>; // comercio → nombre de categoría
   /** Movimientos sueltos. `yaEnFinanzas`: se marcan exportados para no duplicarlos allá. */
   movimientos?: { id: string; tipo: Tipo; fecha: string; monto: number; moneda: Moneda; usd: number; cuenta: string; categoria: string; comentario?: string; yaEnFinanzas?: boolean }[];
+  /** Corregir lo que ya hay, por id: nombre o categoría de un recurrente; categoría o
+   *  comentario de un movimiento. Lo que no existe se ignora. */
+  actualizar?: {
+    recurrentes?: { id: string; nombre?: string; categoria?: string }[];
+    movimientos?: { id: string; comentario?: string; categoria?: string }[];
+    /** Estas reglas pisan a las que haya. */
+    reglasComercio?: Record<string, string>;
+  };
 }
 
 export async function sumarPaquete(archivo: File) {
@@ -206,7 +214,7 @@ export async function sumarPaquete(archivo: File) {
   const cats = await db.categorias.toArray(), cuentas = await db.cuentas.toArray();
   const cat = (n: string) => cats.find(c => c.nombre.toLowerCase() === n.toLowerCase());
   const cta = (n: string) => cuentas.find(c => c.nombre.toLowerCase() === n.toLowerCase());
-  const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, movimientos: 0, salteados: [] as string[] };
+  const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, movimientos: 0, corregidos: 0, salteados: [] as string[] };
   await db.transaction("rw", [db.recurrentes, db.movimientos, db.cuentas, db.ajustes], async () => {
     for (const r of p.recurrentes ?? []) {
       const c = cat(r.categoria), k = cta(r.cuenta);
@@ -240,6 +248,26 @@ export async function sumarPaquete(archivo: File) {
       const cierres = cambios.cierres && Object.keys(cambios.cierres).length ? { ...(k.cierres ?? {}), ...cambios.cierres } : cambios.cierres;
       await db.cuentas.update(k.id, { ...cambios, ...(cierres ? { cierres } : {}) });
       res.cuentas++;
+    }
+    const act = p.actualizar;
+    for (const u of act?.recurrentes ?? []) {
+      const r = await db.recurrentes.get(u.id);
+      if (!r) continue;
+      const c = u.categoria ? cat(u.categoria) : undefined;
+      await db.recurrentes.update(u.id, { ...(u.nombre ? { nombre: u.nombre } : {}), ...(c ? { categoriaId: c.id } : {}) });
+      res.corregidos++;
+    }
+    for (const u of act?.movimientos ?? []) {
+      const m = await db.movimientos.get(u.id);
+      if (!m) continue;
+      const c = u.categoria ? cat(u.categoria) : undefined;
+      await db.movimientos.update(u.id, { ...(u.comentario ? { comentario: u.comentario } : {}), ...(c ? { categoriaId: c.id } : {}), modificado: new Date().toISOString() });
+      res.corregidos++;
+    }
+    if (act?.reglasComercio) {
+      const actuales = ((await db.ajustes.get("reglasComercio"))?.valor ?? {}) as Record<string, string>;
+      for (const [k, n] of Object.entries(act.reglasComercio)) { const c = cat(n); if (c) actuales[k] = c.id; }
+      await db.ajustes.put({ clave: "reglasComercio", valor: actuales });
     }
     if (p.reglasComercio) {
       const actuales = ((await db.ajustes.get("reglasComercio"))?.valor ?? {}) as Record<string, string>;
