@@ -105,7 +105,7 @@ export function Respaldo() {
       <div className="titulo-sec"><span>Copia de seguridad</span></div>
       <div className="caja">
         <div className="chico">Tus datos viven solo en este celular. La copia es un archivo: guardalo en Drive o mandátelo por mail.</div>
-        <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(ultimo.slice(0, 10)) : "nunca"} · te aviso en "Para revisar" si pasa más de una semana.</div>
+        <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(ultimo.slice(0, 10)) : "nunca"} · se baja sola cada vez que exportás a Finanzas.</div>
         {persistente === false && <div className="mini ambar" style={{ marginTop: 4 }}>Instalá la app en la pantalla de inicio para que Android no borre los datos si le falta espacio.</div>}
         <div className="botones"><button className="btn1" onClick={copiaDeSeguridad}>Hacer copia ahora</button></div>
         {/* Sin filtro de tipo: Android a veces no reconoce el .json que llega por

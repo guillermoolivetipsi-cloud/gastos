@@ -3,7 +3,7 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Clase, type Frecuencia, type Moneda, type Recurrente, type Tipo } from "../tipos";
-import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, type Alcance } from "../lib/acciones";
+import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
@@ -86,12 +86,7 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
     // lo cargaste) quedan como pagos de este recurrente.
     if (props.desdeSugerencia && !existente) {
       const s = detectarRecurrentes(d.movimientos, d.categorias, d.recurrentes, descartesSet(d.descartes)).find(s => s.clave === props.desdeSugerencia);
-      if (s) {
-        const [, catId, texto] = s.clave.split("|");
-        const norm = (x: string) => x.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-        const pagos = d.movimientos.filter(m => !m.recurrenteId && m.categoriaId === catId && m.tipo === s.tipo && m.fecha.slice(0, 7) >= s.meses[0] && norm(m.comentario || m.etiquetas[0] || "") === texto);
-        await db.movimientos.bulkUpdate(pagos.map(m => ({ key: m.id, changes: { recurrenteId: r.id, periodo: m.fecha.slice(0, 7) } })));
-      }
+      if (s) await vincularPagosDeSugerencia(r.id, s, d.movimientos);
     }
     toast({ texto: existente ? "Recurrente guardado" : "Recurrente creado" });
     nav.volver();

@@ -12,7 +12,7 @@ import { Editor } from "./pantallas/Editor";
 import { EditorCategoria, ListaCategorias, Objetivos } from "./pantallas/Categorias";
 import { EditorCuenta, ListaCuentas, Tarjeta } from "./pantallas/Cuentas";
 import { EditorRecurrente, Instancia, ListaRecurrentes } from "./pantallas/Recurrentes";
-import { Revisar } from "./pantallas/Revisar";
+import { Clases, Revisar } from "./pantallas/Revisar";
 import { Exportar, Respaldo } from "./pantallas/Archivos";
 import { Ajustes } from "./pantallas/Ajustes";
 import { SubirResumen } from "./pantallas/SubirResumen";
@@ -39,6 +39,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "subir-resumen": return <SubirResumen cuentaId={p.cuentaId} />;
     case "etiquetas": return <Etiquetas />;
     case "como-venis": return <ComoVenis periodo={p.periodo} />;
+    case "clases": return <Clases />;
   }
 }
 

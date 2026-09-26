@@ -1,5 +1,6 @@
 import { db, nuevoId } from "../db";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
+import type { SugerenciaRecurrente } from "./analisis";
 import { aUsd, cotizar } from "./cotizaciones";
 import { diasDelMes, periodoHoy, sumarDias } from "./fecha";
 
@@ -79,6 +80,32 @@ export async function marcarEnCero(r: Recurrente, clave: string, enCero: boolean
   if (enCero) actual.add(clave); else actual.delete(clave);
   await db.recurrentes.update(r.id, { enCero: [...actual] });
 }
+
+/** Los gastos que originaron una sugerencia (y el de este mes, si ya está) pasan a
+ *  ser pagos del recurrente. */
+export async function vincularPagosDeSugerencia(recId: string, s: SugerenciaRecurrente, movs: Movimiento[]) {
+  const [, catId, texto] = s.clave.split("|");
+  const norm = (x: string) => x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const pagos = movs.filter(m => !m.recurrenteId && m.categoriaId === catId && m.tipo === s.tipo && m.fecha.slice(0, 7) >= s.meses[0] && norm(m.comentario || m.etiquetas[0] || "") === texto);
+  await db.movimientos.bulkUpdate(pagos.map(m => ({ key: m.id, changes: { recurrenteId: recId, periodo: m.fecha.slice(0, 7) } })));
+}
+
+/** "Es recurrente" con un toque: se crea con lo sugerido (mensual, avisar). */
+export async function crearDesdeSugerencia(s: SugerenciaRecurrente, movs: Movimiento[]) {
+  const id = nuevoId();
+  await db.recurrentes.add({
+    id, nombre: s.nombre, tipo: s.tipo, categoriaId: s.categoriaId, cuentaId: s.cuentaId, monto: s.monto, moneda: s.moneda,
+    clase: s.clase, frecuencia: "mensual", dia: s.dia, inicio: `${s.meses[0]}-01`, modo: "avisar", activo: true,
+  });
+  await vincularPagosDeSugerencia(id, s, movs);
+  return async () => {
+    await db.movimientos.where("recurrenteId").equals(id).modify({ recurrenteId: undefined, periodo: undefined });
+    await db.recurrentes.delete(id);
+  };
+}
+
+/** "Ahora no": la sugerencia se esconde por 30 días. */
+export const pausar = (clave: string) => descartar(`pausa|${clave}`);
 
 export async function descartar(clave: string) {
   await db.descartes.put({ clave, fecha: new Date().toISOString() });

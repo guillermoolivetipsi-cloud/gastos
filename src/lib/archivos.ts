@@ -2,7 +2,7 @@ type XLSXMod = typeof import("xlsx");
 // La librería de Excel pesa: se carga solo al exportar o importar.
 const xlsx = () => import("xlsx");
 import { db, guardarAjuste, nuevoId, sembrar } from "../db";
-import type { Categoria, Cuenta, Moneda, Movimiento, Recurrente, Tipo } from "../tipos";
+import type { Categoria, Clase, Cuenta, Moneda, Movimiento, Recurrente, Tipo } from "../tipos";
 import { aTexto, periodoDe } from "./fecha";
 import { aUsd, precargarHistoria, cotizar } from "./cotizaciones";
 
@@ -210,7 +210,7 @@ export interface Paquete {
   categorias?: { nombre: string; tipo: Tipo; icono: string; color: string }[];
   actualizar?: {
     /** Renombrar o archivar categorías existentes (se buscan por nombre y tipo). */
-    categorias?: { nombre: string; tipo: Tipo; nuevoNombre?: string; archivar?: boolean }[];
+    categorias?: { nombre: string; tipo: Tipo; nuevoNombre?: string; archivar?: boolean; clase?: Clase }[];
     recurrentes?: { id: string; nombre?: string; categoria?: string }[];
     movimientos?: { id: string; comentario?: string; categoria?: string }[];
     /** Estas reglas pisan a las que haya. */
@@ -231,7 +231,11 @@ export async function sumarPaquete(archivo: File) {
     for (const u of p.actualizar?.categorias ?? []) {
       const c = cats.find(x => igual(x.nombre, u.nombre) && x.tipo === u.tipo);
       if (!c) continue;
-      const cambios = { ...(u.nuevoNombre ? { nombre: u.nuevoNombre } : {}), ...(u.archivar != null ? { archivada: u.archivar } : {}) };
+      const cambios = {
+        ...(u.nuevoNombre ? { nombre: u.nuevoNombre } : {}),
+        ...(u.archivar != null ? { archivada: u.archivar } : {}),
+        ...(u.clase ? { clase: u.clase, claseConfirmada: true } : {}),
+      };
       await db.categorias.update(c.id, cambios);
       Object.assign(c, cambios);
       res.corregidos++;

@@ -24,7 +24,8 @@ export type Pantalla =
   | { p: "ajustes" }
   | { p: "subir-resumen"; cuentaId?: string }
   | { p: "etiquetas" }
-  | { p: "como-venis"; periodo: string };
+  | { p: "como-venis"; periodo: string }
+  | { p: "clases" };
 
 type Nav = {
   solapa: Solapa;
