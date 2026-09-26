@@ -1,14 +1,13 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
 import { eliminarMovimiento } from "../lib/acciones";
 import { usdDe } from "../lib/analisis";
 import { fechaCorta, fechaLarga } from "../lib/fecha";
-import { num } from "../lib/formato";
+import { num, sinAcentos } from "../lib/formato";
 import { Deslizable, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
-const normal = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export function Movimientos() {
   const d = useDatos();
@@ -25,15 +24,18 @@ export function Movimientos() {
   const cta = useMemo(() => new Map(d.cuentas.map(c => [c.id, c])), [d.cuentas]);
   const rec = useMemo(() => new Map(d.recurrentes.map(r => [r.id, r])), [d.recurrentes]);
 
+  // El texto de búsqueda de cada movimiento se arma una vez, no en cada tecla.
+  const textos = useMemo(() => new Map(d.movimientos.map(m => [m.id, sinAcentos([cat.get(m.categoriaId)?.nombre, cta.get(m.cuentaId)?.nombre, m.comentario, ...m.etiquetas, String(m.monto)].join(" "))])), [d.movimientos, cat, cta]);
+  const qDiferida = useDeferredValue(q);
   const lista = useMemo(() => {
-    const t = normal(q.trim());
+    const t = sinAcentos(qDiferida);
     return d.movimientos
       .filter(m => tipo === "todos" || m.tipo === tipo)
       .filter(m => medio === "todos" || (medio === "sin" ? !cta.get(m.cuentaId)?.esTarjeta : m.cuentaId === medio))
       .filter(m => !catFiltro || m.categoriaId === catFiltro)
-      .filter(m => !t || normal([cat.get(m.categoriaId)?.nombre, cta.get(m.cuentaId)?.nombre, m.comentario, ...m.etiquetas, String(m.monto)].join(" ")).includes(t))
+      .filter(m => !t || textos.get(m.id)!.includes(t))
       .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
-  }, [d.movimientos, q, tipo, cat, cta, medio, catFiltro]);
+  }, [d.movimientos, qDiferida, textos, tipo, cta, medio, catFiltro]);
   const filtrando = medio !== "todos" || !!catFiltro || !!q.trim();
   const totalFiltrado = lista.reduce((s, m) => s + (m.tipo === "gasto" ? 1 : -1) * usdDe(m), 0);
 

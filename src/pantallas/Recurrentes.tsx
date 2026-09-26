@@ -3,7 +3,7 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Clase, type Frecuencia, type Moneda, type Recurrente, type Tipo } from "../tipos";
-import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
+import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincular, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
@@ -272,8 +272,8 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
           if (!lista.length) return <div className="tenue chico">No hay gastos sin vincular ese mes.</div>;
           return lista.map(m => (
             <button key={m.id} className="opcion" onClick={async () => {
-              await db.movimientos.update(m.id, { recurrenteId: r.id, periodo: clave, modificado: new Date().toISOString() });
-              setElegir(false); toast({ texto: `Vinculado como pago de ${r.nombre}` });
+              const deshacer = await vincular(m.id, r.id, clave);
+              setElegir(false); toast({ texto: `Vinculado como pago de ${r.nombre}`, deshacer });
             }}>
               <div className="fila" style={{ padding: 0 }}>
                 <span>{fechaCorta(m.fecha, false)} · {d.categorias.find(c => c.id === m.categoriaId)?.nombre}{m.comentario ? ` · ${m.comentario}` : ""}</span>

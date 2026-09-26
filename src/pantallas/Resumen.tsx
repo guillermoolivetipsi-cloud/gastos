@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useDatos } from "../datos";
+import { useDatos, usePendientes } from "../datos";
 import { db } from "../db";
 import { useNav } from "../nav";
 import type { Categoria, Movimiento, Tipo } from "../tipos";
 import { avanceDelMes, bloques, claseProvisoria, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { fechaCorta, hoy, moverAncla, nombreMes, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
 import { num, usd } from "../lib/formato";
-import { pendientes, useExtras } from "../lib/revisar";
 import { Barra, Dona, Hoja, Punto } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
 import { useInsights } from "./ComoVenis";
@@ -43,8 +42,7 @@ export function Resumen() {
   const porCargar = instancias.filter(i => !conTarjeta.has(i.rec.cuentaId) && (i.estado === "por-cargar" || (i.estado === "parcial" && i.fecha <= hoy())));
   const clase = useMemo(() => claseProvisoria(d.categorias, d.movimientos), [d.categorias, d.movimientos]);
   const b = esMes && tipo === "gasto" ? bloques(periodo, movs, d.categorias, d.recurrentes, instancias.filter(i => i.estado !== "cargado"), tasa, clase) : null;
-  const extras = useExtras();
-  const revisar = d.listo && extras ? pendientes(d, extras).total : 0;
+  const revisar = usePendientes()?.total ?? 0;
 
   const vacio = tipo === "gasto" ? "Sin gastos" : "Sin ingresos";
   const enEsto = { dia: "este día", semana: "esta semana", mes: "este mes", anio: "este año", periodo: "este período" }[vista];

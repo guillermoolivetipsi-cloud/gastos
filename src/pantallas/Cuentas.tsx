@@ -95,13 +95,8 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
   const porCompra = new Map<string, typeof futuras>();
   for (const q of futuras) porCompra.set(q.mov.id, [...(porCompra.get(q.mov.id) ?? []), q]);
 
-  async function borrarCierre() {
-    const { [periodo]: _, ...resto } = c!.cierres ?? {};
-    await db.cuentas.update(c!.id, { cierres: resto });
-  }
-  async function confirmarCierre(dia: number) {
-    await db.cuentas.update(c!.id, { cierres: { ...(c!.cierres ?? {}), [periodo]: dia } });
-  }
+  const borrarCierre = () => db.cuentas.where("id").equals(c!.id).modify(x => { const { [periodo]: _, ...resto } = x.cierres ?? {}; x.cierres = resto; });
+  const confirmarCierre = (dia: number) => db.cuentas.where("id").equals(c!.id).modify(x => { x.cierres = { ...(x.cierres ?? {}), [periodo]: dia }; });
 
   return (
     <div className="pantalla sin-tabs">

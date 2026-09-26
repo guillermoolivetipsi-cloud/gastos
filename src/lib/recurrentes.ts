@@ -1,8 +1,8 @@
-import { db, nuevoId } from "../db";
+import { db } from "../db";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
 import { cotizar, aUsd } from "./cotizaciones";
 import { aFecha, diasDelMes, fechaEnMes, hoy, periodoDe, sumarMeses } from "./fecha";
-import { redondear } from "./formato";
+import { redondear, sinAcentos } from "./formato";
 
 /* Un recurrente es algo que se repite: el alquiler, las expensas, un ingreso.
    Cada vez que toca es una "instancia", con su clave:
@@ -94,8 +94,14 @@ export function estadoDe(i: Instancia, movs: Movimiento[], tasaRec: number | nul
   };
 }
 
-/** Los recurrentes en modo "se carga solo" que ya vencieron y no tienen pago. */
-export async function cargarAutomaticos() {
+/** Los recurrentes en modo "se carga solo" que ya vencieron y no tienen pago.
+ *  Una sola corrida a la vez (la app la dispara al abrir, al volver y al reconectar),
+ *  y cada pago automático tiene id fijo: aunque dos corridas se crucen, no se duplica. */
+let cargando: Promise<number> | null = null;
+export function cargarAutomaticos() {
+  return (cargando ??= cargarAutomaticosUnaVez().finally(() => { cargando = null; }));
+}
+async function cargarAutomaticosUnaVez() {
   const recs = (await db.recurrentes.toArray()).filter(r => r.activo && r.modo === "auto");
   if (!recs.length) return 0;
   const cuentas = new Map((await db.cuentas.toArray()).map(c => [c.id, c] as [string, Cuenta]));
@@ -109,8 +115,10 @@ export async function cargarAutomaticos() {
         if (ya) continue;
         const cot = await cotizar(r.moneda, i.fecha, cuentas.get(r.cuentaId)?.dolar ?? "blue");
         const ahora = new Date().toISOString();
+        const id = `auto|${r.id}|${i.clave}`;
+        if (await db.movimientos.get(id)) continue;
         await db.movimientos.add({
-          id: nuevoId(), tipo: r.tipo, fecha: i.fecha, monto: r.monto, moneda: r.moneda,
+          id, tipo: r.tipo, fecha: i.fecha, monto: r.monto, moneda: r.moneda,
           usd: cot ? aUsd(r.monto, cot.tasa) : null, cotizacion: cot ?? undefined,
           cuentaId: r.cuentaId, categoriaId: r.categoriaId, etiquetas: [], comentario: r.nombre,
           recurrenteId: r.id, periodo: i.clave, creado: ahora, modificado: ahora,
@@ -139,7 +147,6 @@ export function recurrenteDe(m: Movimiento, recs: Recurrente[], movs: Movimiento
   return null;
 }
 
-const sinAcentos = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 /** El comentario del gasto nombra al recurrente ("gas", "Pago expensas"). */
 export const nombraA = (m: Movimiento, r: Recurrente) => !!m.comentario && sinAcentos(m.comentario).includes(sinAcentos(r.nombre));
 

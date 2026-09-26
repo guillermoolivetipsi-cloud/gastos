@@ -1,9 +1,9 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import type { useDatos } from "../datos";
+import type { Datos } from "../datos";
 import { leerAjuste } from "../db";
 import { RECORDATORIOS, tareas, type Recordatorios, type Tarea } from "./recordatorios";
 import { cambiosDePrecio, cierresDudosos, descartesSet, detectarRecurrentes, sugerirClase, type CambioPrecio, type CierreDudoso, type SugerenciaClase, type SugerenciaRecurrente } from "./analisis";
-import { diasEntre, hoy, periodoHoy, sumarMeses } from "./fecha";
+import { diaLocal, diasEntre, hoy, periodoHoy, sumarMeses } from "./fecha";
 import { recurrentesDelMes } from "./analisis";
 import { sugerirVinculos, type EstadoInstancia } from "./recurrentes";
 import type { Movimiento } from "../tipos";
@@ -39,10 +39,10 @@ export function useExtras(): Extras | undefined {
   }), []);
 }
 
-export function pendientes(d: ReturnType<typeof useDatos>, x: Extras): Pendientes {
+export function pendientes(d: Datos, x: Extras): Pendientes {
   const ds = descartesSet(d.descartes);
   // "Ahora no" esconde algo por 30 días (una tarea, por 3).
-  const pausas = new Map(d.descartes.filter(z => z.clave.startsWith("pausa|")).map(z => [z.clave.slice(6), z.fecha.slice(0, 10)]));
+  const pausas = new Map(d.descartes.filter(z => z.clave.startsWith("pausa|")).map(z => [z.clave.slice(6), diaLocal(z.fecha)]));
   const pausado = (k: string, dias = 30) => { const f = pausas.get(k); return !!f && diasEntre(f, hoy()) < dias; };
 
   // Fijo o variable: se revisan todas juntas en una lista, así que cuenta como uno.

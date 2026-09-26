@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
-import { recurrentesDelMes } from "../lib/analisis";
-import { fechaCierre, cuotasFuturas, resumenQueVence } from "../lib/tarjeta";
-import { fechaCorta, nombreMes, periodoHoy, sumarDias, sumarMeses } from "../lib/fecha";
+import { aPagarTarjeta, recurrentesDelMes } from "../lib/analisis";
+import { cuotasFuturas, resumenQueVence } from "../lib/tarjeta";
+import { fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import type { EstadoInstancia } from "../lib/recurrentes";
-import type { Cuenta } from "../tipos";
 import { Barra, Punto, useToast } from "../ui/piezas";
-import { db } from "../db";
-import { descartar, marcarEnCero } from "../lib/acciones";
+import { descartar, marcarEnCero, vincular } from "../lib/acciones";
 import { sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
 
@@ -67,13 +65,13 @@ function Recurrentes({ periodo }: { periodo: string }) {
   const toast = useToast();
   const descartados = new Set(d.descartes.map(x => x.clave));
   const sugeridos = sugerirVinculos(insts, d.movimientos, tasa, (m, r) => descartados.has(`vinc|${m}|${r}`));
-  async function vincular(m: (typeof d.movimientos)[number], i: EstadoInstancia) {
-    await db.movimientos.update(m.id, { recurrenteId: i.rec.id, periodo: i.clave, modificado: new Date().toISOString() });
-    toast({ texto: `Vinculado como pago de ${i.rec.nombre}`, deshacer: () => { db.movimientos.update(m.id, { recurrenteId: undefined, periodo: undefined }); } });
+  async function esEste(m: (typeof d.movimientos)[number], i: EstadoInstancia) {
+    const deshacer = await vincular(m.id, i.rec.id, i.clave);
+    toast({ texto: `Vinculado como pago de ${i.rec.nombre}`, deshacer });
   }
   async function enCero(i: EstadoInstancia) {
     await marcarEnCero(i.rec, i.clave, true);
-    toast({ texto: `${i.rec.nombre}: este mes en 0`, deshacer: () => { marcarEnCero({ ...i.rec, enCero: [...(i.rec.enCero ?? []), i.clave] }, i.clave, false); } });
+    toast({ texto: `${i.rec.nombre}: este mes en 0`, deshacer: () => { marcarEnCero(i.rec, i.clave, false); } });
   }
   const monto = (i: EstadoInstancia) => `${i.estimado ? "~" : ""}${num(i.estado === "parcial" ? i.falta : i.esperado)} ${i.rec.moneda}`;
   const cargar = (i: EstadoInstancia) => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: i.fecha });
@@ -128,7 +126,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
               <div className="caja sug" style={{ margin: "0 0 8px", padding: "8px 10px" }}>
                 <div className="mini">¿Ya lo cargaste? <span className="tenue">{fechaCorta(ya.fecha, false)} · {cat.get(ya.categoriaId)?.nombre}{ya.comentario ? ` · ${ya.comentario}` : ""} · {num(ya.monto)} {ya.moneda}</span></div>
                 <div className="botones" style={{ marginTop: 6 }}>
-                  <button className="btn1" style={{ padding: "4px 8px" }} onClick={() => vincular(ya, i)}>Es este</button>
+                  <button className="btn1" style={{ padding: "4px 8px" }} onClick={() => esEste(ya, i)}>Es este</button>
                   <button className="btn2" style={{ padding: "4px 8px" }} onClick={() => descartar(`vinc|${ya.id}|${i.rec.id}`)}>No</button>
                 </div>
               </div>
@@ -200,24 +198,12 @@ function Tarjetas({ periodo }: { periodo: string }) {
   const d = useDatos();
   const nav = useNav();
   const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada);
-  const desde = (c: Cuenta, p: string) => sumarDias(fechaCierre(c, sumarMeses(p, -1)), 1);
   const tasaR = (r: EstadoInstancia["rec"]) => d.tasas.rec(r, d.cuentas);
-  /** Los recurrentes de esta tarjeta que caen en el período del resumen: cobrados o previstos. */
-  const recurrentesDe = (c: Cuenta, p: string, desdeF: string, hastaF: string) => {
-    const insts = [p, sumarMeses(p, -1)].flatMap(q => recurrentesDelMes(d.recurrentes.filter(r => r.cuentaId === c.id && r.tipo === "gasto"), d.movimientos, q, tasaR))
-      .filter(i => i.fecha >= desdeF && i.fecha <= hastaF);
-    const previsto = redondear(insts.filter(i => i.estado !== "cargado").reduce((s, i) => { const t = tasaR(i.rec); return s + (t ? i.esperado / t : 0); }, 0));
-    return { insts, previsto };
-  };
-  const resumenes = tarjetas.map(c => resumenQueVence(c, d.movimientos, periodo));
-  const conPrevistos = resumenes.map(r => ({ r, ...recurrentesDe(r.cuenta, r.periodo, desde(r.cuenta, r.periodo), r.cierre) }));
-  const total = redondear(conPrevistos.reduce((s, x) => s + x.r.total + (x.r.confirmado ? 0 : x.previsto), 0));
-  const hayEstimados = conPrevistos.some(x => (x.r.items.length || x.insts.length) && !x.r.confirmado);
+  const aPagar = tarjetas.map(c => aPagarTarjeta(c, d.movimientos, d.recurrentes, periodo, tasaR));
+  const total = redondear(aPagar.reduce((s, x) => s + x.total, 0));
+  const hayEstimados = aPagar.some(x => (x.resumen.items.length || x.insts.length) && !x.resumen.confirmado);
   const siguiente = sumarMeses(periodo, 1);
-  const juntando = redondear(tarjetas.reduce((s, c) => {
-    const r = resumenQueVence(c, d.movimientos, siguiente);
-    return s + r.total + recurrentesDe(c, r.periodo, desde(c, r.periodo), r.cierre).previsto;
-  }, 0));
+  const juntando = redondear(tarjetas.reduce((s, c) => s + aPagarTarjeta(c, d.movimientos, d.recurrentes, siguiente, tasaR).total, 0));
 
   if (!tarjetas.length) return <div className="vacio">No tenés tarjetas cargadas.</div>;
   return (
@@ -228,8 +214,7 @@ function Tarjetas({ periodo }: { periodo: string }) {
         {hayEstimados && <div className="mini tenue">Estimado con lo que cargaste. Se confirma al subir cada resumen.</div>}
       </div>
 
-      {conPrevistos.map(({ r, insts, previsto }) => {
-        const totalR = r.total + (r.confirmado ? 0 : previsto);
+      {aPagar.map(({ resumen: r, insts, previsto, total: totalR, desde }) => {
         return (
           <div key={r.cuenta.id} className="caja">
             <div className="fila" style={{ padding: 0 }}>
@@ -242,7 +227,7 @@ function Tarjetas({ periodo }: { periodo: string }) {
                   <span className="mediano num">{r.confirmado ? "" : "~"}{num(totalR)} <span className="chico tenue">USD</span></span>
                   <span className="tenue chico">vence ~{fechaCorta(r.vence, false)}</span>
                 </div>
-                <div className="mini tenue">compras del {fechaCorta(desde(r.cuenta, r.periodo), false)} al {fechaCorta(r.cierre, false)} · {r.items.length} consumos{r.enCuotas > 0 ? ` · ${num(r.enCuotas)} en cuotas` : ""}</div>
+                <div className="mini tenue">compras del {fechaCorta(desde, false)} al {fechaCorta(r.cierre, false)} · {r.items.length} consumos{r.enCuotas > 0 ? ` · ${num(r.enCuotas)} en cuotas` : ""}</div>
                 {insts.length > 0 && (
                   <div className="sep" style={{ marginTop: 8, paddingTop: 6 }}>
                     <div className="mini tenue" style={{ marginBottom: 2 }}>Recurrentes de este resumen{previsto > 0 && !r.confirmado ? ` · ${num(previsto, 0)} USD previstos incluidos` : ""}</div>

@@ -3,7 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, leerAjuste } from "../db";
 import { useNav } from "../nav";
 import { copiaDeSeguridad, editadosDespues, exportar, importarXlsx, mesesSinExportar, restaurar, sumarPaquete, type ResultadoImport } from "../lib/archivos";
-import { fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
+import { diaLocal, fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -25,7 +25,7 @@ export function Exportar() {
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Exportar a Finanzas</h1></div>
       <div className="dos">
         <div className="caja"><div className="etq">Sin exportar</div><div className="mediano num">{sinExportar ?? "…"}</div></div>
-        <div className="caja"><div className="etq">Última vez</div><div className="mediano">{ultima ? fechaCorta(ultima.slice(0, 10)) : "nunca"}</div></div>
+        <div className="caja"><div className="etq">Última vez</div><div className="mediano">{ultima ? fechaCorta(diaLocal(ultima)) : "nunca"}</div></div>
       </div>
       <div className="pills" style={{ margin: "6px 0 10px" }}>
         <button className={`pill${modo === "nuevo" ? " on" : ""}`} onClick={() => setModo("nuevo")}>Lo nuevo</button>
@@ -105,7 +105,7 @@ export function Respaldo() {
       <div className="titulo-sec"><span>Copia de seguridad</span></div>
       <div className="caja">
         <div className="chico">Tus datos viven solo en este celular. La copia es un archivo: guardalo en Drive o mandátelo por mail.</div>
-        <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(ultimo.slice(0, 10)) : "nunca"} · se baja sola cada vez que exportás a Finanzas.</div>
+        <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(diaLocal(ultimo)) : "nunca"} · se baja sola cada vez que exportás a Finanzas.</div>
         {persistente === false && <div className="mini ambar" style={{ marginTop: 4 }}>Instalá la app en la pantalla de inicio para que Android no borre los datos si le falta espacio.</div>}
         <div className="botones"><button className="btn1" onClick={copiaDeSeguridad}>Hacer copia ahora</button></div>
         {/* Sin filtro de tipo: Android a veces no reconoce el .json que llega por

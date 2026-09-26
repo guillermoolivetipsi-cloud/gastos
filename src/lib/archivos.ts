@@ -85,13 +85,13 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
   const vistos = new Map<string, number>();
   const res: ResultadoImport = { nuevos: 0, repetidos: 0, sinCotizar: 0, categoriasNuevas: [], cuentasNuevas: [] };
   const nuevos: Movimiento[] = [];
+  const catsNuevas: Categoria[] = [], ctasNuevas: Cuenta[] = [];
 
   const categoria = (nombre: string, tipo: Tipo): Categoria => {
     let c = cats.find(c => c.nombre.toLowerCase() === nombre.toLowerCase() && c.tipo === tipo);
     if (!c) {
       c = { id: nuevoId(), nombre, tipo, icono: "question-mark", color: "#6B6880", orden: cats.length };
-      cats.push(c); res.categoriasNuevas.push(nombre);
-      db.categorias.add(c);
+      cats.push(c); res.categoriasNuevas.push(nombre); catsNuevas.push(c);
     }
     return c;
   };
@@ -99,8 +99,7 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
     let c = cuentas.find(c => c.nombre.toLowerCase() === nombre.toLowerCase());
     if (!c) {
       c = { id: nuevoId(), nombre, moneda, dolar: "blue", esTarjeta: false, orden: cuentas.length };
-      cuentas.push(c); res.cuentasNuevas.push(nombre);
-      db.cuentas.add(c);
+      cuentas.push(c); res.cuentasNuevas.push(nombre); ctasNuevas.push(c);
     }
     return c;
   };
@@ -145,7 +144,12 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
     }
     if (++i % 200 === 0) avance?.(`Convirtiendo ${i} de ${nuevos.length}…`);
   }
-  await db.movimientos.bulkAdd(nuevos);
+  // Categorías, cuentas y movimientos nuevos entran juntos: o todo, o nada.
+  await db.transaction("rw", [db.categorias, db.cuentas, db.movimientos], async () => {
+    await db.categorias.bulkAdd(catsNuevas);
+    await db.cuentas.bulkAdd(ctasNuevas);
+    await db.movimientos.bulkAdd(nuevos);
+  });
   res.nuevos = nuevos.length;
   return res;
 }
@@ -153,7 +157,8 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
 /* ── Copia de seguridad ─────────────────────────────────────────────────── */
 
 export async function copiaDeSeguridad() {
-  const datos = {
+  // Todo leído en una sola transacción: una foto consistente aunque algo se esté guardando.
+  const datos = await db.transaction("r", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes], async () => ({
     app: "gastos", version: 1, fecha: new Date().toISOString(),
     cuentas: await db.cuentas.toArray(),
     categorias: await db.categorias.toArray(),
@@ -161,7 +166,7 @@ export async function copiaDeSeguridad() {
     recurrentes: await db.recurrentes.toArray(),
     descartes: await db.descartes.toArray(),
     ajustes: (await db.ajustes.toArray()).filter(a => a.clave !== "cotizaciones"),
-  };
+  }));
   descargar(new Blob([JSON.stringify(datos)], { type: "application/json" }), `gastos-respaldo-${aTexto(new Date())}.json`);
   await guardarAjuste("ultimoRespaldo", datos.fecha);
 }
@@ -169,6 +174,12 @@ export async function copiaDeSeguridad() {
 export async function restaurar(archivo: File) {
   const d = JSON.parse(await archivo.text());
   if (d.app !== "gastos") throw new Error("Este archivo no es una copia de seguridad de Gastos.");
+  // Antes de borrar nada, que el archivo tenga la forma esperada.
+  const listas = ["cuentas", "categorias", "movimientos", "recurrentes"] as const;
+  if (listas.some(k => !Array.isArray(d[k])) || !(d.movimientos as unknown[]).every(m => {
+    const x = m as Movimiento;
+    return typeof x.id === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.fecha) && typeof x.monto === "number" && Array.isArray(x.etiquetas);
+  })) throw new Error("La copia está incompleta o dañada: no se cambió nada.");
   // Que la carga inicial de cuentas y categorías termine antes: si no, podría
   // escribirse encima de lo restaurado y duplicar las cuentas.
   await sembrar();

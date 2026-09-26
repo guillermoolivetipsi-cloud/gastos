@@ -29,6 +29,7 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
   const [conc, setConc] = useState<Conciliacion | null>(null);
   const [cats, setCats] = useState<Record<number, string>>({});
   const [aplicar, setAplicar] = useState<Record<number, boolean>>({});
+  const [guardando, setGuardando] = useState(false);
   const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada);
   const tarjeta = d.cuentas.find(c => c.id === tarjetaId);
   const catsGasto = d.categorias.filter(c => c.tipo === "gasto" && !c.archivada);
@@ -64,59 +65,75 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
   const sinCategoria = faltan.filter(([, i]) => aplicar[i] && !cats[i]).length;
 
   async function guardar() {
-    if (!conc || !tarjeta || !res) return;
-    const ahora = new Date().toISOString();
-    // Lo anterior al primer movimiento de la app ya lo tiene Finanzas (venía de la
-    // app anterior): se agrega marcado como exportado para no duplicarlo allá.
-    const primera = d.movimientos.map(m => m.fecha).sort()[0] ?? "9999";
-    let nuevos = 0, cambiados = 0;
-    const agregados: Movimiento[] = [];
-    const tasaRec = (r: Parameters<typeof d.tasas.rec>[0]) => d.tasas.rec(r, d.cuentas);
-    for (const [i, f] of filas.entries()) {
-      // Un cobro que ya estaba en esta tarjeta y coincide con un recurrente (Claude, Gym…) queda como su pago.
-      if (f.tipo === "coincide" && f.mov && !f.mov.recurrenteId) {
-        const v = recurrenteDe(f.mov, d.recurrentes, [...d.movimientos, ...agregados], tasaRec);
-        if (v) { await db.movimientos.update(f.mov.id, v); Object.assign(f.mov, v); }
+    if (!conc || !tarjeta || !res || guardando) return;
+    setGuardando(true);
+    try {
+      const ahora = new Date().toISOString();
+      // Lo anterior al primer movimiento de la app ya lo tiene Finanzas (venía de la
+      // app anterior): se agrega marcado como exportado para no duplicarlo allá.
+      const primera = d.movimientos.map(m => m.fecha).sort()[0] ?? "9999";
+      const tasaRec = (r: Parameters<typeof d.tasas.rec>[0]) => d.tasas.rec(r, d.cuentas);
+      // 1) Primero lo que necesita la red (cotizaciones de los consumos en pesos)…
+      const cots = new Map<number, Awaited<ReturnType<typeof cotizar>>>();
+      for (const [i, f] of filas.entries())
+        if (aplicar[i] && f.tipo === "falta" && f.consumo.columna === "ARS") cots.set(i, await cotizar("ARS", f.consumo.fecha, tarjeta.dolar));
+
+      // 2) …después se arma todo en memoria…
+      const agregados: Movimiento[] = [];
+      const cambios: { id: string; changes: Partial<Movimiento> }[] = [];
+      for (const [i, f] of filas.entries()) {
+        // Un cobro que ya estaba en esta tarjeta y coincide con un recurrente (Claude, Gym…) queda como su pago.
+        if (f.tipo === "coincide" && f.mov && !f.mov.recurrenteId) {
+          const v = recurrenteDe(f.mov, d.recurrentes, [...d.movimientos, ...agregados], tasaRec);
+          if (v) cambios.push({ id: f.mov.id, changes: v });
+        }
+        if (!aplicar[i]) continue;
+        if (f.tipo === "falta") {
+          const c = f.consumo;
+          const esArs = c.columna === "ARS";
+          const cot = cots.get(i) ?? null;
+          const mov: Movimiento = {
+            id: nuevoId(), tipo: "gasto", fecha: c.fecha, monto: c.importe, moneda: esArs ? "ARS" : (c.moneda as Movimiento["moneda"]),
+            usd: esArs ? (cot ? aUsd(c.importe, cot.tasa) : null) : c.usd,
+            cotizacion: esArs ? cot ?? undefined : { tasa: c.usd ? redondear(c.importe / c.usd, 6) : 1, fuente: "resumen", fecha: c.fecha },
+            cuentaId: tarjeta.id, categoriaId: cats[i], etiquetas: [], comentario: c.comercio, creado: ahora, modificado: ahora,
+            exportado: c.fecha < primera ? ahora : undefined,
+          };
+          if (!["USD", "EUR", "ARS"].includes(mov.moneda)) { mov.moneda = "USD"; mov.monto = c.usd ?? c.importe; }
+          Object.assign(mov, recurrenteDe(mov, d.recurrentes, [...d.movimientos, ...agregados], tasaRec) ?? {});
+          agregados.push(mov);
+        } else if (f.mov && (f.tipo === "otra-cuenta" || f.tipo === "moneda")) {
+          const ch: Partial<Movimiento> = { cuentaId: tarjeta.id, modificado: ahora };
+          if (f.tipo === "moneda") Object.assign(ch, { moneda: f.consumo.moneda, usd: f.consumo.usd, cotizacion: { tasa: redondear(f.consumo.importe / (f.consumo.usd ?? f.consumo.importe), 6), fuente: "resumen", fecha: f.consumo.fecha } });
+          if (!f.mov.recurrenteId) Object.assign(ch, recurrenteDe({ ...f.mov, cuentaId: tarjeta.id }, d.recurrentes, [...d.movimientos, ...agregados], tasaRec) ?? {});
+          cambios.push({ id: f.mov.id, changes: ch });
+        }
       }
-      if (!aplicar[i]) continue;
-      if (f.tipo === "falta") {
-        const c = f.consumo;
-        const esArs = c.columna === "ARS";
-        const cot = esArs ? await cotizar("ARS", c.fecha, tarjeta.dolar) : null;
-        const mov: Movimiento = {
-          id: nuevoId(), tipo: "gasto", fecha: c.fecha, monto: c.importe, moneda: esArs ? "ARS" : (c.moneda as Movimiento["moneda"]),
-          usd: esArs ? (cot ? aUsd(c.importe, cot.tasa) : null) : c.usd,
-          cotizacion: esArs ? cot ?? undefined : { tasa: c.usd ? redondear(c.importe / c.usd, 6) : 1, fuente: "resumen", fecha: c.fecha },
-          cuentaId: tarjeta.id, categoriaId: cats[i], etiquetas: [], comentario: c.comercio, creado: ahora, modificado: ahora,
-          exportado: c.fecha < primera ? ahora : undefined,
-        };
-        if (!["USD", "EUR", "ARS"].includes(mov.moneda)) { mov.moneda = "USD"; mov.monto = c.usd ?? c.importe; }
-        Object.assign(mov, recurrenteDe(mov, d.recurrentes, [...d.movimientos, ...agregados], tasaRec) ?? {});
-        agregados.push(mov);
-        await db.movimientos.add(mov); nuevos++;
-      } else if (f.mov && (f.tipo === "otra-cuenta" || f.tipo === "moneda")) {
-        const cambios: Partial<Movimiento> = { cuentaId: tarjeta.id, modificado: ahora };
-        if (f.tipo === "moneda") Object.assign(cambios, { moneda: f.consumo.moneda, usd: f.consumo.usd, cotizacion: { tasa: redondear(f.consumo.importe / (f.consumo.usd ?? f.consumo.importe), 6), fuente: "resumen", fecha: f.consumo.fecha } });
-        await db.movimientos.update(f.mov.id, cambios); cambiados++;
-      }
-      if (f.mov && !f.mov.recurrenteId && (f.tipo === "otra-cuenta" || f.tipo === "moneda")) {
-        const v = recurrenteDe({ ...f.mov, cuentaId: tarjeta.id }, d.recurrentes, [...d.movimientos, ...agregados], tasaRec);
-        if (v) await db.movimientos.update(f.mov.id, v);
-      }
+
+      // 3) …y se guarda todo junto: o entra el resumen entero, o nada.
+      const p = cierre ? periodoDe(cierre) : null;
+      const venceDias = cierre && vence ? Math.max(1, Math.round((new Date(vence).getTime() - new Date(cierre).getTime()) / 864e5)) : tarjeta.venceDias;
+      await db.transaction("rw", [db.movimientos, db.cuentas, db.ajustes], async () => {
+        await db.movimientos.bulkAdd(agregados);
+        await db.movimientos.bulkUpdate(cambios.map(x => ({ key: x.id, changes: x.changes })));
+        // Aprende los comercios: los que coincidieron y los que categorizaste.
+        const reglas = await leerAjuste<Record<string, string>>("reglasComercio", {});
+        await guardarAjuste("reglasComercio", aprender(reglas, filas.map((f, i) => ({ consumo: f.consumo, categoriaId: f.mov?.categoriaId ?? cats[i] })), d.categorias));
+        // El cierre real ordena en qué resumen cae cada compra, y el vencimiento, cuándo se paga.
+        if (p) {
+          await db.cuentas.where("id").equals(tarjeta.id).modify(c => { c.cierres = { ...(c.cierres ?? {}), [p]: Number(cierre.slice(8)) }; c.venceDias = venceDias; });
+          const hechos = await leerAjuste<Record<string, string>>("resumenesCargados", {});
+          await guardarAjuste("resumenesCargados", { ...hechos, [`${tarjeta.id}|${p}`]: ahora });
+        }
+      });
+      const nuevos = agregados.length, cambiados = cambios.filter(x => "cuentaId" in x.changes).length;
+      toast({ texto: `Resumen guardado: ${nuevos} nuevos, ${cambiados} corregidos` });
+      nav.volver();
+    } catch (e) {
+      setError(`No se pudo guardar: ${(e as Error).message}. No se cambió nada.`);
+    } finally {
+      setGuardando(false);
     }
-    // Aprende los comercios: los que coincidieron y los que categorizaste.
-    const reglas = await leerAjuste<Record<string, string>>("reglasComercio", {});
-    await guardarAjuste("reglasComercio", aprender(reglas, filas.map((f, i) => ({ consumo: f.consumo, categoriaId: f.mov?.categoriaId ?? cats[i] })), d.categorias));
-    // El cierre real ordena en qué resumen cae cada compra, y el vencimiento, cuándo se paga.
-    if (cierre) {
-      const p = periodoDe(cierre);
-      const venceDias = vence ? Math.max(1, Math.round((new Date(vence).getTime() - new Date(cierre).getTime()) / 864e5)) : tarjeta.venceDias;
-      await db.cuentas.update(tarjeta.id, { cierres: { ...(tarjeta.cierres ?? {}), [p]: Number(cierre.slice(8)) }, venceDias });
-      const hechos = await leerAjuste<Record<string, string>>("resumenesCargados", {});
-      await guardarAjuste("resumenesCargados", { ...hechos, [`${tarjeta.id}|${p}`]: ahora });
-    }
-    toast({ texto: `Resumen guardado: ${nuevos} nuevos, ${cambiados} corregidos` });
-    nav.volver();
   }
 
   const etiqueta: Record<Fila["tipo"], string> = { coincide: "Ya cargados", "otra-cuenta": "Cargados en otra cuenta", moneda: "Cargados con la moneda equivocada", falta: "No están en la app" };
@@ -205,9 +222,10 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
           )}
 
           {cierre && <div className="mini tenue" style={{ marginTop: 10 }}>Queda registrado el cierre del {fechaCorta(cierre, false)} (resumen de {nombreMes(periodoDe(cierre), false)}).</div>}
+          {error && <div className="mal chico" style={{ marginTop: 10 }}>{error}</div>}
           <div className="pie-fijo">
-            <button className="btn" disabled={!tarjeta || sinCategoria > 0} onClick={guardar}>
-              {sinCategoria > 0 ? `Falta la categoría de ${sinCategoria}` : "Guardar"}
+            <button className="btn" disabled={!tarjeta || sinCategoria > 0 || guardando} onClick={guardar}>
+              {guardando ? "Guardando…" : sinCategoria > 0 ? `Falta la categoría de ${sinCategoria}` : "Guardar"}
             </button>
           </div>
         </>

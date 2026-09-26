@@ -15,13 +15,21 @@ export function monto(n: number, moneda: Moneda) {
 }
 export const simbolo = (m: Moneda) => SIMBOLO[m];
 
-/** Lee lo que tipeaste: "1.234,5" o "1234.5". */
+/** Lee lo que tipeaste. La coma es decimal ("2,40"); el punto es de miles si hay
+ *  varios o si le siguen exactamente tres cifras ("18.500", "1.234.567"), y decimal
+ *  si no ("12.5"). */
 export function leerNumero(s: string): number {
   const limpio = s.trim().replace(/\s/g, "");
   if (!limpio) return 0;
-  const normal = limpio.includes(",") ? limpio.replace(/\./g, "").replace(",", ".") : limpio;
+  let normal: string;
+  if (limpio.includes(",")) normal = limpio.replace(/\./g, "").replace(",", ".");
+  else if ((limpio.match(/\./g) ?? []).length > 1 || /\.\d{3}$/.test(limpio)) normal = limpio.replace(/\./g, "");
+  else normal = limpio;
   const n = Number(normal);
   return Number.isFinite(n) ? n : 0;
 }
+
+/** "Categoría" y "categoria" son lo mismo al comparar. */
+export const sinAcentos = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
 export const redondear = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d;

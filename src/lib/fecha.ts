@@ -5,6 +5,8 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 export const aTexto = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 export const hoy = () => aTexto(new Date());
+/** El día local de un instante guardado con toISOString() (que está en UTC). */
+export const diaLocal = (iso: string) => aTexto(new Date(iso));
 export const aFecha = (s: string) => {
   const [a, m, d] = s.split("-").map(Number);
   return new Date(a, m - 1, d || 1);

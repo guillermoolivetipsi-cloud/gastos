@@ -1,5 +1,5 @@
 import type { Cuenta, Movimiento } from "../tipos";
-import { hoy, nombreMes, periodoDe, periodoHoy, sumarMeses } from "./fecha";
+import { diaLocal, hoy, nombreMes, periodoDe, periodoHoy, sumarMeses } from "./fecha";
 
 /* Recordatorios. Viven como tareas en "Para revisar" y no se van hasta que las
    hacés; cuando haya notificaciones, estas mismas tareas son las que avisan. */
@@ -28,7 +28,7 @@ export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], 
   const h = hoy(), dia = Number(h.slice(8)), anterior = sumarMeses(periodoHoy(), -1);
   const primerMes = movs.length ? movs.map(m => periodoDe(m.fecha)).sort()[0] : periodoHoy();
 
-  if (r.diario.activo && horaActual() >= r.diario.hora && !movs.some(m => m.creado.slice(0, 10) === h || m.fecha === h)) {
+  if (r.diario.activo && horaActual() >= r.diario.hora && !movs.some(m => diaLocal(m.creado) === h || m.fecha === h)) {
     const clave = `diario|${h}`;
     if (!hechas.has(clave)) out.push({ tipo: "diario", clave, titulo: "¿Cargaste los gastos de hoy?", detalle: "Todavía no anotaste nada hoy." });
   }
@@ -47,7 +47,7 @@ export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], 
 
   if (r.exportar.activo && dia >= r.exportar.dia && anterior >= primerMes) {
     const clave = `exportar|${anterior}`;
-    const exportadoEsteMes = ultimaExportacion != null && ultimaExportacion.slice(0, 7) >= periodoHoy();
+    const exportadoEsteMes = ultimaExportacion != null && diaLocal(ultimaExportacion).slice(0, 7) >= periodoHoy();
     const quedan = movs.some(m => !m.exportado && periodoDe(m.fecha) <= anterior);
     if (!exportadoEsteMes && quedan && !hechas.has(clave))
       out.push({ tipo: "exportar", clave, periodo: anterior, titulo: `Exportá ${nombreMes(anterior, false)} a Finanzas`, detalle: "Hay movimientos del mes pasado que todavía no mandaste." });

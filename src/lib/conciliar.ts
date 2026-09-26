@@ -41,7 +41,8 @@ function error(consumo: Consumo, m: Movimiento): { err: number; moneda: boolean 
     const contraUsd = consumo.usd ? Math.abs(m.monto - consumo.usd) / consumo.usd : 1;
     const contraOriginal = Math.abs(m.monto - consumo.importe) / consumo.importe;
     // El número exacto del monto original, cargado como USD: moneda equivocada.
-    if (consumo.moneda !== "USD" && contraOriginal <= 0.01 && contraOriginal < contraUsd) return { err: contraOriginal, moneda: true };
+    // Solo con monedas que la app maneja (una compra en libras se deja como está).
+    if ((consumo.moneda === "EUR" || consumo.moneda === "ARS") && contraOriginal <= 0.01 && contraOriginal < contraUsd) return { err: contraOriginal, moneda: true };
     return { err: contraUsd, moneda: false };
   }
   if (m.usd != null && consumo.usd) return { err: Math.abs(m.usd - consumo.usd) / consumo.usd, moneda: false };

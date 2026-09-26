@@ -112,6 +112,8 @@ export function Editor(props: Props) {
   }, [d.movimientos, existente, props.recurrenteId]);
 
   async function repetir(m: Movimiento) {
+    if (guardando) return;
+    setGuardando(true);
     const nuevo = await guardarMovimiento({ tipo: "gasto", fecha, monto: m.monto, moneda: m.moneda, cuentaId: m.cuentaId, categoriaId: m.categoriaId, etiquetas: m.etiquetas, comentario: m.comentario }, d.cuentas.find(c => c.id === m.cuentaId));
     toast({ texto: `${m.comentario || d.categorias.find(c => c.id === m.categoriaId)?.nombre} guardado`, deshacer: () => { eliminarMovimiento(nuevo.id); } });
     nav.volver();
@@ -125,15 +127,20 @@ export function Editor(props: Props) {
   }, [d.movimientos, ocultas]);
 
   // ¿Es parte de un recurrente que falta pagar? Mismo tipo y categoría, este mes o el anterior.
+  // Los recurrentes sin pagar de este mes y el anterior: se calculan una vez por mes
+  // elegido, no en cada tecla del monto.
+  const periodoFecha = periodoDe(fecha);
+  const pendientesDelMes = useMemo(() => [periodoFecha, sumarMeses(periodoFecha, -1)]
+    .flatMap(p => recurrentesDelMes(d.recurrentes, d.movimientos, p, d.tasaRec))
+    .filter(i => i.estado !== "cargado"), [d.recurrentes, d.movimientos, d.tasaRec, periodoFecha]);
+
   // ¿Este gasto es el pago de un recurrente pendiente? Se busca el más parecido
   // (lo nombra en el comentario, misma categoría, monto cercano), este mes o el anterior.
   const candidato = useMemo(() => {
     if (vinculo || existente || (!categoriaId && !comentario.trim())) return null;
-    const tasaR = (r: Parameters<typeof d.tasas.rec>[0]) => d.tasas.rec(r, d.cuentas);
-    const p = periodoDe(fecha);
+    const tasaR = d.tasaRec;
     const borrador = { id: "", tipo, fecha, monto: monto || 0, moneda, usd: enUsd, cuentaId, categoriaId, etiquetas: [], comentario, creado: "", modificado: "" } as Movimiento;
-    const insts = [...recurrentesDelMes(d.recurrentes, d.movimientos, p, tasaR), ...recurrentesDelMes(d.recurrentes, d.movimientos, sumarMeses(p, -1), tasaR)]
-      .filter(i => i.estado !== "cargado" && !rechazados.includes(i.rec.id + i.clave));
+    const insts = pendientesDelMes.filter(i => !rechazados.includes(i.rec.id + i.clave));
     let mejor: { i: (typeof insts)[number]; s: number } | null = null;
     for (const i of insts) {
       // Sin monto todavía, alcanza con la categoría o el nombre para sugerir.
@@ -141,7 +148,7 @@ export function Editor(props: Props) {
       if (sc != null && (!mejor || sc < mejor.s)) mejor = { i, s: sc };
     }
     return mejor?.i ?? null;
-  }, [vinculo, categoriaId, comentario, fecha, tipo, monto, moneda, enUsd, cuentaId, d.recurrentes, d.movimientos, rechazados, existente]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [vinculo, categoriaId, comentario, fecha, tipo, monto, moneda, enUsd, cuentaId, pendientesDelMes, rechazados, existente]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recVinculado = vinculo ? d.recurrentes.find(r => r.id === vinculo.recurrenteId) : undefined;
   const esTarjeta = !!cuenta?.esTarjeta && tipo === "gasto";
@@ -150,33 +157,37 @@ export function Editor(props: Props) {
   async function guardar() {
     if (!puedeGuardar) return;
     setGuardando(true);
-    let v = vinculo;
-    // Si no contestaste la pregunta pero la coincidencia es clara, se vincula igual.
-    let autoVinculado: string | null = null;
-    if (!v && candidato && monto > 0 && esClaro({ monto, moneda, comentario }, candidato)) {
-      v = { recurrenteId: candidato.rec.id, periodo: candidato.clave };
-      autoVinculado = `${candidato.rec.nombre} de ${candidato.clave.length === 7 ? nombreMes(candidato.clave, false) : fechaCorta(candidato.fecha)}`;
+    try {
+      let v = vinculo;
+      // Si no contestaste la pregunta pero la coincidencia es clara, se vincula igual.
+      let autoVinculado: string | null = null;
+      if (!v && candidato && monto > 0 && esClaro({ monto, moneda, comentario }, candidato)) {
+        v = { recurrenteId: candidato.rec.id, periodo: candidato.clave };
+        autoVinculado = `${candidato.rec.nombre} de ${candidato.clave.length === 7 ? nombreMes(candidato.clave, false) : fechaCorta(candidato.fecha)}`;
+      }
+      // "Pago en partes" de algo que no es recurrente: se crea un recurrente de una
+      // sola vez con el total, y este es el primer pago.
+      const total = leerNumero(totalTxt);
+      if (enPartes && !v && total > monto) {
+        const id = nuevoId();
+        const cat = d.categorias.find(c => c.id === categoriaId);
+        await db.recurrentes.add({
+          id, nombre: comentario || cat?.nombre || "Gasto en partes", tipo, categoriaId, cuentaId, monto: total, moneda,
+          clase: "fijo", frecuencia: "una-vez", dia: Number(fecha.slice(8)), inicio: fecha, modo: "avisar", activo: true,
+        });
+        v = { recurrenteId: id, periodo: periodoDe(fecha) };
+      }
+      await guardarMovimiento({
+        id: existente?.id, tipo, fecha, monto, moneda, cuentaId, categoriaId, etiquetas,
+        comentario: comentario.trim() || undefined,
+        cuotas: esTarjeta && cuotas > 1 ? cuotas : undefined,
+        recurrenteId: v?.recurrenteId, periodo: v?.periodo,
+      }, cuenta);
+      toast({ texto: autoVinculado ? `Guardado como pago de ${autoVinculado}` : existente ? "Cambios guardados" : tipo === "gasto" ? "Gasto guardado" : "Ingreso guardado" });
+      nav.volver();
+    } finally {
+      setGuardando(false);
     }
-    // "Pago en partes" de algo que no es recurrente: se crea un recurrente de una
-    // sola vez con el total, y este es el primer pago.
-    const total = leerNumero(totalTxt);
-    if (enPartes && !v && total > monto) {
-      const id = nuevoId();
-      const cat = d.categorias.find(c => c.id === categoriaId);
-      await db.recurrentes.add({
-        id, nombre: comentario || cat?.nombre || "Gasto en partes", tipo, categoriaId, cuentaId, monto: total, moneda,
-        clase: "fijo", frecuencia: "una-vez", dia: Number(fecha.slice(8)), inicio: fecha, modo: "avisar", activo: true,
-      });
-      v = { recurrenteId: id, periodo: periodoDe(fecha) };
-    }
-    await guardarMovimiento({
-      id: existente?.id, tipo, fecha, monto, moneda, cuentaId, categoriaId, etiquetas,
-      comentario: comentario.trim() || undefined,
-      cuotas: esTarjeta && cuotas > 1 ? cuotas : undefined,
-      recurrenteId: v?.recurrenteId, periodo: v?.periodo,
-    }, cuenta);
-    toast({ texto: autoVinculado ? `Guardado como pago de ${autoVinculado}` : existente ? "Cambios guardados" : tipo === "gasto" ? "Gasto guardado" : "Ingreso guardado" });
-    nav.volver();
   }
 
   async function borrar() {

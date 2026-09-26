@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { useDatos } from "../datos";
+import { useDatos, usePendientes } from "../datos";
 import { db } from "../db";
 import { useNav } from "../nav";
 import type { Clase } from "../tipos";
-import { crearDesdeSugerencia, descartar, pausar } from "../lib/acciones";
+import { crearDesdeSugerencia, descartar, pausar, vincular } from "../lib/acciones";
 import { claseDe, sugerirClase } from "../lib/analisis";
 import { fechaCorta, mesCorto, nombreMes } from "../lib/fecha";
 import { num } from "../lib/formato";
-import { pendientes, useExtras } from "../lib/revisar";
 import { Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -18,9 +17,8 @@ export function Revisar() {
   const d = useDatos();
   const nav = useNav();
   const toast = useToast();
-  const extras = useExtras();
-  if (!d.listo || !extras) return <div className="pantalla sin-tabs" />;
-  const p = pendientes(d, extras);
+  const p = usePendientes();
+  if (!d.listo || !p) return <div className="pantalla sin-tabs" />;
   const cat = new Map(d.categorias.map(c => [c.id, c]));
   const AhoraNo = ({ clave }: { clave: string }) => <button className="btn2" onClick={() => pausar(clave)}>Ahora no</button>;
 
@@ -62,7 +60,7 @@ export function Revisar() {
           </span></div>
           <div className="mini tenue" style={{ margin: "4px 0 0 38px" }}>¿Es el pago de <span className="viol">{inst.rec.nombre}</span> de {inst.clave.length === 7 ? nombreMes(inst.clave, false) : fechaCorta(inst.fecha, false)}? (esperado ~{num(inst.esperado)} {inst.rec.moneda})</div>
           <div className="botones">
-            <button className="btn1" onClick={() => db.movimientos.update(mov.id, { recurrenteId: inst.rec.id, periodo: inst.clave, modificado: new Date().toISOString() })}>Sí</button>
+            <button className="btn1" onClick={async () => { const deshacer = await vincular(mov.id, inst.rec.id, inst.clave); toast({ texto: `Vinculado como pago de ${inst.rec.nombre}`, deshacer }); }}>Sí</button>
             <button className="btn2" onClick={() => descartar(`vinc|${mov.id}|${inst.rec.id}`)}>No</button>
             <button className="btn2" onClick={() => nav.abrir({ p: "instancia", id: inst.rec.id, clave: inst.clave })}>Otra cosa…</button>
             <AhoraNo clave={`vinc|${mov.id}|${inst.rec.id}`} />

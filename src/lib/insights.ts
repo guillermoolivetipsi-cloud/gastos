@@ -1,8 +1,8 @@
 import type { Categoria, Cuenta, Movimiento, Recurrente } from "../tipos";
-import { recurrentesDelMes } from "./analisis";
+import { aPagarTarjeta, recurrentesDelMes } from "./analisis";
 import { periodoDe, sumarMeses } from "./fecha";
 import { redondear } from "./formato";
-import { cuotasFuturas, fechaCierre, resumenQueVence } from "./tarjeta";
+import { cuotasFuturas } from "./tarjeta";
 import type { EstadoInstancia } from "./recurrentes";
 
 /* "Cómo venís": datos del mes para decidir algo, sin juicios. Todo en USD. */
@@ -57,16 +57,7 @@ export function calcularInsights(p: string, movs: Movimiento[], cats: Categoria[
 
   // 2 · El mes siguiente, ya comprometido
   const sig = sumarMeses(p, 1);
-  const desde = (c: Cuenta, q: string) => fechaCierre(c, sumarMeses(q, -1));
-  let tarjetasSig = 0;
-  for (const c of tarjetas) {
-    const r = resumenQueVence(c, movs, sig);
-    // Recurrentes de la tarjeta que todavía no se cobraron pero caen en ese resumen.
-    const previstos = [r.periodo, sumarMeses(r.periodo, -1)]
-      .flatMap(q => recurrentesDelMes(recs.filter(x => x.cuentaId === c.id && x.tipo === "gasto"), movs, q, tasa))
-      .filter(i => i.fecha > desde(c, r.periodo) && i.fecha <= r.cierre && i.estado !== "cargado");
-    tarjetasSig += r.total + (r.confirmado ? 0 : previstos.reduce((s, i) => { const t = tasa(i.rec); return s + (t ? i.esperado / t : 0); }, 0));
-  }
+  const tarjetasSig = tarjetas.reduce((s, c) => s + aPagarTarjeta(c, movs, recs, sig, tasa).total, 0);
   const instSig = recurrentesDelMes(recs, movs, sig, tasa);
   const enUsd = (i: EstadoInstancia) => { const t = tasa(i.rec); return t ? (i.estado === "cargado" ? i.pagado : i.esperado) / t : 0; };
   const deCuenta = instSig.filter(i => i.rec.tipo === "gasto" && !idsTarjeta.has(i.rec.cuentaId)).reduce((s, i) => s + enUsd(i), 0);

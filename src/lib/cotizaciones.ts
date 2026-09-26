@@ -49,11 +49,14 @@ export async function cotizar(moneda: Moneda, fecha: string, dolar: Dolar): Prom
   const clave = `${moneda}|${moneda === "ARS" ? dolar + "|" : ""}${fecha}`;
   const c = await cache();
   const fuente = moneda === "EUR" ? "BCE" : dolar === "blue" ? "blue" : "oficial";
-  if (c[clave] && fecha < hoy()) return { tasa: c[clave], fuente, fecha };
+  const pasada = fecha < hoy();
+  if (c[clave] && pasada) return { tasa: c[clave], fuente, fecha };
   try {
     const tasa = moneda === "EUR" ? await tasaEur(fecha) : await tasaArs(fecha, dolar);
-    await guardarAjuste("cotizaciones", { ...c, [clave]: tasa });
-    await guardarAjuste(`ultima|${moneda}|${moneda === "ARS" ? dolar : ""}`, tasa);
+    // Días pasados: su cotización ya no cambia y se guarda. Hoy (o una fecha futura)
+    // es la "última": la que se usa para estimar lo que todavía no pasó.
+    if (pasada) await db.transaction("rw", db.ajustes, async () => guardarAjuste("cotizaciones", { ...(await cache()), [clave]: tasa }));
+    else await guardarAjuste(`ultima|${moneda}|${moneda === "ARS" ? dolar : ""}`, tasa);
     return { tasa, fuente, fecha };
   } catch {
     return null;

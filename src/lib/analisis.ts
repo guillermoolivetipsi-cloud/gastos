@@ -1,7 +1,7 @@
 import type { Categoria, Clase, Cuenta, Descarte, Movimiento, Recurrente } from "../tipos";
-import { diasDelMes, diasEntre, hoy, periodoDe, periodoHoy, sumarMeses } from "./fecha";
-import { num, redondear } from "./formato";
-import { esDudosa } from "./tarjeta";
+import { diasDelMes, diasEntre, hoy, periodoDe, periodoHoy, sumarDias, sumarMeses } from "./fecha";
+import { num, redondear, sinAcentos } from "./formato";
+import { esDudosa, fechaCierre, resumenQueVence } from "./tarjeta";
 import { estadoDe, instanciasDelMes, type EstadoInstancia } from "./recurrentes";
 
 export const usdDe = (m: Movimiento) => m.usd ?? 0;
@@ -135,7 +135,7 @@ export interface SugerenciaRecurrente {
   meses: string[];
 }
 
-const normal = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+const normal = sinAcentos;
 
 /** Lo que cargaste en al menos 3 de los últimos 4 meses, una vez por mes,
  *  con el mismo comentario o etiqueta (o que es lo único de su categoría). */
@@ -196,6 +196,9 @@ export interface CierreDudoso { cuenta: Cuenta; periodo: string; compras: number
 /** Tarjetas con compras entre el 5 y el 10 de un mes cuyo cierre no confirmaste. */
 export function cierresDudosos(cuentas: Cuenta[], movs: Movimiento[]): CierreDudoso[] {
   const out: CierreDudoso[] = [];
+  // Solo este mes y el anterior: los cierres de meses viejos ya no cambian nada.
+  const desde = `${sumarMeses(periodoHoy(), -1)}-01`;
+  movs = movs.filter(m => m.fecha >= desde);
   for (const c of cuentas.filter(c => c.esTarjeta && !c.archivada)) {
     const porMes = new Map<string, number>();
     for (const m of movs) if (m.cuentaId === c.id && esDudosa(c, m.fecha) && m.fecha <= hoy())
@@ -215,3 +218,17 @@ export function recurrentesDelMes(recs: Recurrente[], movs: Movimiento[], period
 }
 
 export const descartesSet = (ds: Descarte[]) => new Set(ds.map(d => d.clave));
+
+/** Lo que se paga de una tarjeta en `periodo`: el resumen que vence ese mes y, mientras
+ *  sea estimado, los recurrentes de esa tarjeta que todavía no se cobraron pero caen
+ *  en ese resumen. Única fuente para "Lo que viene" y "Cómo venís". */
+export function aPagarTarjeta(c: Cuenta, movs: Movimiento[], recs: Recurrente[], periodo: string, tasa: (r: Recurrente) => number | null) {
+  const r = resumenQueVence(c, movs, periodo);
+  const desde = sumarDias(fechaCierre(c, sumarMeses(r.periodo, -1)), 1);
+  const propios = recs.filter(x => x.cuentaId === c.id && x.tipo === "gasto");
+  const insts = [sumarMeses(r.periodo, -1), r.periodo]
+    .flatMap(q => recurrentesDelMes(propios, movs, q, tasa))
+    .filter(i => i.fecha >= desde && i.fecha <= r.cierre);
+  const previsto = redondear(insts.filter(i => i.estado !== "cargado").reduce((s, i) => { const t = tasa(i.rec); return s + (t ? i.esperado / t : 0); }, 0));
+  return { resumen: r, desde, insts, previsto, total: redondear(r.total + (r.confirmado ? 0 : previsto)) };
+}

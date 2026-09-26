@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { App } from "./App";
 import { ProveedorNav } from "./nav";
+import { ProveedorDatos } from "./datos";
 import { ProveedorToast } from "./ui/piezas";
 import "./estilos.css";
 
@@ -12,7 +13,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ProveedorNav>
       <ProveedorToast>
-        <App />
+        <ProveedorDatos>
+          <App />
+        </ProveedorDatos>
       </ProveedorToast>
     </ProveedorNav>
   </StrictMode>,

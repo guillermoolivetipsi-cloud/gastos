@@ -127,6 +127,9 @@ describe("fechas y números", () => {
     expect(leerNumero("2,40")).toBe(2.4);
     expect(leerNumero("18500")).toBe(18500);
     expect(leerNumero("12.5")).toBe(12.5);
+    expect(leerNumero("18.500")).toBe(18500);
+    expect(leerNumero("1.234.567")).toBe(1234567);
+    expect(leerNumero("1.234.567,5")).toBe(1234567.5);
   });
 });
 

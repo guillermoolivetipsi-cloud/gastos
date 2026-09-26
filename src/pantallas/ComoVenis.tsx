@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos } from "../datos";
 import { leerAjuste } from "../db";
@@ -8,11 +9,12 @@ import { num } from "../lib/formato";
 import { Barra, Punto } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
+/** Se recalcula solo si cambian los datos o el mes, no en cada dibujo. */
 export function useInsights(periodo: string) {
   const d = useDatos();
   const cache = useLiveQuery(() => leerAjuste<Record<string, number>>("cotizaciones", {}), []);
-  if (!d.listo || !cache) return null;
-  return calcularInsights(periodo, d.movimientos, d.categorias, d.cuentas, d.recurrentes, r => d.tasas.rec(r, d.cuentas), f => cache[`EUR|${f}`] ?? null);
+  return useMemo(() => (!d.listo || !cache ? null
+    : calcularInsights(periodo, d.movimientos, d.categorias, d.cuentas, d.recurrentes, d.tasaRec, f => cache[`EUR|${f}`] ?? null)), [d, cache, periodo]);
 }
 
 const Num = ({ n }: { n: number }) => <span className="num">{num(n, 0)}</span>;

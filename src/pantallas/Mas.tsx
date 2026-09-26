@@ -1,14 +1,11 @@
 import type { ReactNode } from "react";
-import { useDatos } from "../datos";
+import { usePendientes } from "../datos";
 import { useNav, type Pantalla } from "../nav";
-import { pendientes, useExtras } from "../lib/revisar";
 import { T } from "../ui/Icono";
 
 export function Mas() {
-  const d = useDatos();
   const nav = useNav();
-  const extras = useExtras();
-  const revisar = d.listo && extras ? pendientes(d, extras).total : 0;
+  const revisar = usePendientes()?.total ?? 0;
   const item = (p: Pantalla, icono: ReactNode, texto: string, extra?: ReactNode) => (
     <button className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir(p)}>
       <span className="izq"><span className="viol" style={{ display: "flex" }}>{icono}</span><span>{texto}</span></span>
