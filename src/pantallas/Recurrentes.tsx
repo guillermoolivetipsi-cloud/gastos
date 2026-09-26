@@ -3,9 +3,9 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Clase, type Frecuencia, type Moneda, type Recurrente, type Tipo } from "../tipos";
-import { eliminarRecurrente, marcarEnCero, type Alcance } from "../lib/acciones";
+import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
-import { DIAS_CORTOS, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
+import { DIAS_CORTOS, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { candidatos, estadoDe } from "../lib/recurrentes";
 import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
@@ -97,15 +97,21 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
     nav.volver();
   }
 
-  async function eliminar(a: Alcance) {
+  async function terminar() {
     if (!existente) return;
-    // "Que no se repita más": lo de este mes queda, termina desde el próximo.
-    const clave = a === "siguientes" ? sumarMeses(periodoHoy(), 1) : undefined;
-    const deshacer = await eliminarRecurrente(existente, a, clave);
+    const deshacer = await terminarRecurrente(existente);
     setBorrar(false);
-    toast({ texto: a === "todo" ? "Recurrente eliminado" : "No se repite más", deshacer });
+    toast({ texto: `${existente.nombre}: no se pide más`, deshacer });
     nav.volver();
   }
+  async function eliminarDelTodo() {
+    if (!existente) return;
+    const deshacer = await eliminarRecurrente(existente, "todo");
+    setBorrar(false);
+    toast({ texto: "Recurrente eliminado", deshacer });
+    nav.volver();
+  }
+  const terminado = !!existente?.fin && existente.fin < hoy();
 
   return (
     <div className="pantalla sin-tabs">
@@ -173,12 +179,21 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
         </div>
       )}
       <div className="pie-fijo"><button className="btn" disabled={!valido} onClick={guardar}>Guardar</button></div>
+      {existente && (terminado
+        ? <button className="btn2" style={{ width: "100%", marginTop: 12 }} onClick={async () => { await reactivarRecurrente(existente); toast({ texto: `${existente.nombre}: se vuelve a pedir` }); }}>Volver a pedirlo</button>
+        : <button className="btn2" style={{ width: "100%", marginTop: 12 }} onClick={() => setBorrar(true)}>Ya no aplica: dejar de pedirlo</button>)}
 
       <Hoja abierta={borrar} cerrar={() => setBorrar(false)}>
-        <h2>Eliminar {existente?.nombre}</h2>
-        <div className="tenue chico">Lo que ya pagaste queda cargado.</div>
-        <button className="opcion" onClick={() => eliminar("siguientes")}>Que no se repita más (este mes queda)</button>
-        <button className="opcion mal" onClick={() => eliminar("todo")}>Eliminar el recurrente entero</button>
+        <h2>Dejar de pedir {existente?.nombre}</h2>
+        <div className="tenue chico">Lo que ya pagaste queda cargado y vinculado.</div>
+        <button className="opcion" onClick={terminar}>
+          <div>Dejar de pedirlo</div>
+          <div className="mini tenue">Pasa a "Terminados". El historial queda igual y lo podés volver a activar.</div>
+        </button>
+        <button className="opcion mal" onClick={eliminarDelTodo}>
+          <div>Eliminarlo del todo</div>
+          <div className="mini tenue">Los pagos anteriores quedan como gastos sueltos.</div>
+        </button>
         <button className="opcion tenue" style={{ textAlign: "center" }} onClick={() => setBorrar(false)}>Cancelar</button>
       </Hoja>
     </div>
@@ -202,7 +217,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
   async function eliminar(a: Alcance) {
     const deshacer = await eliminarRecurrente(r!, a, clave);
     setBorrar(false);
-    toast({ texto: a === "este" ? `Salteado ${titulo}` : a === "siguientes" ? "Terminado desde acá" : "Recurrente eliminado", deshacer });
+    toast({ texto: a === "este" ? `Salteado ${titulo}` : "Recurrente eliminado", deshacer });
     nav.volver();
   }
 
@@ -249,6 +264,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
       )}
       <div className="espacio" />
       <button className="btn2" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>Editar el recurrente</button>
+      <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setBorrar(true)}>Ya no aplica: dejar de pedirlo</button>
 
       <Hoja abierta={elegir} cerrar={() => setElegir(false)}>
         <h2>¿Cuál es el pago de {r.nombre}?</h2>
@@ -277,10 +293,21 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
 
       <Hoja abierta={borrar} cerrar={() => setBorrar(false)}>
         <h2>Eliminar {r.nombre}</h2>
-        <div className="tenue chico">Es un recurrente. ¿Qué querés borrar?</div>
-        <button className="opcion" onClick={() => eliminar("este")}>Solo el de {titulo}</button>
-        {r.frecuencia !== "una-vez" && <button className="opcion" onClick={() => eliminar("siguientes")}>Este y los que siguen</button>}
-        <button className="opcion mal" onClick={() => eliminar("todo")}>El recurrente entero</button>
+        <div className="tenue chico">Lo que ya pagaste queda cargado.</div>
+        {r.frecuencia !== "una-vez" && (
+          <button className="opcion" onClick={async () => { const deshacer = await terminarRecurrente(r); setBorrar(false); toast({ texto: `${r.nombre}: no se pide más`, deshacer }); nav.volver(); }}>
+            <div>Dejar de pedirlo desde ahora</div>
+            <div className="mini tenue">Pasa a "Terminados" con su historial.</div>
+          </button>
+        )}
+        <button className="opcion" onClick={() => eliminar("este")}>
+          <div>Saltear solo {titulo}</div>
+          <div className="mini tenue">Este mes no se pide; los demás sí.</div>
+        </button>
+        <button className="opcion mal" onClick={() => eliminar("todo")}>
+          <div>Eliminarlo del todo</div>
+          <div className="mini tenue">Los pagos anteriores quedan como gastos sueltos.</div>
+        </button>
         <button className="opcion tenue" style={{ textAlign: "center" }} onClick={() => setBorrar(false)}>Cancelar</button>
       </Hoja>
     </div>

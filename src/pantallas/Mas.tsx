@@ -23,6 +23,7 @@ export function Mas() {
       </div>
       <div className="caja lista">
         {item({ p: "categorias" }, <T.IconCategory size={20} />, "Categorías")}
+        {item({ p: "etiquetas" }, <T.IconTag size={20} />, "Etiquetas")}
         {item({ p: "objetivos" }, <T.IconTarget size={20} />, "Objetivos por categoría")}
         {item({ p: "recurrentes" }, <T.IconRepeat size={20} />, "Recurrentes")}
         {item({ p: "cuentas" }, <T.IconBuildingBank size={20} />, "Cuentas y tarjetas")}

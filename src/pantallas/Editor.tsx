@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDatos } from "../datos";
-import { db, nuevoId } from "../db";
+import { db, leerAjuste, nuevoId } from "../db";
+import { useLiveQuery } from "dexie-react-hooks";
 import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
 import { eliminarMovimiento, guardarMovimiento } from "../lib/acciones";
@@ -116,11 +117,12 @@ export function Editor(props: Props) {
     nav.volver();
   }
 
+  const ocultas = useLiveQuery(() => leerAjuste<string[]>("etiquetasOcultas", []), []) ?? [];
   const etiquetasUsadas = useMemo(() => {
     const cuenta = new Map<string, number>();
     for (const m of d.movimientos) for (const e of m.etiquetas) cuenta.set(e, (cuenta.get(e) ?? 0) + 1);
-    return [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([e]) => e).slice(0, 14);
-  }, [d.movimientos]);
+    return [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([e]) => e).filter(e => !ocultas.includes(e)).slice(0, 14);
+  }, [d.movimientos, ocultas]);
 
   // ¿Es parte de un recurrente que falta pagar? Mismo tipo y categoría, este mes o el anterior.
   // ¿Este gasto es el pago de un recurrente pendiente? Se busca el más parecido

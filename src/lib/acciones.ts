@@ -1,7 +1,7 @@
 import { db, nuevoId } from "../db";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
 import { aUsd, cotizar } from "./cotizaciones";
-import { sumarDias } from "./fecha";
+import { diasDelMes, periodoHoy, sumarDias } from "./fecha";
 
 export type Borrador = Omit<Movimiento, "id" | "usd" | "cotizacion" | "creado" | "modificado" | "exportado"> & { id?: string };
 
@@ -57,6 +57,21 @@ export async function eliminarRecurrente(r: Recurrente, alcance: Alcance, clave?
   await db.movimientos.bulkUpdate(pagos.map(p => ({ key: p.id, changes: { recurrenteId: undefined, periodo: undefined } })));
   return async () => { await db.recurrentes.put(antes!); await db.movimientos.bulkPut(pagos); };
 }
+
+/** Dejar de pedir un recurrente: termina y queda en "Terminados" con todos sus
+ *  pagos vinculados (el historial no se toca). Si este mes ya está pagado, termina
+ *  a fin de mes; si no, termina el mes pasado y este mes ya no se pide. */
+export async function terminarRecurrente(r: Recurrente) {
+  const antes = await db.recurrentes.get(r.id);
+  const p = periodoHoy();
+  const pagadoEsteMes = (await db.movimientos.where("recurrenteId").equals(r.id).toArray()).some(m => m.periodo?.startsWith(p));
+  const fin = pagadoEsteMes ? `${p}-${String(diasDelMes(p)).padStart(2, "0")}` : sumarDias(`${p}-01`, -1);
+  await db.recurrentes.update(r.id, { fin });
+  return async () => { if (antes) await db.recurrentes.put(antes); };
+}
+
+/** Volver a pedirlo: le saca la fecha de fin. */
+export const reactivarRecurrente = (r: Recurrente) => db.recurrentes.update(r.id, { fin: undefined });
 
 /** "Este mes fue 0": la instancia queda resuelta sin pago. Se puede deshacer. */
 export async function marcarEnCero(r: Recurrente, clave: string, enCero: boolean) {

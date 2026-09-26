@@ -216,12 +216,14 @@ export async function sumarPaquete(archivo: File) {
   const p = JSON.parse(await archivo.text()) as Paquete;
   if (p.app !== "gastos-paquete") throw new Error("Este archivo no es un paquete para sumar.");
   const cats = await db.categorias.toArray(), cuentas = await db.cuentas.toArray();
-  const cat = (n: string) => cats.find(c => c.nombre.toLowerCase() === n.toLowerCase());
-  const cta = (n: string) => cuentas.find(c => c.nombre.toLowerCase() === n.toLowerCase());
+  // Mismo nombre aunque la tilde venga escrita de otra forma (é o e + ´).
+  const igual = (a: string, b: string) => a.normalize("NFC").toLowerCase() === b.normalize("NFC").toLowerCase();
+  const cat = (n: string) => cats.find(c => igual(c.nombre, n));
+  const cta = (n: string) => cuentas.find(c => igual(c.nombre, n));
   const res = { recurrentes: 0, pagos: 0, cuentas: 0, reglas: 0, movimientos: 0, corregidos: 0, categorias: 0, salteados: [] as string[] };
   await db.transaction("rw", [db.recurrentes, db.movimientos, db.cuentas, db.ajustes, db.categorias], async () => {
     for (const u of p.actualizar?.categorias ?? []) {
-      const c = cats.find(x => x.nombre.toLowerCase() === u.nombre.toLowerCase() && x.tipo === u.tipo);
+      const c = cats.find(x => igual(x.nombre, u.nombre) && x.tipo === u.tipo);
       if (!c) continue;
       const cambios = { ...(u.nuevoNombre ? { nombre: u.nuevoNombre } : {}), ...(u.archivar != null ? { archivada: u.archivar } : {}) };
       await db.categorias.update(c.id, cambios);
@@ -229,8 +231,8 @@ export async function sumarPaquete(archivo: File) {
       res.corregidos++;
     }
     for (const n of p.categorias ?? []) {
-      if (cats.some(x => x.nombre.toLowerCase() === n.nombre.toLowerCase() && x.tipo === n.tipo)) continue;
-      const c = { id: nuevoId(), ...n, orden: cats.length };
+      if (cats.some(x => igual(x.nombre, n.nombre) && x.tipo === n.tipo)) continue;
+      const c = { id: nuevoId(), ...n, nombre: n.nombre.normalize("NFC"), orden: cats.length };
       await db.categorias.add(c);
       cats.push(c);
       res.categorias++;
