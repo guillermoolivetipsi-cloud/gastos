@@ -177,3 +177,10 @@ it("prefiere la misma moneda aunque la cuenta sea otra", () => {
   const s = sugerirVinculos(insts, [m], r => tasas[r.id], () => false);
   expect([s.get("gas2026-10")?.id, s.get("cel2026-10")]).toEqual(["x", undefined]);
 });
+
+it("un mes marcado en 0 queda resuelto sin pago", () => {
+  const r: Recurrente = { id: "exp", nombre: "Expensas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 179100, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true, enCero: ["2026-10"] };
+  const e = estadoDe(instanciasDelMes(r, "2026-10")[0], [], 1545);
+  expect([e.estado, e.cero, e.esperado, e.falta]).toEqual(["cargado", true, 0, 0]);
+  expect(candidatos(e, [mov({ categoriaId: "casa", monto: 179100, moneda: "ARS", fecha: "2026-10-09" })], 1545)).toEqual([]);
+});

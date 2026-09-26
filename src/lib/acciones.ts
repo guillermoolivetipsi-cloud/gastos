@@ -58,6 +58,13 @@ export async function eliminarRecurrente(r: Recurrente, alcance: Alcance, clave?
   return async () => { await db.recurrentes.put(antes!); await db.movimientos.bulkPut(pagos); };
 }
 
+/** "Este mes fue 0": la instancia queda resuelta sin pago. Se puede deshacer. */
+export async function marcarEnCero(r: Recurrente, clave: string, enCero: boolean) {
+  const actual = new Set(r.enCero ?? []);
+  if (enCero) actual.add(clave); else actual.delete(clave);
+  await db.recurrentes.update(r.id, { enCero: [...actual] });
+}
+
 export async function descartar(clave: string) {
   await db.descartes.put({ clave, fecha: new Date().toISOString() });
 }

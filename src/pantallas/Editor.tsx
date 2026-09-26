@@ -245,7 +245,7 @@ export function Editor(props: Props) {
       {esTarjeta && cuenta && (
         <div className="caja" style={{ marginTop: 10 }}>
           <div className="etq">Cuotas</div>
-          <div className="pills">
+      <div className="pills">
             {[1, 3, 6, 12].map(n => <button key={n} className={`pill${cuotas === n ? " on" : ""}`} onClick={() => setCuotas(n)}>{n === 1 ? "1 pago" : n}</button>)}
             <button className={`pill${![1, 3, 6, 12].includes(cuotas) ? " on" : ""}`} onClick={() => setOtrasCuotas(true)}>{![1, 3, 6, 12].includes(cuotas) ? cuotas : "otra"}</button>
           </div>
@@ -276,6 +276,22 @@ export function Editor(props: Props) {
         ))}
         {!todas && cats.length > 7 && (
           <button className="cat" onClick={() => setTodas(true)}><Punto icono="question-mark" color="#2A2A36" /><span>Todas</span></button>
+        )}
+      </div>
+
+      {/* Etiquetas siempre a mano: las más usadas, y "+" para una nueva. */}
+      <div className="titulo-sec"><span>Etiquetas</span></div>
+      <div className="pills">
+        {[...new Set([...etiquetas, ...etiquetasUsadas])].map(e => (
+          <button key={e} className={`pill${etiquetas.includes(e) ? " on" : ""}`} onClick={() => setEtiquetas(x => x.includes(e) ? x.filter(y => y !== e) : [...x, e])}>{e}</button>
+        ))}
+        {nuevaEtq == null ? (
+          <button className="pill" onClick={() => setNuevaEtq("")}><T.IconPlus size={14} /> etiqueta</button>
+        ) : (
+          <input className="pill" autoFocus value={nuevaEtq} placeholder="Nueva" style={{ width: 120 }}
+            onChange={e => setNuevaEtq(e.target.value)}
+            onBlur={() => { const t = nuevaEtq.trim(); if (t) setEtiquetas(x => [...new Set([...x, t])]); setNuevaEtq(null); }}
+            onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
         )}
       </div>
 
@@ -320,20 +336,6 @@ export function Editor(props: Props) {
       </button>
       {detalles && (
         <>
-          <div className="etq">Etiquetas</div>
-          <div className="pills">
-            {[...new Set([...etiquetas, ...etiquetasUsadas])].map(e => (
-              <button key={e} className={`pill${etiquetas.includes(e) ? " on" : ""}`} onClick={() => setEtiquetas(x => x.includes(e) ? x.filter(y => y !== e) : [...x, e])}>{e}</button>
-            ))}
-            {nuevaEtq == null ? (
-              <button className="pill" onClick={() => setNuevaEtq("")}><T.IconPlus size={14} /> etiqueta</button>
-            ) : (
-              <input className="pill" autoFocus value={nuevaEtq} placeholder="Nueva" style={{ width: 120 }}
-                onChange={e => setNuevaEtq(e.target.value)}
-                onBlur={() => { const t = nuevaEtq.trim(); if (t) setEtiquetas(x => [...new Set([...x, t])]); setNuevaEtq(null); }}
-                onKeyDown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
-            )}
-          </div>
           <div className="campo"><label>Comentario</label><input value={comentario} onChange={e => setComentario(e.target.value)} placeholder="Verdulería, cena con amigos…" /></div>
           {tipo === "gasto" && !vinculo && !existente && (
             <>

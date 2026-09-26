@@ -3,7 +3,7 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Clase, type Frecuencia, type Moneda, type Recurrente, type Tipo } from "../tipos";
-import { eliminarRecurrente, type Alcance } from "../lib/acciones";
+import { eliminarRecurrente, marcarEnCero, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
@@ -237,7 +237,15 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
         + {e.pagos.length ? "Agregar un pago" : e.estimado ? "Cargar el monto real" : "Cargar el pago"}
       </button>
       {e.estado !== "cargado" && (
-        <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setElegir(true)}>Ya lo cargué como gasto: elegirlo</button>
+        <>
+          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setElegir(true)}>Ya lo cargué como gasto: elegirlo</button>
+          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => marcarEnCero(r, clave, true)}>Este mes no se pagó (queda en 0)</button>
+        </>
+      )}
+      {e.cero && (
+        <div className="caja" style={{ marginTop: 8 }}>
+          <div className="fila" style={{ padding: 0 }}><span className="chico">Marcado en 0 este mes</span><button className="viol chico" onClick={() => marcarEnCero(r, clave, false)}>Deshacer</button></div>
+        </div>
       )}
       <div className="espacio" />
       <button className="btn2" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>Editar el recurrente</button>

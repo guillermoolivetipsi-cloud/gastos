@@ -97,6 +97,8 @@ export interface Recurrente {
   activo: boolean;
   /** Períodos que ya no corresponden ("borrar solo el de octubre"). */
   saltear?: string[];
+  /** Períodos que ese mes fueron 0: quedan resueltos sin un pago. */
+  enCero?: string[];
 }
 
 /** Sugerencias que descartaste, para no volver a mostrarlas. */

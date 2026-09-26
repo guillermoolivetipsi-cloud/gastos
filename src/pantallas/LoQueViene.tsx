@@ -9,7 +9,7 @@ import type { EstadoInstancia } from "../lib/recurrentes";
 import type { Cuenta } from "../tipos";
 import { Barra, Punto, useToast } from "../ui/piezas";
 import { db } from "../db";
-import { descartar } from "../lib/acciones";
+import { descartar, marcarEnCero } from "../lib/acciones";
 import { sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
 
@@ -71,6 +71,10 @@ function Recurrentes({ periodo }: { periodo: string }) {
     await db.movimientos.update(m.id, { recurrenteId: i.rec.id, periodo: i.clave, modificado: new Date().toISOString() });
     toast({ texto: `Vinculado como pago de ${i.rec.nombre}`, deshacer: () => { db.movimientos.update(m.id, { recurrenteId: undefined, periodo: undefined }); } });
   }
+  async function enCero(i: EstadoInstancia) {
+    await marcarEnCero(i.rec, i.clave, true);
+    toast({ texto: `${i.rec.nombre}: este mes en 0`, deshacer: () => { marcarEnCero({ ...i.rec, enCero: [...(i.rec.enCero ?? []), i.clave] }, i.clave, false); } });
+  }
   const monto = (i: EstadoInstancia) => `${i.estimado ? "~" : ""}${num(i.estado === "parcial" ? i.falta : i.esperado)} ${i.rec.moneda}`;
   const cargar = (i: EstadoInstancia) => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: i.fecha });
 
@@ -114,7 +118,10 @@ function Recurrentes({ periodo }: { periodo: string }) {
               </button>
               <span className="derecha">
                 <div className="num chico">{monto(i)}</div>
-                <button className="btn1" style={{ padding: "3px 10px", fontSize: 12, marginTop: 3 }} onClick={() => cargar(i)}>Cargar</button>
+                <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 3 }}>
+                  <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => enCero(i)}>Fue 0</button>
+                  <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => cargar(i)}>Cargar</button>
+                </span>
               </span>
             </div>
             {ya && (
@@ -173,7 +180,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
               {pagados.map(i => (
                 <button key={i.rec.id + i.clave} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
                   <span className="izq"><Punto cat={cat.get(i.rec.categoriaId)} chico /><span>{i.rec.nombre}</span></span>
-                  <span className="ok num chico"><T.IconCheck size={13} style={{ verticalAlign: -2 }} /> {num(i.pagado)} {i.rec.moneda}</span>
+                  {i.cero ? <span className="tenue chico">0 · no se pagó</span> : <span className="ok num chico"><T.IconCheck size={13} style={{ verticalAlign: -2 }} /> {num(i.pagado)} {i.rec.moneda}</span>}
                 </button>
               ))}
             </div>

@@ -48,6 +48,8 @@ export interface EstadoInstancia extends Instancia {
   pagos: Movimiento[];
   /** Variable sin pagos: el monto es un estimado. */
   estimado: boolean;
+  /** Ese mes fue 0 (lo marcaste así): resuelto sin pago. */
+  cero: boolean;
 }
 
 /** Lo pagado, en la moneda del recurrente. Si pagaste desde otra moneda se pasa
@@ -74,6 +76,8 @@ function estimado(r: Recurrente, historia: Movimiento[], clave: string, tasaRec:
 export function estadoDe(i: Instancia, movs: Movimiento[], tasaRec: number | null): EstadoInstancia {
   const r = i.rec;
   const pagos = movs.filter(m => m.recurrenteId === r.id && m.periodo === i.clave);
+  if (r.enCero?.includes(i.clave) && !pagos.length)
+    return { ...i, pagos, pagado: 0, esperado: 0, falta: 0, estado: "cargado", estimado: false, cero: true };
   const pagado = pagadoEn(r, pagos, tasaRec);
   const esperado = r.clase === "variable" ? estimado(r, movs, i.clave, tasaRec) : r.monto;
   let estado: Estado;
@@ -86,6 +90,7 @@ export function estadoDe(i: Instancia, movs: Movimiento[], tasaRec: number | nul
     esperado: esperadoFinal,
     falta: redondear(Math.max(0, esperadoFinal - pagado)),
     estimado: r.clase === "variable" && !pagos.length,
+    cero: false,
   };
 }
 
@@ -99,7 +104,7 @@ export async function cargarAutomaticos() {
   for (const r of recs) {
     for (let p = periodoDe(r.inicio); p <= periodoDe(h); p = sumarMeses(p, 1)) {
       for (const i of instanciasDelMes(r, p)) {
-        if (i.fecha > h) continue;
+        if (i.fecha > h || r.enCero?.includes(i.clave)) continue;
         const ya = await db.movimientos.where("[recurrenteId+periodo]").equals([r.id, i.clave]).count();
         if (ya) continue;
         const cot = await cotizar(r.moneda, i.fecha, cuentas.get(r.cuentaId)?.dolar ?? "blue");
