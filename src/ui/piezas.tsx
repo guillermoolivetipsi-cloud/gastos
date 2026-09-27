@@ -128,3 +128,12 @@ export function Deslizable({ children, borrar, tocar }: { children: ReactNode; b
     </div>
   );
 }
+
+/** El "+" flotante. Abre la carga ya como gasto o como ingreso, según dónde estés. */
+export function BotonAgregar({ tipo, abrir }: { tipo: "gasto" | "ingreso"; abrir: (tipo: "gasto" | "ingreso") => void }) {
+  return (
+    <button className="fab" aria-label={tipo === "ingreso" ? "Nuevo ingreso" : "Nuevo gasto"} onClick={() => abrir(tipo)}>
+      <T.IconPlus size={28} />
+    </button>
+  );
+}

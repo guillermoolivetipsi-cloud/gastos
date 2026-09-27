@@ -86,9 +86,6 @@ export function App() {
       {nav.solapa === "movimientos" && <Movimientos />}
       {nav.solapa === "viene" && <LoQueViene />}
       {nav.solapa === "mas" && <Mas />}
-      {(nav.solapa === "resumen" || nav.solapa === "movimientos") && (
-        <button className="fab" aria-label="Nuevo gasto" onClick={() => nav.abrir({ p: "editor" })}><T.IconPlus size={28} /></button>
-      )}
       <nav className="tabs"><div>
         {SOLAPAS.map(([s, t, I]) => (
           <button key={s} className={`tab${nav.solapa === s ? " on" : ""}`} onClick={() => nav.irA(s)}><I size={22} stroke={1.7} />{t}</button>

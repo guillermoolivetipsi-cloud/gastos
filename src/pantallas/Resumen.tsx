@@ -7,7 +7,7 @@ import type { Categoria, Movimiento, Tipo } from "../tipos";
 import { avanceDelMes, bloques, claseProvisoria, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { fechaCorta, hoy, moverAncla, nombreMes, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
 import { num, usd } from "../lib/formato";
-import { Barra, Dona, Hoja, Punto } from "../ui/piezas";
+import { Barra, BotonAgregar, Dona, Hoja, Punto } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
 import { useInsights } from "./ComoVenis";
 import { T } from "../ui/Icono";
@@ -155,6 +155,8 @@ export function Resumen() {
       )}
 
       {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
+
+      <BotonAgregar tipo={tipo} abrir={t => nav.abrir({ p: "editor", tipo: t })} />
 
       <Hoja abierta={elegirPeriodo} cerrar={() => setElegirPeriodo(false)}>
         <h2>Elegir período</h2>

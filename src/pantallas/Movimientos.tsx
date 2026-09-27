@@ -5,7 +5,7 @@ import { eliminarMovimiento } from "../lib/acciones";
 import { usdDe } from "../lib/analisis";
 import { fechaCorta, fechaLarga } from "../lib/fecha";
 import { num, sinAcentos } from "../lib/formato";
-import { Deslizable, Punto, Seg, useToast } from "../ui/piezas";
+import { BotonAgregar, Deslizable, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 
@@ -104,6 +104,7 @@ export function Movimientos() {
       })}
       {lista.length > cuantos && <button className="btn2" style={{ width: "100%", marginTop: 12 }} onClick={() => setCuantos(c => c + 300)}>Ver más</button>}
       {lista.length > 0 && <div className="mini tenue centro" style={{ marginTop: 14 }}>Deslizá un movimiento a la izquierda para eliminarlo</div>}
+      <BotonAgregar tipo={tipo === "ingreso" ? "ingreso" : "gasto"} abrir={t => nav.abrir({ p: "editor", tipo: t })} />
     </div>
   );
 }

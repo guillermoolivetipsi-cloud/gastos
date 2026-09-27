@@ -7,7 +7,7 @@ import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurren
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
-import { candidatos, estadoDe } from "../lib/recurrentes";
+import { candidatos, estadoDe, mensualEnUsd } from "../lib/recurrentes";
 import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -27,19 +27,32 @@ export function ListaRecurrentes() {
   const cat = new Map(d.categorias.map(c => [c.id, c]));
   const activos = d.recurrentes.filter(r => r.activo && r.frecuencia !== "una-vez" && (!r.fin || r.fin >= hoy()));
   const terminados = d.recurrentes.filter(r => !activos.includes(r) && r.frecuencia !== "una-vez");
+  const usd = (r: Recurrente) => mensualEnUsd(r, d.movimientos, d.tasaRec(r));
+  const total = (tipo: Recurrente["tipo"]) => activos.filter(r => r.tipo === tipo).reduce((s, r) => s + (usd(r) ?? 0), 0);
+  const gastos = total("gasto"), ingresos = total("ingreso");
   const fila = (r: Recurrente) => (
     <button key={r.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>
       <span className="izq"><Punto cat={cat.get(r.categoriaId)} chico /><span>
         <div>{r.nombre}</div>
         <div className="mini tenue">{cadaCuanto(r)} · <span className={`etiq e-${r.clase}`}>{r.clase}</span></div>
       </span></span>
-      <span className={`num ${r.tipo === "ingreso" ? "ok" : ""}`}>{r.clase === "variable" ? "~" : ""}{r.tipo === "ingreso" ? "+" : ""}{num(r.monto)} {r.moneda}</span>
+      <span className="derecha">
+        <div className={`num ${r.tipo === "ingreso" ? "ok" : ""}`}>{r.clase === "variable" ? "~" : ""}{r.tipo === "ingreso" ? "+" : ""}{num(r.monto)} {r.moneda}</div>
+        {r.moneda !== "USD" && usd(r) != null && <div className="mini tenue num">≈ {num(usd(r)!, 0)} USD{r.frecuencia !== "mensual" ? "/mes" : ""}</div>}
+      </span>
     </button>
   );
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Recurrentes</h1><button className="accion" aria-label="Nuevo" onClick={() => nav.abrir({ p: "recurrente" })}><T.IconPlus size={22} /></button></div>
       <div className="chico tenue" style={{ marginBottom: 10 }}>Lo que se repite, gastos e ingresos juntos. Si el monto cambia cada mes (expensas, luz) te aviso con un estimado para que cargues el real.</div>
+      {activos.length > 0 && (
+        <div className="caja">
+          <div className="fila" style={{ padding: 0 }}><span className="tenue chico">Gastos recurrentes por mes</span><span className="mediano num">~{num(gastos, 0)} <span className="chico tenue">USD</span></span></div>
+          {ingresos > 0 && <div className="fila" style={{ paddingBottom: 0 }}><span className="tenue chico">Ingresos recurrentes por mes</span><span className="num ok">+{num(ingresos, 0)} USD</span></div>}
+          <div className="mini tenue" style={{ marginTop: 4 }}>En dólares con la cotización de hoy. Los variables, con su estimado.</div>
+        </div>
+      )}
       {!activos.length && <div className="vacio">Todavía no hay recurrentes.</div>}
       {activos.length > 0 && <div className="caja lista">{activos.map(fila)}</div>}
       {terminados.length > 0 && <><div className="titulo-sec"><span>Terminados</span></div><div className="caja lista">{terminados.map(fila)}</div></>}

@@ -187,3 +187,15 @@ it("un mes marcado en 0 queda resuelto sin pago", () => {
   expect([e.estado, e.cero, e.esperado, e.falta]).toEqual(["cargado", true, 0, 0]);
   expect(candidatos(e, [mov({ categoriaId: "casa", monto: 179100, moneda: "ARS", fecha: "2026-10-09" })], 1545)).toEqual([]);
 });
+
+it("recurrentes por mes en USD: fijo, variable con estimado, semanal y anual", async () => {
+  const { mensualEnUsd } = await import("./recurrentes");
+  const base: Recurrente = { id: "a", nombre: "Alquiler", tipo: "gasto", categoriaId: "casa", cuentaId: "rev", monto: 420, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 24, inicio: "2026-01-01", modo: "avisar", activo: true };
+  expect(mensualEnUsd(base, [], 0.84)).toBe(500);
+  expect(mensualEnUsd({ ...base, frecuencia: "anual", mes: 3 }, [], 0.84)).toBe(41.67);
+  expect(mensualEnUsd({ ...base, frecuencia: "semanal", dia: 2, monto: 12 }, [], 1)).toBe(52);
+  const exp = { ...base, id: "e", clase: "variable" as const, moneda: "ARS" as const, monto: 1 };
+  const pagos = ["2026-06", "2026-07", "2026-08"].map((p, i) => mov({ recurrenteId: "e", periodo: p, monto: 150000 + i * 15000, moneda: "ARS" }));
+  expect(mensualEnUsd(exp, pagos, 1500)).toBe(110);
+  expect(mensualEnUsd({ ...base, frecuencia: "una-vez" }, [], 1)).toBeNull();
+});
