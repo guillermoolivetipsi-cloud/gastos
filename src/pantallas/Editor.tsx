@@ -69,15 +69,39 @@ export function Editor(props: Props) {
       setTipo(rec.tipo); setCategoriaId(rec.categoriaId); setCuentaId(rec.cuentaId); setMoneda(rec.moneda); setComentario(rec.nombre);
       return;
     }
-    // Nuevo: arranca "sin tarjeta" (la cuenta de todos los días) y en la moneda que
-    // más usaste en el último mes.
-    const desde = sumarDias(hoy(), -30);
-    const uso = new Map<Moneda, number>();
-    for (const m of d.movimientos) if (m.tipo === (props.tipo ?? "gasto") && m.fecha >= desde) uso.set(m.moneda, (uso.get(m.moneda) ?? 0) + 1);
-    const masUsada = [...uso.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-    const c = cuentaDiaria(d.cuentas);
-    if (c) { setCuentaId(c.id); setMoneda(masUsada ?? c.moneda); }
+    const t = props.tipo ?? "gasto";
+    arrancarCon(t, props.cuentaId);
+    const cat = props.categoriaId ? d.catPorId.get(props.categoriaId) : undefined;
+    if (cat?.tipo === t) setCategoriaId(cat.id);
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Cuenta y moneda para uno nuevo: la que venías mirando (una tarjeta filtrada),
+   *  o la de todos los días para gastos y la que más usás para ingresos; en la moneda
+   *  que más usaste con ella. */
+  function arrancarCon(t: Tipo, preferida?: string) {
+    const recientes = d.movimientos.filter(m => m.tipo === t && m.fecha >= sumarDias(hoy(), -90));
+    const masUsada = <K,>(xs: K[]) => {
+      const uso = new Map<K, number>();
+      for (const x of xs) uso.set(x, (uso.get(x) ?? 0) + 1);
+      return [...uso.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    };
+    const activa = (id?: string) => d.cuentas.find(c => c.id === id && !c.archivada && (t === "gasto" || !c.esTarjeta));
+    const c = activa(preferida)
+      ?? (t === "ingreso" ? activa(masUsada(recientes.map(m => m.cuentaId))) : undefined)
+      ?? cuentaDiaria(d.cuentas);
+    if (!c) return;
+    const desde = sumarDias(hoy(), -30);
+    const conEsta = recientes.filter(m => m.cuentaId === c.id);
+    setCuentaId(c.id);
+    setMoneda(masUsada((t === "gasto" ? recientes.filter(m => m.fecha >= desde) : conEsta).map(m => m.moneda)) ?? c.moneda);
+  }
+
+  function cambiarTipo(t: Tipo) {
+    setTipo(t); setCategoriaId(""); setVinculo(null); setEnPartes(false); setTotalTxt(""); setCuotas(1);
+    if (!existente && !props.recurrenteId) arrancarCon(t);
+    // Un ingreso no entra en una tarjeta.
+    else if (t === "ingreso" && cuenta?.esTarjeta) { const c = cuentaDiaria(d.cuentas); if (c) { setCuentaId(c.id); setMoneda(c.moneda); } }
+  }
 
   const monto = leerNumero(montoTxt);
   const tasa = d.tasas.de(moneda, cuenta?.dolar);
@@ -175,7 +199,7 @@ export function Editor(props: Props) {
         {existente && <button className="accion peligro" aria-label="Eliminar" onClick={borrar}><T.IconTrash size={21} /></button>}
       </div>
 
-      <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={tipo} cambiar={t => { setTipo(t); setCategoriaId(""); setVinculo(null); }} />
+      <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={tipo} cambiar={cambiarTipo} />
 
       {tipo === "gasto" && frecuentes.length > 0 && !montoTxt && (
         <div style={{ marginTop: 10 }}>

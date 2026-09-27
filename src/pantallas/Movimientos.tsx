@@ -39,6 +39,12 @@ export function Movimientos() {
   const filtrando = medio !== "todos" || !!catFiltro || !!q.trim();
   const totalFiltrado = lista.reduce((s, m) => s + (m.tipo === "gasto" ? 1 : -1) * usdDe(m), 0);
 
+  // El total de cada día sale de la lista entera: no cambia al tocar "Ver más".
+  const totalDia = useMemo(() => {
+    const t = new Map<string, number>();
+    for (const m of lista) t.set(m.fecha, (t.get(m.fecha) ?? 0) + (m.tipo === "gasto" ? -1 : 1) * usdDe(m));
+    return t;
+  }, [lista]);
   const porDia: [string, typeof lista][] = [];
   for (const m of lista.slice(0, cuantos)) {
     const ult = porDia[porDia.length - 1];
@@ -50,23 +56,27 @@ export function Movimientos() {
     <div className="pantalla">
       <div className="enc"><h1>Movimientos</h1></div>
       <div className="buscar"><T.IconSearch size={18} className="tenue" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por categoría, cuenta, comentario…" />{q && <button onClick={() => setQ("")} aria-label="Borrar búsqueda"><T.IconX size={16} /></button>}</div>
-      <Seg opciones={[["todos", "Todos"], ["gasto", "Gastos"], ["ingreso", "Ingresos"]]} valor={tipo} cambiar={setTipo} />
+      <Seg opciones={[["todos", "Todos"], ["gasto", "Gastos"], ["ingreso", "Ingresos"]]} valor={tipo} cambiar={t => {
+        setTipo(t);
+        // Una categoría de gastos no tiene sentido mirando ingresos (y al revés).
+        if (t !== "todos" && catFiltro && cat.get(catFiltro)?.tipo !== t) setCatFiltro("");
+      }} />
       <div className="pills scroll" style={{ marginTop: 10 }}>
         {[["todos", "Todas"], ["sin", "Sin tarjeta"], ...d.cuentas.filter(c => c.esTarjeta && !c.archivada).map(c => [c.id, c.nombre])].map(([v, t]) => (
           <button key={v} className={`pill${medio === v ? " on" : ""}`} onClick={() => setMedio(v)}>{t}</button>
         ))}
         <select className={`pill${catFiltro ? " on" : ""}`} value={catFiltro} onChange={e => setCatFiltro(e.target.value)} aria-label="Categoría" style={{ appearance: "none" }}>
           <option value="">Categoría ▾</option>
-          {d.categorias.filter(c => !c.archivada).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          {d.categorias.filter(c => !c.archivada && (tipo === "todos" || c.tipo === tipo)).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
       {filtrando && lista.length > 0 && <div className="mini tenue" style={{ marginTop: 8 }}>{lista.length} movimientos · {num(Math.abs(totalFiltrado))} USD</div>}
       {sinCotizar > 0 && <div className="mini ambar" style={{ marginTop: 10 }}><T.IconCloudOff size={13} /> {sinCotizar} sin convertir a USD: se completan al tener conexión.</div>}
 
-      {!lista.length && <div className="vacio">{q ? "Nada coincide con la búsqueda." : "Todavía no cargaste nada. Tocá + para empezar."}</div>}
+      {!lista.length && <div className="vacio">{q ? "Nada coincide con la búsqueda." : filtrando || tipo !== "todos" ? "Nada con estos filtros." : "Todavía no cargaste nada. Tocá + para empezar."}</div>}
 
       {porDia.map(([fecha, ms]) => {
-        const total = ms.reduce((s, m) => s + (m.tipo === "gasto" ? -1 : 1) * usdDe(m), 0);
+        const total = totalDia.get(fecha) ?? 0;
         return (
           <div key={fecha}>
             <div className="dia-titulo"><span>{fechaCorta(fecha) === "hoy" || fechaCorta(fecha) === "ayer" ? `${fechaCorta(fecha)} · ` : ""}{fechaLarga(fecha)}</span><span className="num">{num(total)}</span></div>
@@ -104,7 +114,8 @@ export function Movimientos() {
       })}
       {lista.length > cuantos && <button className="btn2" style={{ width: "100%", marginTop: 12 }} onClick={() => setCuantos(c => c + 300)}>Ver más</button>}
       {lista.length > 0 && <div className="mini tenue centro" style={{ marginTop: 14 }}>Deslizá un movimiento a la izquierda para eliminarlo</div>}
-      <BotonAgregar tipo={tipo === "ingreso" ? "ingreso" : "gasto"} abrir={t => nav.abrir({ p: "editor", tipo: t })} />
+      <BotonAgregar tipo={tipo === "ingreso" || cat.get(catFiltro)?.tipo === "ingreso" ? "ingreso" : "gasto"}
+        abrir={t => nav.abrir({ p: "editor", tipo: t, cuentaId: cta.get(medio)?.esTarjeta ? medio : undefined, categoriaId: catFiltro || undefined })} />
     </div>
   );
 }

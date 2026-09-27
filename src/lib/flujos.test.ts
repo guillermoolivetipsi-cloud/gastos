@@ -115,3 +115,44 @@ describe("historial de cotizaciones", () => {
     expect([memo["EUR|2026-09-13"], memo["EUR|2026-09-14"], memo["ARS|blue|2026-09-13"]]).toEqual([0.86, 0.87, 1500]);
   });
 });
+
+describe("saltear un mes de un recurrente", () => {
+  it("no borra lo que ya pagaste: queda como gasto suelto", async () => {
+    const { eliminarRecurrente } = await import("./acciones");
+    const luz: Recurrente = { id: "luz", nombre: "Luz", tipo: "gasto", categoriaId: "casa", cuentaId: "rev", monto: 30, moneda: "USD", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-08-01", modo: "avisar", activo: true };
+    await db.recurrentes.add(luz);
+    await db.movimientos.add(mov({ id: "p", categoriaId: "casa", recurrenteId: "luz", periodo: "2026-09" }));
+    const deshacer = await eliminarRecurrente(luz, "este", "2026-09");
+    const p = (await db.movimientos.get("p"))!;
+    expect([p.recurrenteId, (await db.recurrentes.get("luz"))!.saltear]).toEqual([undefined, ["2026-09"]]);
+    await deshacer();
+    expect((await db.movimientos.get("p"))!.recurrenteId).toBe("luz");
+  });
+});
+
+describe("pago en partes", () => {
+  it("sigue en los meses siguientes hasta que se paga todo", async () => {
+    const { recurrentesDelMes } = await import("./analisis");
+    const curso: Recurrente = { id: "c", nombre: "Curso", tipo: "gasto", categoriaId: "super", cuentaId: "rev", monto: 300, moneda: "USD", clase: "fijo", frecuencia: "una-vez", dia: 10, inicio: "2026-08-10", modo: "avisar", activo: true };
+    const pago1 = mov({ recurrenteId: "c", periodo: "2026-08", monto: 100, fecha: "2026-08-10" });
+    const oct = recurrentesDelMes([curso], [pago1], "2026-10", () => 1);
+    expect(oct.map(i => [i.clave, i.falta])).toEqual([["2026-08", 200]]);
+    const pago2 = mov({ recurrenteId: "c", periodo: "2026-08", monto: 200, fecha: "2026-10-01" });
+    expect(recurrentesDelMes([curso], [pago1, pago2], "2026-10", () => 1)).toEqual([]);
+    expect(recurrentesDelMes([curso], [pago1, pago2], "2026-08", () => 1)[0].estado).toBe("cargado");
+  });
+});
+
+describe("fechas al cargar", () => {
+  it("el pago de un recurrente: hoy si venció este mes; si no, su día", async () => {
+    const { fechaDePago } = await import("./recurrentes");
+    const r = {} as Recurrente;
+    expect([fechaDePago({ rec: r, clave: "", fecha: "2026-09-10" }), fechaDePago({ rec: r, clave: "", fecha: "2026-10-09" }), fechaDePago({ rec: r, clave: "", fecha: "2026-08-09" })])
+      .toEqual(["2026-09-26", "2026-10-09", "2026-08-09"]);
+  });
+  it("el + del resumen usa el período que estás mirando", async () => {
+    const { fechaParaCargar } = await import("../pantallas/Resumen");
+    expect([fechaParaCargar("2026-09-21", "2026-09-27"), fechaParaCargar("2026-08-01", "2026-08-31"), fechaParaCargar("2026-10-01", "2026-10-31")])
+      .toEqual(["2026-09-26", "2026-08-31", "2026-10-01"]);
+  });
+});

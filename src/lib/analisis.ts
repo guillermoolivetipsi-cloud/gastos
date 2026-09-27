@@ -209,6 +209,8 @@ export function recurrentesDelMes(recs: Recurrente[], movs: Movimiento[], period
   return recs
     .flatMap(r => instanciasDelMes(r, periodo))
     .map(i => estadoDe(i, pagos.get(i.rec.id) ?? [], tasa(i.rec)))
+    // Un pago en partes ya completo solo se muestra en su mes.
+    .filter(i => i.rec.frecuencia !== "una-vez" || i.clave === periodo || i.estado !== "cargado")
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 

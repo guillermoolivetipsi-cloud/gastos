@@ -30,7 +30,7 @@ export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], 
   for (const m of movs) if (m.fecha < primera) primera = m.fecha;
   const primerMes = periodoDe(primera);
 
-  if (r.diario.activo && horaActual() >= r.diario.hora && !movs.some(m => diaLocal(m.creado) === h || m.fecha === h)) {
+  if (r.diario.activo && horaActual() >= r.diario.hora && !movs.some(m => m.tipo === "gasto" && !m.id.startsWith("auto|") && (diaLocal(m.creado) === h || m.fecha === h))) {
     const clave = `diario|${h}`;
     if (!hechas.has(clave)) out.push({ tipo: "diario", clave, titulo: "¿Cargaste los gastos de hoy?", detalle: "Todavía no anotaste nada hoy." });
   }

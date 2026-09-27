@@ -50,7 +50,11 @@ export function EditorCuenta({ id }: { id?: string }) {
   async function eliminar() {
     if (!existente) return;
     if (usada) { await db.cuentas.update(existente.id, { archivada: !existente.archivada }); toast({ texto: existente.archivada ? "Cuenta reactivada" : "Cuenta archivada" }); }
-    else { await db.cuentas.delete(existente.id); toast({ texto: "Cuenta eliminada" }); }
+    else {
+      const antes = existente;
+      await db.cuentas.delete(antes.id);
+      toast({ texto: "Cuenta eliminada", deshacer: () => { db.cuentas.put(antes); } });
+    }
     nav.volver();
   }
 
@@ -88,7 +92,9 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
   const nav = useNav();
   const [periodo, setPeriodo] = useState(inicial ?? periodoHoy());
   const c = d.cuentas.find(c => c.id === id);
-  if (!c) return <div className="pantalla sin-tabs" />;
+  // Si la eliminaste desde el engranaje, esta pantalla ya no tiene sentido.
+  useEffect(() => { if (d.listo && !c) nav.volver(); }, [d.listo, c]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!c) return <div className="pantalla sin-tabs"><div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button></div></div>;
   const r = resumen(c, d.movimientos, periodo);
   const futuras = cuotasFuturas(c, d.movimientos, periodo);
   const cat = new Map(d.categorias.map(c => [c.id, c.nombre]));

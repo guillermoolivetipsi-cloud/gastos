@@ -28,7 +28,9 @@ export function instanciasDelMes(r: Recurrente, periodo: string): Instancia[] {
       if (aFecha(f).getDay() === r.dia && dentro(f)) out.push({ rec: r, clave: f, fecha: f });
     }
   } else if (r.frecuencia === "una-vez") {
-    if (periodoDe(r.inicio) === periodo) out.push({ rec: r, clave: periodo, fecha: r.inicio });
+    // Sigue apareciendo cada mes hasta que se paga todo (recurrentesDelMes esconde
+    // los ya pagados). La clave es siempre la del mes en que empezó.
+    if (periodo >= periodoDe(r.inicio)) out.push({ rec: r, clave: periodoDe(r.inicio), fecha: r.inicio });
   } else {
     if (r.frecuencia === "anual" && Number(periodo.slice(5)) !== r.mes) return [];
     const f = fechaEnMes(periodo, r.dia);
@@ -226,4 +228,11 @@ export function mensualEnUsd(r: Recurrente, movs: Movimiento[], tasa: number | n
     : r.monto;
   const porMes = r.frecuencia === "semanal" ? (base * 52) / 12 : r.frecuencia === "anual" ? base / 12 : base;
   return redondear(porMes / tasa);
+}
+
+/** La fecha para cargar el pago de una instancia: la del vencimiento si todavía no
+ *  llegó o si es de un mes anterior; hoy si ya venció este mes. */
+export function fechaDePago(i: Instancia) {
+  const h = hoy();
+  return i.fecha > h || periodoDe(i.fecha) !== periodoDe(h) ? i.fecha : h;
 }

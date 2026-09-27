@@ -40,7 +40,11 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
       const r = leerResumen(await textoDePdf(new Uint8Array(await f.arrayBuffer())));
       if (!r.consumos.length) throw new Error("No encontré consumos en ese PDF. ¿Es el resumen de la tarjeta?");
       setRes(r);
-      const t = tarjetas.find(c => c.nombre.toLowerCase().includes(r.tarjeta.startsWith("Master") ? "master" : "visa")) ?? tarjetas.find(c => c.id === tarjetaId);
+      // La tarjeta desde la que viniste manda, salvo que su nombre sea de la otra marca.
+      const marca = r.tarjeta.startsWith("Master") ? "master" : "visa", otra = marca === "visa" ? "master" : "visa";
+      const elegida = tarjetas.find(c => c.id === tarjetaId);
+      const t = elegida && !elegida.nombre.toLowerCase().includes(otra) ? elegida
+        : tarjetas.find(c => c.nombre.toLowerCase().includes(marca)) ?? elegida;
       if (t) setTarjetaId(t.id);
       setCierre(r.cierre ?? "");
       setVence(r.vencimiento ?? "");

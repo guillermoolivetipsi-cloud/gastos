@@ -8,7 +8,7 @@ import type { Tipo } from "./tipos";
 export type Solapa = "resumen" | "movimientos" | "viene" | "mas";
 
 export type Pantalla =
-  | { p: "editor"; id?: string; tipo?: Tipo; recurrenteId?: string; periodo?: string; monto?: number; fecha?: string }
+  | { p: "editor"; id?: string; tipo?: Tipo; recurrenteId?: string; periodo?: string; monto?: number; fecha?: string; cuentaId?: string; categoriaId?: string }
   | { p: "categorias" }
   | { p: "categoria"; id?: string; tipo?: Tipo }
   | { p: "cuentas" }
@@ -29,7 +29,9 @@ export type Pantalla =
 
 type Nav = {
   solapa: Solapa;
-  irA: (s: Solapa) => void;
+  /** `periodo`: el mes a mostrar en "Lo que viene" (si venís de otro mes). */
+  irA: (s: Solapa, periodo?: string) => void;
+  periodoViene?: string;
   abrir: (p: Pantalla) => void;
   volver: () => void;
   pila: Pantalla[];
@@ -41,6 +43,7 @@ export const useNav = () => useContext(Ctx);
 export function ProveedorNav({ children }: { children: ReactNode }) {
   const [solapa, setSolapa] = useState<Solapa>("resumen");
   const [pila, setPila] = useState<Pantalla[]>([]);
+  const [periodoViene, setPeriodoViene] = useState<string>();
 
   useEffect(() => {
     const alVolver = () => setPila(p => p.slice(0, -1));
@@ -54,7 +57,7 @@ export function ProveedorNav({ children }: { children: ReactNode }) {
     window.scrollTo(0, 0);
   };
   const volver = () => history.back();
-  const irA = (s: Solapa) => { setSolapa(s); window.scrollTo(0, 0); };
+  const irA = (s: Solapa, periodo?: string) => { setSolapa(s); setPeriodoViene(periodo); window.scrollTo(0, 0); };
 
-  return <Ctx.Provider value={{ solapa, irA, abrir, volver, pila }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ solapa, irA, abrir, volver, pila, periodoViene }}>{children}</Ctx.Provider>;
 }

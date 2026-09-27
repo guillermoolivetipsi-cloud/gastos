@@ -48,9 +48,12 @@ export async function eliminarRecurrente(r: Recurrente, alcance: Alcance, clave?
   const antes = await db.recurrentes.get(r.id);
   const pagos = await db.movimientos.where("recurrenteId").equals(r.id).toArray();
   if (alcance === "este" && clave) {
-    await db.recurrentes.where("id").equals(r.id).modify(x => { x.saltear = [...new Set([...(x.saltear ?? []), clave])]; });
+    // Lo ya pagado de esa vez queda cargado, como gasto suelto.
     const deEste = pagos.filter(p => p.periodo === clave);
-    await db.movimientos.bulkDelete(deEste.map(p => p.id));
+    await db.transaction("rw", db.recurrentes, db.movimientos, async () => {
+      await db.recurrentes.where("id").equals(r.id).modify(x => { x.saltear = [...new Set([...(x.saltear ?? []), clave])]; });
+      await db.movimientos.bulkUpdate(deEste.map(p => ({ key: p.id, changes: { recurrenteId: undefined, periodo: undefined } })));
+    });
     return async () => { await db.recurrentes.put(antes!); await db.movimientos.bulkPut(deEste); };
   }
   // Entero: se borra el recurrente; los pagos ya hechos quedan como gastos sueltos.

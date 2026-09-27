@@ -8,7 +8,7 @@ import { num, redondear } from "../lib/formato";
 import type { EstadoInstancia } from "../lib/recurrentes";
 import { Barra, Punto, useToast } from "../ui/piezas";
 import { descartar, marcarEnCero, vincular } from "../lib/acciones";
-import { sugerirVinculos } from "../lib/recurrentes";
+import { fechaDePago, sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
 
 /* Lo que está por salir o entrar, en dos pestañas:
@@ -22,9 +22,11 @@ type Pestana = "recurrentes" | "tarjetas";
 
 export function LoQueViene() {
   const d = useDatos();
-  const [periodo, setPeriodo] = useState(periodoHoy());
+  const nav = useNav();
+  const [periodo, setPeriodo] = useState(nav.periodoViene ?? periodoHoy());
   const [pestana, setPestana] = useState<Pestana>("recurrentes");
   const meses = Array.from({ length: 4 }, (_, i) => sumarMeses(periodoHoy(), i - 1));
+  if (!meses.includes(periodo)) meses.unshift(periodo);
   return (
     <div className="pantalla">
       <div className="enc"><h1>Lo que viene</h1></div>
@@ -74,7 +76,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
     toast({ texto: `${i.rec.nombre}: este mes en 0`, deshacer: () => { marcarEnCero(i.rec, i.clave, false); } });
   }
   const monto = (i: EstadoInstancia) => `${i.estimado ? "~" : ""}${num(i.estado === "parcial" ? i.falta : i.esperado)} ${i.rec.moneda}`;
-  const cargar = (i: EstadoInstancia) => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: i.fecha });
+  const cargar = (i: EstadoInstancia) => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: fechaDePago(i) });
 
   if (!insts.length) return (
     <div className="vacio">

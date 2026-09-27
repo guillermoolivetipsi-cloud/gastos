@@ -7,9 +7,10 @@ import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurren
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
-import { candidatos, estadoDe, mensualEnUsd } from "../lib/recurrentes";
+import { candidatos, estadoDe, fechaDePago, mensualEnUsd } from "../lib/recurrentes";
 import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
+import { cuentaDiaria } from "./Editor";
 
 
 export function cadaCuanto(r: Recurrente) {
@@ -27,6 +28,10 @@ export function ListaRecurrentes() {
   const cat = new Map(d.categorias.map(c => [c.id, c]));
   const activos = d.recurrentes.filter(r => r.activo && r.frecuencia !== "una-vez" && (!r.fin || r.fin >= hoy()));
   const terminados = d.recurrentes.filter(r => !activos.includes(r) && r.frecuencia !== "una-vez");
+  // Los pagos en partes que todavía deben algo (se abren en su mes).
+  const enPartes = d.recurrentes.filter(r => r.frecuencia === "una-vez" && r.activo)
+    .map(r => estadoDe({ rec: r, clave: r.inicio.slice(0, 7), fecha: r.inicio }, d.movimientos, d.tasaRec(r)))
+    .filter(e => e.estado !== "cargado");
   const usd = (r: Recurrente) => mensualEnUsd(r, d.movimientos, d.tasaRec(r));
   const total = (tipo: Recurrente["tipo"]) => activos.filter(r => r.tipo === tipo).reduce((s, r) => s + (usd(r) ?? 0), 0);
   const gastos = total("gasto"), ingresos = total("ingreso");
@@ -55,6 +60,12 @@ export function ListaRecurrentes() {
       )}
       {!activos.length && <div className="vacio">Todavía no hay recurrentes.</div>}
       {activos.length > 0 && <div className="caja lista">{activos.map(fila)}</div>}
+      {enPartes.length > 0 && <><div className="titulo-sec"><span>En partes, sin terminar</span></div><div className="caja lista">{enPartes.map(e => (
+        <button key={e.rec.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: e.rec.id, clave: e.clave })}>
+          <span className="izq"><Punto cat={cat.get(e.rec.categoriaId)} chico /><span><div>{e.rec.nombre}</div><div className="mini tenue">{cadaCuanto(e.rec)}</div></span></span>
+          <span className="derecha"><div className="num ambar">faltan {num(e.falta)} {e.rec.moneda}</div></span>
+        </button>
+      ))}</div></>}
       {terminados.length > 0 && <><div className="titulo-sec"><span>Terminados</span></div><div className="caja lista">{terminados.map(fila)}</div></>}
     </div>
   );
@@ -81,7 +92,7 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
       const s = detectarRecurrentes(d.movimientos, d.categorias, d.recurrentes, descartesSet(d.descartes)).find(s => s.clave === props.desdeSugerencia);
       if (s) { setF(x => ({ ...x, nombre: s.nombre, tipo: s.tipo, categoriaId: s.categoriaId, cuentaId: s.cuentaId, montoTxt: String(s.monto).replace(".", ","), moneda: s.moneda, clase: s.clase, dia: s.dia, inicio: `${s.meses[0]}-01` })); return; }
     }
-    const c = d.cuentas.find(c => !c.archivada);
+    const c = cuentaDiaria(d.cuentas);
     if (c) setF(x => ({ ...x, cuentaId: c.id, moneda: c.moneda }));
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -215,7 +226,9 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
   const [borrar, setBorrar] = useState(false);
   const [elegir, setElegir] = useState(false);
   const r = d.recurrentes.find(r => r.id === id);
-  if (!r) return <div className="pantalla sin-tabs"><div className="vacio">Este recurrente ya no existe.</div></div>;
+  // Si lo eliminaste desde "Editar el recurrente", esta pantalla ya no tiene sentido.
+  useEffect(() => { if (d.listo && !r) nav.volver(); }, [d.listo, r]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!r) return <div className="pantalla sin-tabs"><div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button></div><div className="vacio">Este recurrente ya no existe.</div></div>;
   const fecha = clave.length === 7 ? fechaEnMes(clave, r.dia) : clave;
   const e = estadoDe({ rec: r, clave, fecha: r.frecuencia === "una-vez" ? r.inicio : fecha }, d.movimientos, d.tasaRec(r));
   const cta = new Map(d.cuentas.map(c => [c.id, c.nombre]));
@@ -255,7 +268,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
           ))}
         </div>
       )}
-      <button className="btn1" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "editor", recurrenteId: r.id, periodo: clave, monto: e.estimado ? undefined : e.falta || undefined, fecha: e.fecha <= hoy() ? hoy() : e.fecha })}>
+      <button className="btn1" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "editor", recurrenteId: r.id, periodo: clave, monto: e.estimado ? undefined : e.falta || undefined, fecha: fechaDePago(e) })}>
         + {e.pagos.length ? "Agregar un pago" : e.estimado ? "Cargar el monto real" : "Cargar el pago"}
       </button>
       {e.estado !== "cargado" && (

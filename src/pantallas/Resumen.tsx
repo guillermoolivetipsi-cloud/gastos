@@ -78,7 +78,7 @@ export function Resumen() {
       </div>
 
       {porCargar.length > 0 && (
-        <button className="caja aviso" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.irA("viene")}>
+        <button className="caja aviso" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.irA("viene", periodo)}>
           <div className="ambar" style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
             <T.IconBell size={16} /> {porCargar.length === 1 ? "1 recurrente sin cargar" : `${porCargar.length} recurrentes sin cargar`}
           </div>
@@ -156,7 +156,7 @@ export function Resumen() {
 
       {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
 
-      <BotonAgregar tipo={tipo} abrir={t => nav.abrir({ p: "editor", tipo: t })} />
+      <BotonAgregar tipo={tipo} abrir={t => nav.abrir({ p: "editor", tipo: t, fecha: fechaParaCargar(desde, fin) })} />
 
       <Hoja abierta={elegirPeriodo} cerrar={() => setElegirPeriodo(false)}>
         <h2>Elegir período</h2>
@@ -210,4 +210,11 @@ function TarjetaComoVenis({ periodo }: { periodo: string }) {
       <div className="mini tenue" style={{ marginTop: 4, lineHeight: 1.5 }}>{partes.join(" · ")}</div>
     </button>
   );
+}
+
+/** Al cargar mirando otro día, semana o mes, el gasto va ahí: hoy si cae adentro,
+ *  si no el último día (pasado) o el primero (futuro). */
+export function fechaParaCargar(desde: string, fin: string) {
+  const h = hoy();
+  return h < desde ? desde : h > fin ? fin : h;
 }
