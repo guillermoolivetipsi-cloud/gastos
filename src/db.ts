@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { Ajuste, Categoria, Cuenta, Descarte, Movimiento, Recurrente } from "./tipos";
+import type { Ajuste, Categoria, Cuenta, Descarte, Movimiento, Proyeccion, Recurrente } from "./tipos";
 
 /* Todo vive en el celular (IndexedDB). No hay servidor: por eso funciona sin
    conexión, y por eso importa la copia de seguridad. */
@@ -10,6 +10,7 @@ export const db = new Dexie("gastos") as Dexie & {
   recurrentes: EntityTable<Recurrente, "id">;
   descartes: EntityTable<Descarte, "clave">;
   ajustes: EntityTable<Ajuste, "clave">;
+  proyecciones: EntityTable<Proyeccion, "id">;
 };
 
 db.version(1).stores({
@@ -20,6 +21,8 @@ db.version(1).stores({
   descartes: "clave",
   ajustes: "clave",
 });
+// v2: proyecciones (tabla nueva; lo demás queda igual).
+db.version(2).stores({ proyecciones: "id, periodo" });
 
 export const nuevoId = () => crypto.randomUUID();
 

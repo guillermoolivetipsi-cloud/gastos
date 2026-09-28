@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Tipo } from "./tipos";
+import type { Moneda, Tipo } from "./tipos";
 
 /* Navegación mínima: cuatro solapas y una pila de pantallas encima. Cada pantalla
    que se abre agrega una entrada al historial, así el botón "atrás" de Android
@@ -8,7 +8,7 @@ import type { Tipo } from "./tipos";
 export type Solapa = "resumen" | "movimientos" | "viene" | "mas";
 
 export type Pantalla =
-  | { p: "editor"; id?: string; tipo?: Tipo; recurrenteId?: string; periodo?: string; monto?: number; fecha?: string; cuentaId?: string; categoriaId?: string }
+  | { p: "editor"; id?: string; tipo?: Tipo; recurrenteId?: string; periodo?: string; monto?: number; fecha?: string; cuentaId?: string; categoriaId?: string; comentario?: string; proyeccionId?: string; moneda?: Moneda }
   | { p: "categorias" }
   | { p: "categoria"; id?: string; tipo?: Tipo }
   | { p: "cuentas" }
@@ -25,7 +25,8 @@ export type Pantalla =
   | { p: "subir-resumen"; cuentaId?: string }
   | { p: "etiquetas" }
   | { p: "como-venis"; periodo: string }
-  | { p: "clases" };
+  | { p: "clases" }
+  | { p: "proyeccion"; id?: string; periodo?: string };
 
 type Nav = {
   solapa: Solapa;

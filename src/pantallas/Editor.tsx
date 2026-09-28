@@ -36,7 +36,7 @@ export function Editor(props: Props) {
   const [fecha, setFecha] = useState(props.fecha ?? hoy());
   const [cuotas, setCuotas] = useState(1);
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
-  const [comentario, setComentario] = useState("");
+  const [comentario, setComentario] = useState(props.comentario ?? "");
   const [vinculo, setVinculo] = useState<{ recurrenteId: string; periodo: string } | null>(props.recurrenteId ? { recurrenteId: props.recurrenteId, periodo: props.periodo! } : null);
   const [rechazados, setRechazados] = useState<string[]>([]);
   const [detalles, setDetalles] = useState(false);
@@ -73,6 +73,8 @@ export function Editor(props: Props) {
     arrancarCon(t, props.cuentaId);
     const cat = props.categoriaId ? d.catPorId.get(props.categoriaId) : undefined;
     if (cat?.tipo === t) setCategoriaId(cat.id);
+    if (props.comentario) setDetalles(true);
+    if (props.moneda) setMoneda(props.moneda);
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Cuenta y moneda para uno nuevo: la que venías mirando (una tarjeta filtrada),
@@ -169,6 +171,8 @@ export function Editor(props: Props) {
         cuotas: esTarjeta && cuotas > 1 ? cuotas : undefined,
         recurrenteId: v?.recurrenteId, periodo: v?.periodo,
       }, cuenta);
+      // Venía de una proyección que pasó: ya es un gasto real.
+      if (props.proyeccionId) await db.proyecciones.delete(props.proyeccionId);
       const sumar = etiquetas.filter(e => asignadas[e]?.length && !asignadas[e].includes(categoriaId));
     if (sumar.length) await db.transaction("rw", db.ajustes, async () => {
       const actual = await leerAjuste<Record<string, string[]>>("etiquetasCategorias", {});

@@ -38,7 +38,7 @@ export function Seg<V extends string>({ opciones, valor, cambiar }: { opciones: 
 }
 
 /** Dona: los segmentos van en el orden dado, arrancando arriba. */
-export function Dona({ partes, centro, sub, tam = 190 }: { partes: { valor: number; color: string }[]; centro: ReactNode; sub?: ReactNode; tam?: number }) {
+export function Dona({ partes, centro, sub, tam = 190 }: { partes: { valor: number; color: string; tenue?: boolean }[]; centro: ReactNode; sub?: ReactNode; tam?: number }) {
   const total = partes.reduce((s, p) => s + p.valor, 0);
   const r = 44, C = 2 * Math.PI * r;
   let acum = 0;
@@ -49,7 +49,7 @@ export function Dona({ partes, centro, sub, tam = 190 }: { partes: { valor: numb
         const largo = (p.valor / total) * C;
         const hueco = partes.length > 1 ? Math.min(1.2, largo / 3) : 0;
         const el = (
-          <circle key={i} cx="60" cy="60" r={r} fill="none" stroke={p.color} strokeWidth="15"
+          <circle key={i} cx="60" cy="60" r={r} fill="none" stroke={p.color} strokeWidth="15" strokeOpacity={p.tenue ? 0.4 : 1}
             strokeDasharray={`${Math.max(0, largo - hueco)} ${C}`} strokeDashoffset={-acum} transform="rotate(-90 60 60)" />
         );
         acum += largo;

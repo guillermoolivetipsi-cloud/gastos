@@ -3,7 +3,7 @@ import { createContext, createElement, useContext, useEffect, useMemo, useState,
 import { db } from "./db";
 import { ultimaTasa } from "./lib/cotizaciones";
 import { pendientes, useExtras, type Pendientes } from "./lib/revisar";
-import type { Categoria, Cuenta, Descarte, Dolar, Moneda, Movimiento, Recurrente } from "./tipos";
+import type { Categoria, Cuenta, Descarte, Dolar, Moneda, Movimiento, Proyeccion, Recurrente } from "./tipos";
 
 /* Los datos de la app, leídos UNA vez y compartidos por todas las pantallas.
    Antes cada pantalla abierta leía la base entera por su cuenta (con miles de
@@ -16,6 +16,7 @@ export interface Datos {
   movimientos: Movimiento[];
   recurrentes: Recurrente[];
   descartes: Descarte[];
+  proyecciones: Proyeccion[];
   tasas: Tasas;
   /** Cotización para un recurrente, con el dólar de su cuenta. */
   tasaRec: (r: Recurrente) => number | null;
@@ -32,18 +33,19 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
   const movimientos = useLiveQuery(() => db.movimientos.toArray(), []);
   const recurrentes = useLiveQuery(() => db.recurrentes.toArray(), []);
   const descartes = useLiveQuery(() => db.descartes.toArray(), []);
+  const proyecciones = useLiveQuery(() => db.proyecciones.toArray(), []);
   const tasas = useTasas(movimientos);
   const datos = useMemo<Datos>(() => {
     const cs = cuentas ?? [];
     return {
       listo: !!(cuentas && categorias && movimientos && recurrentes && descartes),
-      cuentas: cs, categorias: categorias ?? [], movimientos: movimientos ?? [], recurrentes: recurrentes ?? [], descartes: descartes ?? [],
+      cuentas: cs, categorias: categorias ?? [], movimientos: movimientos ?? [], recurrentes: recurrentes ?? [], descartes: descartes ?? [], proyecciones: proyecciones ?? [],
       tasas,
       tasaRec: r => tasas.rec(r, cs),
       catPorId: new Map((categorias ?? []).map(c => [c.id, c])),
       cuentaPorId: new Map(cs.map(c => [c.id, c])),
     };
-  }, [cuentas, categorias, movimientos, recurrentes, descartes, tasas]);
+  }, [cuentas, categorias, movimientos, recurrentes, descartes, proyecciones, tasas]);
   // "Para revisar" se calcula una vez por cambio en los datos, no en cada pantalla.
   const extras = useExtras();
   const revisar = useMemo(() => (datos.listo && extras ? pendientes(datos, extras) : null), [datos, extras]);

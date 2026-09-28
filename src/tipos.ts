@@ -101,6 +101,24 @@ export interface Recurrente {
   enCero?: string[];
 }
 
+/** Un gasto que todavía no pasó, para ver cómo quedaría el mes. "Seguro" es muy
+ *  probable y siempre suma; "capricho" es opcional y suma solo si está prendido.
+ *  `montoMax`: si es un rango ("entre 150 y 250"). */
+export interface Proyeccion {
+  id: string;
+  nombre: string;
+  clase: "seguro" | "capricho";
+  monto: number;
+  montoMax?: number;
+  moneda: Moneda;
+  /** El mes en que pasaría: "2026-10". */
+  periodo: string;
+  categoriaId: string;
+  /** Solo para caprichos: si suma en la proyección. Arrancan apagados. */
+  activa: boolean;
+  creado: string;
+}
+
 /** Sugerencias que descartaste, para no volver a mostrarlas. */
 export interface Descarte {
   clave: string;

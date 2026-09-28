@@ -161,13 +161,14 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
 
 export async function copiaDeSeguridad() {
   // Todo leído en una sola transacción: una foto consistente aunque algo se esté guardando.
-  const datos = await db.transaction("r", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes], async () => ({
+  const datos = await db.transaction("r", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes, db.proyecciones], async () => ({
     app: "gastos", version: 1, fecha: new Date().toISOString(),
     cuentas: await db.cuentas.toArray(),
     categorias: await db.categorias.toArray(),
     movimientos: await db.movimientos.toArray(),
     recurrentes: await db.recurrentes.toArray(),
     descartes: await db.descartes.toArray(),
+    proyecciones: await db.proyecciones.toArray(),
     ajustes: (await db.ajustes.toArray()).filter(a => a.clave !== "cotizaciones"),
   }));
   descargar(new Blob([JSON.stringify(datos)], { type: "application/json" }), `gastos-respaldo-${aTexto(new Date())}.json`);
@@ -186,13 +187,14 @@ export async function restaurar(archivo: File) {
   // Que la carga inicial de cuentas y categorías termine antes: si no, podría
   // escribirse encima de lo restaurado y duplicar las cuentas.
   await sembrar();
-  await db.transaction("rw", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes], async () => {
-    for (const t of [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes]) await t.clear();
+  await db.transaction("rw", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes, db.proyecciones], async () => {
+    for (const t of [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.proyecciones]) await t.clear();
     await db.cuentas.bulkAdd(d.cuentas);
     await db.categorias.bulkAdd(d.categorias);
     await db.movimientos.bulkAdd(d.movimientos);
     await db.recurrentes.bulkAdd(d.recurrentes);
     await db.descartes.bulkAdd(d.descartes ?? []);
+    await db.proyecciones.bulkAdd(d.proyecciones ?? []);
     for (const a of d.ajustes ?? []) await db.ajustes.put(a);
   });
   return d.movimientos.length as number;
