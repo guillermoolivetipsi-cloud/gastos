@@ -3,8 +3,9 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav } from "../nav";
 import { MONEDAS, type Cuenta, type Dolar, type Moneda } from "../tipos";
-import { fechaCorta, nombreMes, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
-import { num } from "../lib/formato";
+import { fechaCorta, nombreMes, periodoDe, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
+import { num, redondear } from "../lib/formato";
+import { aPagarTarjeta } from "../lib/analisis";
 import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
 import { Interruptor, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
@@ -117,7 +118,19 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
         <button aria-label="Siguiente" onClick={() => setPeriodo(sumarMeses(periodo, 1))}><T.IconChevronRight size={20} /></button>
       </div>
       <div className="caja">
-        <div className="mediano num">{num(r.total)} USD</div>
+        {/* Mientras no está confirmado, suma los recurrentes que todavía no se cobraron
+            (igual que "Lo que viene"). */}
+        {(() => {
+          const ap = aPagarTarjeta(c, d.movimientos, d.recurrentes, periodoDe(r.vence), d.tasaRec);
+          const previsto = ap.resumen.periodo === periodo && !r.confirmado ? ap.previsto : 0;
+          return <>
+            <div className="mediano num">{r.confirmado ? "" : "~"}{num(redondear(r.total + previsto))} USD</div>
+            {previsto > 0 && <>
+              <div className="fila chico" style={{ padding: "4px 0 0" }}><span className="tenue">consumos</span><span className="num">{num(r.total)}</span></div>
+              <div className="fila chico" style={{ padding: 0 }}><span className="tenue">recurrentes que faltan cobrar</span><span className="num ambar">+{num(previsto)}</span></div>
+            </>}
+          </>;
+        })()}
         <div className="mini tenue">cierra {fechaCorta(r.cierre, false)}{r.confirmado ? "" : " (estimado)"} · vence ~{fechaCorta(r.vence, false)}</div>
         {r.enCuotas > 0 && <div className="fila chico" style={{ paddingBottom: 0 }}><span className="tenue">en cuotas {num(r.enCuotas)}</span><span className="tenue">en un pago {num(r.enUnPago)}</span></div>}
       </div>

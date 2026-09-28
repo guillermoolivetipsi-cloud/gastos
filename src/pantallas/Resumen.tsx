@@ -4,7 +4,8 @@ import { useDatos, usePendientes } from "../datos";
 import { db } from "../db";
 import { useNav } from "../nav";
 import type { Categoria, Movimiento, Tipo } from "../tipos";
-import { avanceDelMes, bloques, claseProvisoria, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
+import { avanceDelMes, bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
+import { enUsdDe } from "../lib/recurrentes";
 import { fechaCorta, hoy, moverAncla, nombreMes, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
 import { num, usd } from "../lib/formato";
 import { Barra, BotonAgregar, Dona, Hoja, Punto } from "../ui/piezas";
@@ -37,9 +38,9 @@ export function Resumen() {
 
   const tasa = d.tasaRec;
   const instancias = esMes ? recurrentesDelMes(d.recurrentes, d.movimientos, periodo, tasa) : [];
-  // Lo que va con tarjeta llega con el resumen: no se pide cargar a mano.
-  const conTarjeta = new Set(d.cuentas.filter(c => c.esTarjeta).map(c => c.id));
-  const porCargar = instancias.filter(i => !conTarjeta.has(i.rec.cuentaId) && (i.estado === "por-cargar" || (i.estado === "parcial" && i.fecha <= hoy())));
+  // Lo que va con tarjeta llega con el resumen: no se pide cargar a mano. Se avisa
+  // solo si algo ya venció; el número es el mismo que en "Lo que viene".
+  const { todos: porCargar, vencidos } = porCargarDelMes(instancias, d.cuentas);
   const clase = useMemo(() => claseProvisoria(d.categorias, d.movimientos), [d.categorias, d.movimientos]);
   const b = esMes && tipo === "gasto" ? bloques(periodo, movs, d.categorias, d.recurrentes, instancias.filter(i => i.estado !== "cargado"), tasa, clase) : null;
   const revisar = usePendientes()?.total ?? 0;
@@ -77,15 +78,15 @@ export function Resumen() {
         <button aria-label="Siguiente" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, 1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronRight size={20} /></button>
       </div>
 
-      {porCargar.length > 0 && (
+      {vencidos.length > 0 && (
         <button className="caja aviso" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.irA("viene", periodo)}>
           <div className="ambar" style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
-            <T.IconBell size={16} /> {porCargar.length === 1 ? "1 recurrente sin cargar" : `${porCargar.length} recurrentes sin cargar`}
+            <T.IconBell size={16} /> {porCargar.length} por cargar{vencidos.length < porCargar.length ? ` (${vencidos.length} ${vencidos.length === 1 ? "vencido" : "vencidos"})` : ""}
           </div>
-          {porCargar.slice(0, 3).map(i => (
+          {vencidos.slice(0, 3).map(i => (
             <div className="fila chico" key={i.rec.id + i.clave} style={{ padding: "3px 0" }}>
               <span>{i.rec.nombre} · {fechaCorta(i.fecha)}</span>
-              <span className="tenue">{i.estado === "parcial" ? `faltan ${num(i.falta)}` : `~${num(i.esperado)}`} {i.rec.moneda}</span>
+              <span className="tenue">{i.estado === "parcial" ? `faltan ${num(i.falta)}` : `~${num(i.esperado)}`} {i.rec.moneda}{(() => { const u = enUsdDe(i.rec, i.estado === "parcial" ? i.falta : i.esperado, tasa(i.rec)); return u != null ? ` · ≈ ${num(u, 0)} USD` : ""; })()}</span>
             </div>
           ))}
         </button>

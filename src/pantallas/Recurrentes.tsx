@@ -7,7 +7,7 @@ import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurren
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
-import { candidatos, estadoDe, fechaDePago, mensualEnUsd } from "../lib/recurrentes";
+import { candidatos, enUsdDe, estadoDe, fechaDePago, mensualEnUsd } from "../lib/recurrentes";
 import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 import { cuentaDiaria } from "./Editor";
@@ -203,14 +203,14 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
 
       <Hoja abierta={borrar} cerrar={() => setBorrar(false)}>
         <h2>Dejar de pedir {existente?.nombre}</h2>
-        <div className="tenue chico">Lo que ya pagaste queda cargado y vinculado.</div>
+        <div className="tenue chico">Lo que ya {f.tipo === "ingreso" ? "cobraste" : "pagaste"} queda cargado y vinculado.</div>
         <button className="opcion" onClick={terminar}>
           <div>Dejar de pedirlo</div>
           <div className="mini tenue">Pasa a "Terminados". El historial queda igual y lo podés volver a activar.</div>
         </button>
         <button className="opcion mal" onClick={eliminarDelTodo}>
           <div>Eliminarlo del todo</div>
-          <div className="mini tenue">Los pagos anteriores quedan como gastos sueltos.</div>
+          <div className="mini tenue">{f.tipo === "ingreso" ? "Los cobros anteriores quedan como ingresos sueltos." : "Los pagos anteriores quedan como gastos sueltos."}</div>
         </button>
         <button className="opcion tenue" style={{ textAlign: "center" }} onClick={() => setBorrar(false)}>Cancelar</button>
       </Hoja>
@@ -233,6 +233,9 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
   const e = estadoDe({ rec: r, clave, fecha: r.frecuencia === "una-vez" ? r.inicio : fecha }, d.movimientos, d.tasaRec(r));
   const cta = new Map(d.cuentas.map(c => [c.id, c.nombre]));
   const titulo = clave.length === 7 ? nombreMes(clave, false) : fechaCorta(clave, false);
+  const ing = r.tipo === "ingreso";
+  const pagoTxt = ing ? "cobro" : "pago";
+  const totalUsd = enUsdDe(r, e.esperado, d.tasaRec(r));
 
   async function eliminar(a: Alcance) {
     const deshacer = await eliminarRecurrente(r!, a, clave);
@@ -250,15 +253,15 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
       </div>
       <div className="caja">
         <div className="etq">{e.estimado ? "Estimado del mes" : r.tipo === "gasto" ? "Total a pagar" : "Total a cobrar"}</div>
-        <div className="mediano num">{e.estimado ? "~" : ""}{num(e.esperado)} {r.moneda}</div>
+        <div className="mediano num">{e.estimado ? "~" : ""}{num(e.esperado)} {r.moneda}{totalUsd != null && <span className="chico tenue"> · ≈ {num(totalUsd, 0)} USD</span>}</div>
         <Barra valor={e.esperado ? e.pagado / e.esperado : 0} color="#60A5FA" />
         <div className="fila chico" style={{ padding: 0 }}>
-          <span className="tenue">{r.tipo === "gasto" ? "pagado" : "cobrado"} {num(e.pagado)}</span>
+          <span className="tenue">{ing ? "cobrado" : "pagado"} {num(e.pagado)}</span>
           {e.falta > 0 && !e.estimado && <span className="ambar">faltan {num(e.falta)}</span>}
         </div>
       </div>
-      <div className="titulo-sec"><span>Pagos</span></div>
-      {!e.pagos.length && <div className="tenue chico" style={{ marginBottom: 8 }}>Todavía no hay pagos. {e.estimado ? "El monto es un estimado: cargá el real." : ""}</div>}
+      <div className="titulo-sec"><span>{ing ? "Cobros" : "Pagos"}</span></div>
+      {!e.pagos.length && <div className="tenue chico" style={{ marginBottom: 8 }}>Todavía no hay {pagoTxt}s. {e.estimado ? "El monto es un estimado: cargá el real." : ""}</div>}
       {e.pagos.length > 0 && (
         <div className="caja lista">
           {e.pagos.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(p => (
@@ -269,12 +272,12 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
         </div>
       )}
       <button className="btn1" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "editor", recurrenteId: r.id, periodo: clave, monto: e.estimado ? undefined : e.falta || undefined, fecha: fechaDePago(e) })}>
-        + {e.pagos.length ? "Agregar un pago" : e.estimado ? "Cargar el monto real" : "Cargar el pago"}
+        + {e.pagos.length ? `Agregar un ${pagoTxt}` : e.estimado ? "Cargar el monto real" : `Cargar el ${pagoTxt}`}
       </button>
       {e.estado !== "cargado" && (
         <>
-          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setElegir(true)}>Ya lo cargué como gasto: elegirlo</button>
-          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => marcarEnCero(r, clave, true)}>Este mes no se pagó (queda en 0)</button>
+          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setElegir(true)}>Ya lo cargué como {ing ? "ingreso" : "gasto"}: elegirlo</button>
+          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => marcarEnCero(r, clave, true)}>Este mes no se {ing ? "cobró" : "pagó"} (queda en 0)</button>
         </>
       )}
       {e.cero && (
@@ -287,18 +290,18 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
       <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setBorrar(true)}>Ya no aplica: dejar de pedirlo</button>
 
       <Hoja abierta={elegir} cerrar={() => setElegir(false)}>
-        <h2>¿Cuál es el pago de {r.nombre}?</h2>
-        <div className="mini tenue" style={{ marginBottom: 6 }}>Gastos de {titulo} sin vincular, los más parecidos primero.</div>
+        <h2>¿Cuál es el {pagoTxt} de {r.nombre}?</h2>
+        <div className="mini tenue" style={{ marginBottom: 6 }}>{ing ? "Ingresos" : "Gastos"} de {titulo} sin vincular, los más parecidos primero.</div>
         {(() => {
           const tasaR = d.tasaRec(r);
           const parecidos = candidatos(e, d.movimientos, tasaR);
           const resto = d.movimientos.filter(m => m.tipo === r.tipo && !m.recurrenteId && m.fecha.slice(0, 7) === e.fecha.slice(0, 7) && !parecidos.includes(m)).sort((a, b) => b.fecha.localeCompare(a.fecha));
           const lista = [...parecidos, ...resto].slice(0, 25);
-          if (!lista.length) return <div className="tenue chico">No hay gastos sin vincular ese mes.</div>;
+          if (!lista.length) return <div className="tenue chico">No hay {ing ? "ingresos" : "gastos"} sin vincular ese mes.</div>;
           return lista.map(m => (
             <button key={m.id} className="opcion" onClick={async () => {
               const deshacer = await vincular(m.id, r.id, clave);
-              setElegir(false); toast({ texto: `Vinculado como pago de ${r.nombre}`, deshacer });
+              setElegir(false); toast({ texto: `Vinculado como ${pagoTxt} de ${r.nombre}`, deshacer });
             }}>
               <div className="fila" style={{ padding: 0 }}>
                 <span>{fechaCorta(m.fecha, false)} · {d.categorias.find(c => c.id === m.categoriaId)?.nombre}{m.comentario ? ` · ${m.comentario}` : ""}</span>
@@ -313,7 +316,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
 
       <Hoja abierta={borrar} cerrar={() => setBorrar(false)}>
         <h2>Eliminar {r.nombre}</h2>
-        <div className="tenue chico">Lo que ya pagaste queda cargado.</div>
+        <div className="tenue chico">Lo que ya {ing ? "cobraste" : "pagaste"} queda cargado.</div>
         {r.frecuencia !== "una-vez" && (
           <button className="opcion" onClick={async () => { const deshacer = await terminarRecurrente(r); setBorrar(false); toast({ texto: `${r.nombre}: no se pide más`, deshacer }); nav.volver(); }}>
             <div>Dejar de pedirlo desde ahora</div>
@@ -326,7 +329,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
         </button>
         <button className="opcion mal" onClick={() => eliminar("todo")}>
           <div>Eliminarlo del todo</div>
-          <div className="mini tenue">Los pagos anteriores quedan como gastos sueltos.</div>
+          <div className="mini tenue">Los {pagoTxt}s anteriores quedan como {ing ? "ingresos" : "gastos"} sueltos.</div>
         </button>
         <button className="opcion tenue" style={{ textAlign: "center" }} onClick={() => setBorrar(false)}>Cancelar</button>
       </Hoja>

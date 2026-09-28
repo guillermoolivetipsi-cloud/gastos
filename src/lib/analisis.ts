@@ -229,3 +229,12 @@ export function aPagarTarjeta(c: Cuenta, movs: Movimiento[], recs: Recurrente[],
   const previsto = redondear(insts.filter(i => i.estado !== "cargado").reduce((s, i) => { const t = tasa(i.rec); return s + (t ? i.esperado / t : 0); }, 0));
   return { resumen: r, desde, insts, previsto, total: redondear(r.total + (r.confirmado ? 0 : previsto)) };
 }
+
+/** Los recurrentes de gasto que se pagan desde una cuenta (no tarjeta) y faltan
+ *  cargar ese mes, y cuáles ya vencieron. Una sola cuenta para Resumen y Lo que viene. */
+export function porCargarDelMes(insts: EstadoInstancia[], cuentas: Cuenta[]) {
+  const tarjetas = new Set(cuentas.filter(c => c.esTarjeta).map(c => c.id));
+  const todos = insts.filter(i => i.rec.tipo === "gasto" && !tarjetas.has(i.rec.cuentaId) && i.estado !== "cargado");
+  const vencidos = todos.filter(i => i.fecha <= hoy());
+  return { todos, vencidos };
+}

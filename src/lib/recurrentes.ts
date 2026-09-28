@@ -236,3 +236,8 @@ export function fechaDePago(i: Instancia) {
   const h = hoy();
   return i.fecha > h || periodoDe(i.fecha) !== periodoDe(h) ? i.fecha : h;
 }
+
+/** Un monto de un recurrente en USD, para mostrar debajo si está en otra moneda. */
+export function enUsdDe(r: Recurrente, monto: number, tasa: number | null) {
+  return r.moneda === "USD" || !tasa ? null : redondear(monto / tasa);
+}

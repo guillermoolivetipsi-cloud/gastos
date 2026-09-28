@@ -37,7 +37,9 @@ export function Movimientos() {
       .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
   }, [d.movimientos, qDiferida, textos, tipo, cta, medio, catFiltro]);
   const filtrando = medio !== "todos" || !!catFiltro || !!q.trim();
-  const totalFiltrado = lista.reduce((s, m) => s + (m.tipo === "gasto" ? 1 : -1) * usdDe(m), 0);
+  // Gastos e ingresos por separado: restarlos esconde los dos.
+  const gastosF = lista.reduce((s, m) => s + (m.tipo === "gasto" ? usdDe(m) : 0), 0);
+  const ingresosF = lista.reduce((s, m) => s + (m.tipo === "ingreso" ? usdDe(m) : 0), 0);
 
   // El total de cada día sale de la lista entera: no cambia al tocar "Ver más".
   const totalDia = useMemo(() => {
@@ -70,7 +72,7 @@ export function Movimientos() {
           {d.categorias.filter(c => !c.archivada && (tipo === "todos" || c.tipo === tipo)).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
-      {filtrando && lista.length > 0 && <div className="mini tenue" style={{ marginTop: 8 }}>{lista.length} movimientos · {num(Math.abs(totalFiltrado))} USD</div>}
+      {filtrando && lista.length > 0 && <div className="mini tenue" style={{ marginTop: 8 }}>{lista.length} movimientos{gastosF > 0 && <> · <span style={{ color: "var(--tinta)" }}>−{num(gastosF)} gastos</span></>}{ingresosF > 0 && <> · <span className="ok">+{num(ingresosF)} ingresos</span></>} <span>USD</span></div>}
       {sinCotizar > 0 && <div className="mini ambar" style={{ marginTop: 10 }}><T.IconCloudOff size={13} /> {sinCotizar} sin convertir a USD: se completan al tener conexión.</div>}
 
       {!lista.length && <div className="vacio">{q ? "Nada coincide con la búsqueda." : filtrando || tipo !== "todos" ? "Nada con estos filtros." : "Todavía no cargaste nada. Tocá + para empezar."}</div>}

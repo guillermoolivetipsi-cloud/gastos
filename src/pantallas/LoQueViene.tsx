@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
-import { aPagarTarjeta, descartesSet, recurrentesDelMes } from "../lib/analisis";
+import { aPagarTarjeta, descartesSet, porCargarDelMes, recurrentesDelMes } from "../lib/analisis";
 import { cuotasFuturas, resumenQueVence } from "../lib/tarjeta";
 import { fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import type { EstadoInstancia } from "../lib/recurrentes";
 import { Barra, Punto, useToast } from "../ui/piezas";
 import { descartar, marcarEnCero, vincular } from "../lib/acciones";
-import { fechaDePago, sugerirVinculos } from "../lib/recurrentes";
+import { enUsdDe, fechaDePago, sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
 
 /* Lo que está por salir o entrar, en dos pestañas:
@@ -56,7 +56,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
   const deCuenta = insts.filter(i => i.rec.tipo === "gasto" && !conTarjeta(i));
   const aTarjeta = insts.filter(i => i.rec.tipo === "gasto" && conTarjeta(i));
   const ingresos = insts.filter(i => i.rec.tipo === "ingreso");
-  const porPagar = deCuenta.filter(i => i.estado !== "cargado");
+  const { todos: porPagar, vencidos } = porCargarDelMes(insts, d.cuentas);
   const pagados = deCuenta.filter(i => i.estado === "cargado");
 
   const total = redondear(deCuenta.reduce((s, i) => s + enUsd(i, i.esperado), 0));
@@ -76,6 +76,12 @@ function Recurrentes({ periodo }: { periodo: string }) {
     toast({ texto: `${i.rec.nombre}: este mes en 0`, deshacer: () => { marcarEnCero(i.rec, i.clave, false); } });
   }
   const monto = (i: EstadoInstancia) => `${i.estimado ? "~" : ""}${num(i.estado === "parcial" ? i.falta : i.esperado)} ${i.rec.moneda}`;
+  /** "≈ X USD" debajo del monto, si está en otra moneda. */
+  const usd = (i: EstadoInstancia, x = i.estado === "cargado" ? i.pagado : i.estado === "parcial" ? i.falta : i.esperado) => {
+    const u = enUsdDe(i.rec, x, tasa(i.rec));
+    return u != null ? <div className="mini tenue num">≈ {num(u, 0)} USD</div> : null;
+  };
+  const totalCobrar = redondear(ingresos.reduce((s, i) => s + enUsd(i, i.estado === "cargado" ? i.pagado : i.esperado), 0));
   const cargar = (i: EstadoInstancia) => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: fechaDePago(i) });
 
   if (!insts.length) return (
@@ -91,7 +97,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
         <div className="caja">
           <div className="fila" style={{ padding: 0 }}><span className="tenue chico">De tus cuentas en {nombreMes(periodo, false)}</span><span className="mediano num">{num(total, 0)} <span className="chico tenue">USD</span></span></div>
           <Barra valor={total ? pagado / total : 0} color="#60A5FA" />
-          <div className="fila mini" style={{ padding: 0 }}><span className="tenue">pagado {num(pagado, 0)}</span>{porPagar.length > 0 ? <span className="ambar">{porPagar.length === 1 ? "falta 1" : `faltan ${porPagar.length}`}</span> : <span className="ok">todo pagado</span>}</div>
+          <div className="fila mini" style={{ padding: 0 }}><span className="tenue">pagado {num(pagado, 0)}</span>{porPagar.length > 0 ? <span className="ambar">{porPagar.length} por cargar{vencidos.length && vencidos.length < porPagar.length ? ` (${vencidos.length} ${vencidos.length === 1 ? "vencido" : "vencidos"})` : ""}</span> : <span className="ok">todo pagado</span>}</div>
           {aTarjeta.length > 0 && (
             <div className="fila chico sep" style={{ paddingBottom: 0, marginTop: 6 }}>
               <span className="tenue"><T.IconCreditCard size={13} style={{ verticalAlign: -2 }} /> Con tarjeta: {aTarjeta.length} {tarjetaPendientes ? `(${tarjetaPendientes} por cobrar)` : "(ya cobrados)"}</span>
@@ -118,6 +124,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
               </button>
               <span className="derecha">
                 <div className="num chico">{monto(i)}</div>
+                {usd(i)}
                 <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 3 }}>
                   <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => enCero(i)}>Fue 0</button>
                   <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => cargar(i)}>Cargar</button>
@@ -149,7 +156,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
                   <div>{i.rec.nombre}</div>
                   <div className="mini tenue"><T.IconCreditCard size={11} style={{ verticalAlign: -1 }} /> {cuenta.get(i.rec.cuentaId)?.nombre} · {fechaCorta(i.fecha, false)}</div>
                 </span></span>
-                <span className="derecha num chico">{i.estado === "cargado" ? <span className="ok"><T.IconCheck size={13} style={{ verticalAlign: -2 }} /> {num(i.pagado)} {i.rec.moneda}</span> : monto(i)}</span>
+                <span className="derecha num chico">{i.estado === "cargado" ? <span className="ok"><T.IconCheck size={13} style={{ verticalAlign: -2 }} /> {num(i.pagado)} {i.rec.moneda}</span> : monto(i)}{usd(i)}</span>
               </button>
             ))}
           </div>
@@ -158,15 +165,30 @@ function Recurrentes({ periodo }: { periodo: string }) {
 
       {ingresos.length > 0 && (
         <>
-          <div className="titulo-sec"><span>A cobrar</span></div>
+          <div className="titulo-sec"><span>A cobrar</span><span className="ok num">+{num(totalCobrar, 0)} USD</span></div>
           <div className="caja lista">
             {ingresos.map(i => (
               <div key={i.rec.id + i.clave} className="fila">
-                <span className="izq"><Punto cat={cat.get(i.rec.categoriaId)} chico /><span><div>{i.rec.nombre}</div><div className="mini tenue">{fechaCorta(i.fecha, false)}</div></span></span>
-                {i.estado === "cargado" ? <span className="ok num chico">+{num(i.pagado)} {i.rec.moneda}</span> : <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => cargar(i)}>+{monto(i)}</button>}
+                <button className="izq" style={{ textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
+                  <Punto cat={cat.get(i.rec.categoriaId)} chico />
+                  <span><div>{i.rec.nombre}</div><div className="mini tenue">{fechaCorta(i.fecha, false)} · {cuenta.get(i.rec.cuentaId)?.nombre}</div></span>
+                </button>
+                <span className="derecha">
+                  {i.estado === "cargado"
+                    ? <div className="ok num chico">{i.cero ? "0 · no se cobró" : `+${num(i.pagado)} ${i.rec.moneda}`}</div>
+                    : <div className="num chico">+{monto(i)}</div>}
+                  {!i.cero && usd(i)}
+                  {i.estado !== "cargado" && (
+                    <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 3 }}>
+                      <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => enCero(i)}>Fue 0</button>
+                      <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => cargar(i)}>Cargar</button>
+                    </span>
+                  )}
+                </span>
               </div>
             ))}
           </div>
+          <button className="mini viol" style={{ margin: "-4px 2px 0" }} onClick={() => nav.abrir({ p: "recurrente", tipo: "ingreso" })}>+ Agregar ingreso</button>
         </>
       )}
 
@@ -190,7 +212,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
 
       <div className="botones" style={{ marginTop: 16 }}>
         <button className="btn2" onClick={() => nav.abrir({ p: "recurrentes" })}>Ver todos</button>
-        <button className="btn2" onClick={() => nav.abrir({ p: "recurrente" })}>+ Agregar</button>
+        <button className="btn2" onClick={() => nav.abrir({ p: "recurrente", tipo: "gasto" })}>+ Agregar</button>
       </div>
     </>
   );

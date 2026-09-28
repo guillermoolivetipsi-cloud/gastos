@@ -84,7 +84,10 @@ export function EditorCategoria({ id, tipo }: { id?: string; tipo?: Tipo }) {
         <Punto icono={c.icono} color={c.color} />
         <div className="campo" style={{ flex: 1 }}><input value={c.nombre} onChange={e => set("nombre", e.target.value)} placeholder="Nombre de la categoría" autoFocus={!existente} /></div>
       </div>
-      {!existente && <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={c.tipo} cambiar={v => set("tipo", v)} />}
+      {/* Gasto o ingreso se puede cambiar mientras nada la use. */}
+      {!usada && !d.recurrentes.some(r => r.categoriaId === existente?.id)
+        ? <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={c.tipo} cambiar={v => set("tipo", v)} />
+        : <div className="mini tenue">Categoría de {c.tipo === "gasto" ? "gastos" : "ingresos"}: tiene movimientos, no se puede pasar a {c.tipo === "gasto" ? "ingresos" : "gastos"}.</div>}
 
       {c.tipo === "gasto" && (
         <>
