@@ -26,3 +26,24 @@ it("no pide el resumen de un mes sin la tarjeta completa (historial viejo)", asy
   expect(tareas(RECORDATORIOS, [visa], [...hist, ...tardio], {}, null, new Set()).filter(t => t.tipo === "resumen")).toHaveLength(0);
   expect(tareas(RECORDATORIOS, [visa], [...hist, ...completo], {}, null, new Set()).filter(t => t.tipo === "resumen")).toHaveLength(1);
 });
+
+it("app de Android: programa 14 días; hoy no avisa lo que ya cargaste; resumen y exportar desde el día 1, cada 3 días", async () => {
+  const { planificar } = await import("./avisos");
+  const { RECORDATORIOS } = await import("./recordatorios");
+  const visa = { id: "v", nombre: "Visa", moneda: "ARS", dolar: "oficial", esTarjeta: true, orden: 0 } as const;
+  const m = (fecha: string, creado = `${fecha}T12:00:00`) => ({ id: fecha, tipo: "gasto", fecha, monto: 1, moneda: "USD", usd: 1, cuentaId: "v", categoriaId: "c", etiquetas: [], creado, modificado: "" }) as never;
+  const movs = [m("2026-09-02"), m("2026-09-12"), m("2026-09-20"), m("2026-09-29", new Date(2026, 8, 29, 11).toISOString())];
+  const ahora = new Date(2026, 8, 29, 12);
+  const a = planificar(RECORDATORIOS, [visa], movs, {}, null, new Set(), ahora);
+  const diarios = a.filter(x => x.accion === "gasto").map(x => x.cuando.getDate());
+  expect(diarios[0]).toBe(30); // hoy ya cargaste algo
+  expect(diarios).toHaveLength(13);
+  const res = a.filter(x => x.accion === "resumen");
+  expect([res[0].cuando.getMonth(), res[0].cuando.getDate(), res[0].cuando.getHours(), res[0].cuentaId]).toEqual([9, 1, 10, "v"]);
+  expect(res.length).toBeGreaterThan(2);
+  expect(res.length).toBeLessThan(7);
+  expect(a.filter(x => x.accion === "exportar")[0].cuando.getDate()).toBe(1);
+  expect(new Set(a.map(x => x.id)).size).toBe(a.length);
+  // Ya subido: no se avisa.
+  expect(planificar(RECORDATORIOS, [visa], movs, { "v|2026-09": "x" }, null, new Set(), ahora).some(x => x.accion === "resumen")).toBe(false);
+});

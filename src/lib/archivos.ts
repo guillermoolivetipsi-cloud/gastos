@@ -5,6 +5,7 @@ import { db, guardarAjuste, nuevoId, sembrar } from "../db";
 import type { Categoria, Clase, Cuenta, Moneda, Movimiento, Recurrente, Tipo } from "../tipos";
 import { aTexto, periodoDe } from "./fecha";
 import { aUsd, cotizar, guardarCache, leerCache, precargarHistoria } from "./cotizaciones";
+import { guardarArchivo } from "./guardar";
 
 /* ── Exportar a Finanzas ──────────────────────────────────────────────────
    Mismo formato que la app anterior, que es el que lee `lib/importar.ts` de
@@ -50,11 +51,11 @@ export async function exportar(meses: string[]) {
     XLSX.utils.book_append_sheet(wb, ws, hoja);
   }
   const nombre = `gastos-${meses[0]}${meses.length > 1 ? `-a-${meses[meses.length - 1]}` : ""}.xlsx`;
-  descargar(new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombre);
+  const donde = await guardarArchivo(new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombre, { compartir: true, titulo: "Gastos para Finanzas" });
   const ahora = new Date().toISOString();
   await db.movimientos.bulkUpdate(movs.map(m => ({ key: m.id, changes: { exportado: ahora } })));
   await guardarAjuste("ultimaExportacion", ahora);
-  return movs.length;
+  return { cantidad: movs.length, donde };
 }
 
 /* ── Importar desde la app anterior ─────────────────────────────────────── */
@@ -159,7 +160,8 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
 
 /* ── Copia de seguridad ─────────────────────────────────────────────────── */
 
-export async function copiaDeSeguridad() {
+/** La copia de seguridad: todo en un .json. `compartir`: además abre "Compartir" (en Android). */
+export async function copiaDeSeguridad(compartir = true) {
   // Todo leído en una sola transacción: una foto consistente aunque algo se esté guardando.
   const datos = await db.transaction("r", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes, db.proyecciones], async () => ({
     app: "gastos", version: 1, fecha: new Date().toISOString(),
@@ -171,8 +173,9 @@ export async function copiaDeSeguridad() {
     proyecciones: await db.proyecciones.toArray(),
     ajustes: (await db.ajustes.toArray()).filter(a => a.clave !== "cotizaciones"),
   }));
-  descargar(new Blob([JSON.stringify(datos)], { type: "application/json" }), `gastos-respaldo-${aTexto(new Date())}.json`);
+  const donde = await guardarArchivo(new Blob([JSON.stringify(datos)], { type: "application/json" }), `gastos-respaldo-${aTexto(new Date())}.json`, { compartir, titulo: "Copia de seguridad de Gastos" });
   await guardarAjuste("ultimoRespaldo", datos.fecha);
+  return donde;
 }
 
 export async function restaurar(archivo: File) {
@@ -200,13 +203,6 @@ export async function restaurar(archivo: File) {
   return d.movimientos.length as number;
 }
 
-function descargar(blob: Blob, nombre: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = nombre;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
 
 /* ── Sumar desde archivo ───────────────────────────────────────────────────
    Un "paquete" agrega cosas sin tocar lo que ya hay: recurrentes nuevos (con los

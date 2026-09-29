@@ -5,6 +5,7 @@ import { useNav } from "../nav";
 import { copiaDeSeguridad, editadosDespues, exportar, importarXlsx, mesesSinExportar, restaurar, sumarPaquete, type ResultadoImport } from "../lib/archivos";
 import { diaLocal, fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { Seg, useToast } from "../ui/piezas";
+import { esApp } from "../lib/guardar";
 import { T } from "../ui/Icono";
 
 export function Exportar() {
@@ -42,7 +43,7 @@ export function Exportar() {
           : <>{delMes} movimientos de {nombreMes(mes)}.</>}
       </div>
       <div className="tenue chico" style={{ lineHeight: 1.5 }}>
-        Un Excel con hojas Gastos e Ingresos: fecha, categoría, cuenta, monto en su moneda, etiquetas y comentario. El mismo formato que la app anterior: se importa en Finanzas igual que siempre. También se baja una copia de seguridad de la app: guardala en Drive.
+        Un Excel con hojas Gastos e Ingresos: fecha, categoría, cuenta, monto en su moneda, etiquetas y comentario. El mismo formato que la app anterior: se importa en Finanzas igual que siempre. También se guarda una copia de seguridad de la app{esApp() ? " en Documentos/Gastos" : ""}: guardala en Drive.
       </div>
       {editados && editados.length > 0 && (
         <div className="caja aviso" style={{ marginTop: 10 }}>
@@ -52,11 +53,12 @@ export function Exportar() {
       )}
       <div className="pie-fijo">
         <button className="btn" disabled={!cantidad} onClick={async () => {
-          const n = await exportar(elegidos);
-          // Una vez por mes se exporta: se aprovecha para bajar también la copia de seguridad.
-          await new Promise(r => setTimeout(r, 800));
-          await copiaDeSeguridad();
-          toast({ texto: `Exportados ${n} movimientos · copia de seguridad descargada` });
+          const { cantidad: n, donde } = await exportar(elegidos);
+          // Una vez por mes se exporta: se aprovecha para guardar también la copia de
+          // seguridad (en Android queda en Documentos/Gastos, sin abrir "Compartir" otra vez).
+          if (!donde) await new Promise(r => setTimeout(r, 800));
+          await copiaDeSeguridad(!donde);
+          toast({ texto: donde ? `Exportados ${n} movimientos · el Excel y la copia quedaron en Documentos/Gastos` : `Exportados ${n} movimientos · copia de seguridad descargada` });
         }}>
           Exportar {cantidad ? `${cantidad} movimientos` : ""}
         </button>
@@ -105,9 +107,12 @@ export function Respaldo() {
       <div className="titulo-sec"><span>Copia de seguridad</span></div>
       <div className="caja">
         <div className="chico">Tus datos viven solo en este celular. La copia es un archivo: guardalo en Drive o mandátelo por mail.</div>
-        <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(diaLocal(ultimo)) : "nunca"} · se baja sola cada vez que exportás a Finanzas.</div>
-        {persistente === false && <div className="mini ambar" style={{ marginTop: 4 }}>Instalá la app en la pantalla de inicio para que Android no borre los datos si le falta espacio.</div>}
-        <div className="botones"><button className="btn1" onClick={copiaDeSeguridad}>Hacer copia ahora</button></div>
+        <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(diaLocal(ultimo)) : "nunca"} · se {esApp() ? "guarda en Documentos/Gastos" : "baja sola"} cada vez que exportás a Finanzas.</div>
+        {persistente === false && !esApp() && <div className="mini ambar" style={{ marginTop: 4 }}>Instalá la app en la pantalla de inicio para que Android no borre los datos si le falta espacio.</div>}
+        <div className="botones"><button className="btn1" onClick={async () => {
+          const donde = await copiaDeSeguridad();
+          if (donde) toast({ texto: `Copia guardada en ${donde}` });
+        }}>Hacer copia ahora</button></div>
         {/* Sin filtro de tipo: Android a veces no reconoce el .json que llega por
             WhatsApp o Drive y lo muestra deshabilitado. El contenido se valida al leerlo. */}
         <label className="btn1" style={{ display: "block", marginTop: 8 }}>

@@ -1,5 +1,5 @@
 import type { Cuenta, Movimiento } from "../tipos";
-import { diaLocal, hoy, nombreMes, periodoDe, periodoHoy, sumarMeses } from "./fecha";
+import { aTexto, diaLocal, nombreMes, periodoDe, sumarMeses } from "./fecha";
 
 /* Recordatorios. Viven como tareas en "Para revisar" y no se van hasta que las
    hacés; cuando haya notificaciones, estas mismas tareas son las que avisan. */
@@ -21,16 +21,18 @@ export type Tarea =
   | { tipo: "resumen"; clave: string; titulo: string; detalle: string; cuenta: Cuenta; periodo: string }
   | { tipo: "exportar"; clave: string; titulo: string; detalle: string; periodo: string };
 
-const horaActual = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const horaDe = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
-export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], resumenesCargados: Record<string, string>, ultimaExportacion: string | null, hechas: Set<string>): Tarea[] {
+/** Lo pendiente en el momento `ahora` (por defecto, ya). Con otro momento sirve para
+ *  saber qué avisar los próximos días. */
+export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], resumenesCargados: Record<string, string>, ultimaExportacion: string | null, hechas: Set<string>, ahora = new Date()): Tarea[] {
   const out: Tarea[] = [];
-  const h = hoy(), dia = Number(h.slice(8)), anterior = sumarMeses(periodoHoy(), -1);
-  let primera = hoy();
+  const h = aTexto(ahora), dia = Number(h.slice(8)), esteMes = periodoDe(h), anterior = sumarMeses(esteMes, -1);
+  let primera = h;
   for (const m of movs) if (m.fecha < primera) primera = m.fecha;
   const primerMes = periodoDe(primera);
 
-  if (r.diario.activo && horaActual() >= r.diario.hora && !movs.some(m => m.tipo === "gasto" && !m.id.startsWith("auto|") && (diaLocal(m.creado) === h || m.fecha === h))) {
+  if (r.diario.activo && horaDe(ahora) >= r.diario.hora && !movs.some(m => m.tipo === "gasto" && !m.id.startsWith("auto|") && (diaLocal(m.creado) === h || m.fecha === h))) {
     const clave = `diario|${h}`;
     if (!hechas.has(clave)) out.push({ tipo: "diario", clave, titulo: "¿Cargaste los gastos de hoy?", detalle: "Todavía no anotaste nada hoy." });
   }
@@ -49,7 +51,7 @@ export function tareas(r: Recordatorios, cuentas: Cuenta[], movs: Movimiento[], 
 
   if (r.exportar.activo && dia >= r.exportar.dia && anterior >= primerMes) {
     const clave = `exportar|${anterior}`;
-    const exportadoEsteMes = ultimaExportacion != null && diaLocal(ultimaExportacion).slice(0, 7) >= periodoHoy();
+    const exportadoEsteMes = ultimaExportacion != null && diaLocal(ultimaExportacion).slice(0, 7) >= esteMes;
     const quedan = movs.some(m => !m.exportado && periodoDe(m.fecha) <= anterior);
     if (!exportadoEsteMes && quedan && !hechas.has(clave))
       out.push({ tipo: "exportar", clave, periodo: anterior, titulo: `Exportá ${nombreMes(anterior, false)} a Finanzas`, detalle: "Hay movimientos del mes pasado que todavía no mandaste." });

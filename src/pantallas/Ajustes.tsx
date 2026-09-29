@@ -3,7 +3,9 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { guardarAjuste, leerAjuste } from "../db";
 import { useNav } from "../nav";
 import { RECORDATORIOS, type Recordatorios } from "../lib/recordatorios";
-import { activar, estado, probar, type Estado } from "../lib/notificaciones";
+import { activar, estado, probar, registrar, type Estado } from "../lib/notificaciones";
+import { esApp } from "../lib/guardar";
+import { Actualizaciones } from "./Actualizaciones";
 import { Interruptor } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -18,8 +20,12 @@ export function Ajustes() {
   async function cambiarAvisos(on: boolean) {
     await guardarAjuste("notificaciones", on);
     if (on) setEst(await activar());
+    else await registrar(); // en la app: borra los avisos programados
   }
-  const set = <K extends keyof Recordatorios>(k: K, v: Partial<Recordatorios[K]>) => guardarAjuste("recordatorios", { ...r, [k]: { ...r[k], ...v } });
+  const set = async <K extends keyof Recordatorios>(k: K, v: Partial<Recordatorios[K]>) => {
+    await guardarAjuste("recordatorios", { ...r, [k]: { ...r[k], ...v } });
+    if (avisos) await registrar(); // en la app: se reprograma con los horarios nuevos
+  };
   const dia = (v: string) => Math.min(28, Math.max(1, Number(v.replace(/\D/g, "")) || 1));
 
   return (
@@ -28,7 +34,9 @@ export function Ajustes() {
       <div className="titulo-sec"><span>Notificaciones</span></div>
       <div className="caja">
         <div className="fila" style={{ padding: 0 }}><span>Avisarme lo pendiente</span><Interruptor on={!!avisos} cambiar={cambiarAvisos} /></div>
-        <div className="mini tenue" style={{ marginTop: 6 }}>Android despierta la app más o menos una vez al día y, si hay algo pendiente, te avisa. No es a una hora exacta: el aviso diario puede llegar más tarde o saltearse un día.</div>
+        <div className="mini tenue" style={{ marginTop: 6 }}>{esApp()
+          ? "Te aviso a la hora que elijas abajo. Los avisos se preparan para los próximos 14 días cada vez que abrís la app: si no la abrís en dos semanas, dejan de llegar."
+          : "Android despierta la app más o menos una vez al día y, si hay algo pendiente, te avisa. No es a una hora exacta: el aviso diario puede llegar más tarde o saltearse un día."}</div>
         {avisos && est && (
           <div className="chico" style={{ marginTop: 8 }}>
             {est.permiso === "denied" && <div className="mal">Las notificaciones están bloqueadas. Activalas en Ajustes de Android → Apps → Gastos → Notificaciones.</div>}
@@ -76,6 +84,7 @@ export function Ajustes() {
           </div>
         )}
       </div>
+      {esApp() && <Actualizaciones />}
     </div>
   );
 }

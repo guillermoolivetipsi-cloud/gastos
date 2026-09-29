@@ -22,8 +22,10 @@
   --azul: #93C5FD;
   --azul-fondo: #1E2A44;
   --r: 14px;
-  --abajo: env(safe-area-inset-bottom, 0px);
-  --arriba: env(safe-area-inset-top, 0px);
+  /* Barras del sistema: en el navegador vale env(); en la app de Android, Capacitor
+     inyecta --safe-area-inset-* (la app dibuja debajo de la barra de estado). */
+  --abajo: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --arriba: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
   color-scheme: dark;
 }
 
@@ -184,3 +186,8 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 .dona { display: block; margin: 6px auto; }
 .leyenda { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
 .rayado { background: repeating-linear-gradient(45deg, var(--ambar) 0 3px, #5A4520 3px 6px); }
+
+/* ── App de Android ── */
+/* Fondo fijo detrás de la barra de estado: lo que scrollea no pasa por debajo de la hora. */
+body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--arriba); background: var(--bg); z-index: 40; }
+.aviso-version { position: fixed; top: calc(var(--arriba) + 8px); left: 12px; right: 12px; max-width: 496px; margin: 0 auto; z-index: 60; display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--viol); border-radius: 14px; padding: 10px 12px; }

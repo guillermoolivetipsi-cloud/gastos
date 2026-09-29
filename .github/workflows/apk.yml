@@ -1,0 +1,48 @@
+# Compila la app de Android en cada push a main y publica el APK firmado como una versión (Release).
+# En el teléfono: abrir la última versión del repositorio y descargar gastos.apk.
+name: APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: apk
+  cancel-in-progress: true
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build:android
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npx cap sync android
+      - name: Clave de firma
+        run: echo "${{ secrets.FIRMA_P12 }}" | base64 -d > "$RUNNER_TEMP/gastos.p12"
+      - name: Compilar APK
+        working-directory: android
+        env:
+          FIRMA_ARCHIVO: ${{ runner.temp }}/gastos.p12
+          FIRMA_CONTRASENA: ${{ secrets.FIRMA_CONTRASENA }}
+          NUMERO_VERSION: ${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gastos.apk"
+      - name: Publicar versión
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.0.${{ github.run_number }}" "$RUNNER_TEMP/gastos.apk" \
+            --title "Gastos 1.0.${{ github.run_number }}" \
+            --notes "$(git log -1 --pretty=%s)"

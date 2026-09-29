@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Atajo "Subir resumen": círculo violeta con un archivo y una flecha para arriba. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#8B5CF6" android:pathData="M24,0a24,24 0 1,0 0.01,0z" />
+    <group android:translateX="12" android:translateY="12">
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M14,3v4a1,1 0 0,0 1,1h4M17,21h-10a2,2 0 0,1 -2,-2v-14a2,2 0 0,1 2,-2h7l5,5v11a2,2 0 0,1 -2,2zM12,11v6M9.5,13.5l2.5,-2.5l2.5,2.5" />
+    </group>
+</vector>

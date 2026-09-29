@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Gastos</string>
+    <string name="title_activity_main">Gastos</string>
+    <string name="package_name">com.guillermooliveti.gastos</string>
+    <string name="custom_url_scheme">com.guillermooliveti.gastos</string>
+    <string name="atajo_gasto">Nuevo gasto</string>
+    <string name="atajo_resumen">Subir resumen</string>
+</resources>

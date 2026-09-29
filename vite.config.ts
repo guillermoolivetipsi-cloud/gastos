@@ -3,12 +3,15 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 // `base` relativo: la app funciona igual servida en la raíz o en una subcarpeta
-// (por ejemplo usuario.github.io/gastos/).
-export default defineConfig({
+// (por ejemplo usuario.github.io/gastos/) y dentro de la app de Android.
+// Dos compilaciones: la web (PWA, con service worker) y `--mode android` (Capacitor,
+// sin service worker: los avisos son notificaciones programadas).
+export default defineConfig(({ mode }) => ({
   base: "./",
+  resolve: mode === "android" ? { alias: { "virtual:pwa-register": "/src/lib/sin-pwa.ts" } } : undefined,
   plugins: [
     react(),
-    VitePWA({
+    mode !== "android" && VitePWA({
       registerType: "autoUpdate",
       // Service worker propio (src/sw.ts): además de guardar la app para usarla sin
       // conexión, revisa los pendientes cuando Android la despierta y avisa.
@@ -44,4 +47,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+}));

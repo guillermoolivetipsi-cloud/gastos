@@ -1,7 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
 import { useNav, type Pantalla, type Solapa } from "./nav";
 import { leerAjuste, sembrar } from "./db";
-import { registrar } from "./lib/notificaciones";
+import { alTocarAviso, registrar } from "./lib/notificaciones";
+import { buscarActualizacion, type Actualizacion } from "./lib/actualizacion";
+import { useDatos } from "./datos";
+import { AvisoVersion } from "./pantallas/Actualizaciones";
 import { completarPendientes } from "./lib/cotizaciones";
 import { cargarAutomaticos } from "./lib/recurrentes";
 import { Resumen } from "./pantallas/Resumen";
@@ -55,14 +60,63 @@ const SOLAPAS: [Solapa, string, typeof T.IconHome][] = [
 export function App() {
   const nav = useNav();
 
-  // Accesos directos del ícono (?accion=gasto | resumen): abren esa pantalla.
+  const d = useDatos();
+  // La navegación de ahora, para los avisos de Android (que llegan fuera de React).
+  const navRef = useRef(nav);
+  navRef.current = nav;
+  const abrirAccion = (accion: string, cuentaId?: string) => {
+    const n = navRef.current;
+    if (accion === "gasto") n.abrir({ p: "editor" });
+    if (accion === "resumen") n.abrir({ p: "subir-resumen", cuentaId });
+    if (accion === "exportar") n.abrir({ p: "exportar" });
+  };
+
+  // Accesos directos del ícono: en la PWA llegan como ?accion=gasto | resumen; en la
+  // app de Android, como gastos://gasto | gastos://resumen.
   useEffect(() => {
     const accion = new URLSearchParams(location.search).get("accion");
-    if (!accion) return;
-    history.replaceState(null, "", location.pathname);
-    if (accion === "gasto") nav.abrir({ p: "editor" });
-    if (accion === "resumen") nav.abrir({ p: "subir-resumen" });
+    if (accion) {
+      history.replaceState(null, "", location.pathname);
+      abrirAccion(accion);
+    }
+    if (!Capacitor.isNativePlatform()) return;
+    const desdeUrl = (url?: string) => { const m = url?.match(/^gastos:\/\/(\w+)/); if (m) abrirAccion(m[1]); };
+    CapApp.getLaunchUrl().then(u => desdeUrl(u?.url));
+    const l = CapApp.addListener("appUrlOpen", e => desdeUrl(e.url));
+    alTocarAviso(abrirAccion);
+    return () => { l.then(x => x.remove()); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Botón "atrás" de Android: cierra la pantalla de arriba; si no hay, vuelve a
+  // Resumen; en Resumen, minimiza la app.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const l = CapApp.addListener("backButton", () => {
+      const n = navRef.current;
+      if (n.pila.length) n.volver();
+      else if (n.solapa !== "resumen") n.irA("resumen");
+      else CapApp.minimizeApp();
+    });
+    return () => { l.then(x => x.remove()); };
+  }, []);
+
+  // Versión nueva: al abrir la app y al volver a ella (como mucho cada 6 horas).
+  const [nueva, setNueva] = useState<Actualizacion | null>(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let ultima = 0;
+    const revisar = () => { if (Date.now() - ultima > 6 * 3600_000) { ultima = Date.now(); buscarActualizacion().then(setNueva); } };
+    revisar();
+    const l = CapApp.addListener("appStateChange", e => { if (e.isActive) revisar(); });
+    return () => { l.then(x => x.remove()); };
+  }, []);
+
+  // En la app, los avisos se programan de antemano: se rehacen cuando cambian los datos.
+  useEffect(() => {
+    if (!d.listo || !Capacitor.isNativePlatform()) return;
+    const t = window.setTimeout(() => { leerAjuste<boolean>("notificaciones", false).then(on => { if (on) registrar(); }); }, 1500);
+    return () => window.clearTimeout(t);
+  }, [d.listo, d.movimientos, d.cuentas, d.descartes]);
 
   // Al abrir y al volver a la app: completar cotizaciones pendientes y cargar
   // los recurrentes automáticos que ya vencieron.
@@ -82,6 +136,7 @@ export function App() {
   const arriba = nav.pila[nav.pila.length - 1];
   return (
     <>
+      {nueva && <AvisoVersion nueva={nueva} cerrar={() => setNueva(null)} />}
       {arriba && <div className="app" key={nav.pila.length}><Encima p={arriba} /></div>}
       <div className="app" style={arriba ? { display: "none" } : undefined}>
       {nav.solapa === "resumen" && <Resumen />}
