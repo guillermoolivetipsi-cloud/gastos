@@ -21,6 +21,7 @@ Hay dos versiones de la misma app:
 - `src/lib/archivos.ts`: exportar a Finanzas, importar el Excel de la app anterior, copia de seguridad, restaurar y "paquetes" que suman sin borrar.
 - `src/lib/guardar.ts`: guarda archivos. En Android: Documentos/Gastos y "Compartir"; en el navegador, descarga.
 - `src/lib/recordatorios.ts`: qué está pendiente en un momento dado (puro). `src/lib/avisos.ts`: qué avisar; en Android, `planificar` arma los avisos de los próximos 14 días. `src/lib/notificaciones.ts`: los programa (Android) o registra la sincronización periódica (PWA).
+- `src/lib/finanzas.ts` + `src/pantallas/Finanzas.tsx`: «Mandar a Finanzas». POST directo a la Mac por el Wi-Fi (`http://<ip>:3005/api/gastos/sincronizar`, con clave), según `../Finanzas/CONTRATO-GASTOS.md`: el mes en curso y el anterior, completos, en su moneda, con el id de la app. No viajan los cobros de Psicología (entran por PsicoTracker). La dirección y la clave quedan en el ajuste `finanzas`. En Android va por el HTTP nativo (`CapacitorHttp`) y `res/xml/network_security_config.xml` permite http. Todavía no: borrados, recurrentes, el buzón (repo `gastos-buzon`).
 - `src/lib/actualizacion.ts`: busca en GitHub Releases una versión más nueva y ofrece descargarla.
 - `src/sw.ts`: service worker, solo de la PWA. `src/lib/sin-pwa.ts` lo reemplaza en la compilación de Android.
 - `src/App.tsx`: solapas, pila de pantallas, botón atrás de Android, atajos del ícono (`gastos://gasto`, `gastos://resumen`), tocar un aviso, aviso de versión nueva.

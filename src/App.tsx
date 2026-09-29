@@ -24,6 +24,7 @@ import { SubirResumen } from "./pantallas/SubirResumen";
 import { Etiquetas } from "./pantallas/Etiquetas";
 import { ComoVenis } from "./pantallas/ComoVenis";
 import { EditorProyeccion } from "./pantallas/Proyecciones";
+import { ConectarFinanzas, MandarFinanzas } from "./pantallas/Finanzas";
 import { T } from "./ui/Icono";
 
 function Encima({ p }: { p: Pantalla }) {
@@ -47,6 +48,8 @@ function Encima({ p }: { p: Pantalla }) {
     case "como-venis": return <ComoVenis periodo={p.periodo} />;
     case "clases": return <Clases />;
     case "proyeccion": return <EditorProyeccion {...p} />;
+    case "finanzas-conectar": return <ConectarFinanzas />;
+    case "finanzas-mandar": return <MandarFinanzas />;
   }
 }
 

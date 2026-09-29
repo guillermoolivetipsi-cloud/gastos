@@ -6,6 +6,7 @@ import { copiaDeSeguridad, editadosDespues, exportar, importarXlsx, mesesSinExpo
 import { diaLocal, fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { Seg, useToast } from "../ui/piezas";
 import { esApp } from "../lib/guardar";
+import { TarjetaMandar } from "./Finanzas";
 import { T } from "../ui/Icono";
 
 export function Exportar() {
@@ -24,6 +25,9 @@ export function Exportar() {
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Exportar a Finanzas</h1></div>
+      <TarjetaMandar />
+      <div className="titulo-sec"><span>Exportar a Excel</span></div>
+      <div className="mini tenue" style={{ margin: "-4px 2px 8px" }}>El archivo de siempre, por si no hay Wi-Fi.</div>
       <div className="dos">
         <div className="caja"><div className="etq">Sin exportar</div><div className="mediano num">{sinExportar ?? "…"}</div></div>
         <div className="caja"><div className="etq">Última vez</div><div className="mediano">{ultima ? fechaCorta(diaLocal(ultima)) : "nunca"}</div></div>
@@ -60,7 +64,7 @@ export function Exportar() {
           await copiaDeSeguridad(!donde);
           toast({ texto: donde ? `Exportados ${n} movimientos · el Excel y la copia quedaron en Documentos/Gastos` : `Exportados ${n} movimientos · copia de seguridad descargada` });
         }}>
-          Exportar {cantidad ? `${cantidad} movimientos` : ""}
+          Exportar a Excel {cantidad ? `(${cantidad} movimientos)` : ""}
         </button>
       </div>
     </div>

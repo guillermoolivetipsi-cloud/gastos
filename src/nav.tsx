@@ -26,7 +26,9 @@ export type Pantalla =
   | { p: "etiquetas" }
   | { p: "como-venis"; periodo: string }
   | { p: "clases" }
-  | { p: "proyeccion"; id?: string; periodo?: string };
+  | { p: "proyeccion"; id?: string; periodo?: string }
+  | { p: "finanzas-conectar" }
+  | { p: "finanzas-mandar" };
 
 type Nav = {
   solapa: Solapa;
