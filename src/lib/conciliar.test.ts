@@ -7,13 +7,13 @@ import type { Consumo } from "./resumen-tarjeta";
 const visa: Cuenta = { id: "visa", nombre: "Visa", moneda: "ARS", dolar: "oficial", esTarjeta: true, cierreDesde: 31, cierreHasta: 31, venceDias: 10, cierres: {}, orden: 0 };
 let n = 0;
 const mov = (x: Partial<Movimiento>): Movimiento => ({ id: `m${n++}`, tipo: "gasto", fecha: "2026-09-10", monto: 1, moneda: "EUR", usd: 1, cuentaId: "visa", categoriaId: "cat", etiquetas: [], creado: "", modificado: "", ...x });
-const consumo = (x: Partial<Consumo>): Consumo => ({ fecha: "2026-09-10", comercio: "LIDL BCN", moneda: "EUR", importe: 52.63, usd: 61.78, columna: "USD", ...x });
+const consumo = (x: Partial<Consumo>): Consumo => ({ fecha: "2026-09-10", comercio: "MERCADO SOL", moneda: "EUR", importe: 45.5, usd: 53.4, columna: "USD", ...x });
 
 describe("conciliar un resumen", () => {
   it("reconoce lo cargado, lo cargado en otra cuenta y lo que falta", () => {
-    const movs = [mov({ monto: 52.63, usd: 60.1 }), mov({ id: "rev", cuentaId: "revolut", monto: 35.9, usd: 41 })];
-    const c = conciliar([consumo({}), consumo({ comercio: "MANSO", importe: 35.9, usd: 41.84 }), consumo({ comercio: "SQ *ORIGO BAKERY", importe: 6.2, usd: 7.28 })],
-      visa, movs, { "ORIGO BAKERY": "cafe" }, "2026-09-01", "2026-09-30");
+    const movs = [mov({ monto: 45.5, usd: 52 }), mov({ id: "rev", cuentaId: "revolut", monto: 30, usd: 34.3 })];
+    const c = conciliar([consumo({}), consumo({ comercio: "GIMNASIO NORTE", importe: 30, usd: 34.9 }), consumo({ comercio: "SQ *PANADERIA LUNA", importe: 6.2, usd: 7.28 })],
+      visa, movs, { "PANADERIA LUNA": "cafe" }, "2026-09-01", "2026-09-30");
     expect(c.filas.map(f => f.tipo)).toEqual(["coincide", "otra-cuenta", "falta"]);
     expect(c.filas[2].categoriaId).toBe("cafe");
   });
@@ -22,14 +22,14 @@ describe("conciliar un resumen", () => {
     expect(c.filas[0].tipo).toBe("moneda");
   });
   it("compara pesos con pesos y avisa lo cargado que el resumen no trae", () => {
-    const c = conciliar([consumo({ columna: "ARS", moneda: "ARS", importe: 11474.49, usd: null })], visa,
-      [mov({ monto: 11474.49, moneda: "ARS", usd: 7.4 }), mov({ fecha: "2026-09-20", monto: 3, usd: 3.4 })], {}, "2026-09-01", "2026-09-30");
+    const c = conciliar([consumo({ columna: "ARS", moneda: "ARS", importe: 9000, usd: null })], visa,
+      [mov({ monto: 9000, moneda: "ARS", usd: 5.8 }), mov({ fecha: "2026-09-20", monto: 3, usd: 3.4 })], {}, "2026-09-01", "2026-09-30");
     expect(c.filas[0].tipo).toBe("coincide");
     expect(c.sobrantes).toHaveLength(1);
   });
   it("normaliza el nombre del comercio", () => {
-    expect(claveComercio("DLOCAL*SPOTIFY P")).toBe("SPOTIFY");
-    expect(claveComercio("LA CONFITERIA 1912")).toBe("CONFITERIA");
+    expect(claveComercio("DLOCAL*MUSICA P")).toBe("MUSICA");
+    expect(claveComercio("LA CAFETERIA 1900")).toBe("CAFETERIA");
   });
 });
 

@@ -39,7 +39,7 @@ export async function aplicarResumen({ filas, aplicar, cats, tarjeta, cierre, ve
   const agregados: Movimiento[] = [];
   const cambios: { id: string; changes: Partial<Movimiento> }[] = [];
   for (const [i, f] of filas.entries()) {
-    // Un cobro que ya estaba en esta tarjeta y coincide con un recurrente (Claude, Gym…) queda como su pago.
+    // Un cobro que ya estaba en esta tarjeta y coincide con un recurrente (una suscripción, el gimnasio…) queda como su pago.
     if (f.tipo === "coincide" && f.mov && !f.mov.recurrenteId) {
       const v = recurrenteDe(f.mov, d.recurrentes, [...d.movimientos, ...agregados], tasaRec);
       if (v) cambios.push({ id: f.mov.id, changes: v });

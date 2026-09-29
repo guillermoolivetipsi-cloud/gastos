@@ -17,7 +17,7 @@ it("tarjeta, lo comprometido, suscripciones y cambios", () => {
   const movs = [
     ...["2026-06", "2026-07", "2026-08"].map(p => mov({ fecha: `${p}-10`, usd: 100 })),
     mov({ usd: 300 }), // ocio en septiembre: +200 contra el promedio
-    mov({ cuentaId: "visa", usd: 100, categoriaId: "sus", comentario: "Claude", fecha: "2026-09-21" }),
+    mov({ cuentaId: "visa", usd: 100, categoriaId: "sus", comentario: "Nube", fecha: "2026-09-21" }),
     mov({ cuentaId: "visa", usd: 50, fecha: "2026-09-02" }),
   ];
   const x = calcularInsights("2026-09", movs, cats, cuentas, [], () => 1, () => null);

@@ -21,15 +21,15 @@ it("categorías: primero las más usadas; las archivadas no, salvo la elegida", 
 
 it("etiquetas: las de la categoría elegida primero, el resto aparte; las asignadas a mano mandan", () => {
   const movs = [mov({ categoriaId: "dep", etiquetas: ["Padel", "Gym"] }), mov({ categoriaId: "dep", etiquetas: ["Padel"] }), mov({ categoriaId: "super", etiquetas: ["Verduleria"] }), mov({ categoriaId: "super", etiquetas: ["Viejo"] })];
-  const mapa = categoriasDeEtiquetas(movs, { Mallorca: ["trip", "ocio"], Gym: ["dep", "salud"] });
-  expect(etiquetasParaCategoria(mapa, "dep", ["Viejo"])).toEqual({ propias: ["Padel", "Gym"], otras: ["Verduleria", "Mallorca"] });
-  expect(etiquetasParaCategoria(mapa, "ocio", []).propias).toEqual(["Mallorca"]);
+  const mapa = categoriasDeEtiquetas(movs, { Vacaciones: ["trip", "ocio"], Gym: ["dep", "salud"] });
+  expect(etiquetasParaCategoria(mapa, "dep", ["Viejo"])).toEqual({ propias: ["Padel", "Gym"], otras: ["Verduleria", "Vacaciones"] });
+  expect(etiquetasParaCategoria(mapa, "ocio", []).propias).toEqual(["Vacaciones"]);
   expect(etiquetasParaCategoria(mapa, "salud", []).propias).toEqual(["Gym"]);
 });
 
 it("sugiere el recurrente pendiente más parecido", () => {
-  const gas: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "gal", monto: 20972, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
-  const luz: Recurrente = { ...gas, id: "luz", nombre: "Luz", monto: 28716 };
+  const gas: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "gal", monto: 20000, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
+  const luz: Recurrente = { ...gas, id: "luz", nombre: "Luz", monto: 30000 };
   const pend = [gas, luz].map(r => estadoDe(instanciasDelMes(r, "2026-10")[0], [], 1545));
   const b = { tipo: "gasto" as const, fecha: "2026-10-09", monto: 29000, moneda: "ARS" as const, usd: 18.8, cuentaId: "gal", categoriaId: "casa", comentario: "" };
   expect(recurrenteParecido(b, pend, () => 1545)?.rec.id).toBe("luz");

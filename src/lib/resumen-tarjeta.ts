@@ -66,7 +66,7 @@ export function leerResumen(texto: string): Resumen {
       consumos.push({ fecha: `20${aa}-${dos(MES[mm.toLowerCase()])}-${dd}`, comercio: limpio(com), moneda: mon, importe: num(imp), usd: num(usd), columna: "USD" });
       continue;
     }
-    // exterior, Visa:  02-08-26 F LIDL BCN    EUR   54,46 341111 63,52
+    // exterior, Visa:  02-08-26 F SUPER BCN    EUR   54,46 341111 63,52
     m = ln.match(/^\s*(\d{2})-(\d{2})-(\d{2})\s+(?:\S\s+)?(.+?)\s*(USD|EUR|ARS|BRL|GBP|CHF)\s+(-?[\d.,]+)\s+(\d+)\s+(-?[\d.,]+)\s*$/);
     if (m) {
       const [, dd, mm, aa, com, mon, imp, , usd] = m;

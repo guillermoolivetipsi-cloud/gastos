@@ -27,7 +27,7 @@ export interface Conciliacion {
 
 const PALABRAS_VACIAS = new Set(["LA", "EL", "LOS", "LAS", "THE", "DE", "DEL", "WWW", "COM", "SL", "SA", "ESP", "S", "L"]);
 
-/** "SQ *ORIGO BAKERY S.L." → "ORIGO BAKERY" · "DLOCAL*SPOTIFY P" → "SPOTIFY" */
+/** "SQ *PANADERIA LUNA S.L." → "PANADERIA LUNA" · "DLOCAL*MUSICA P" → "MUSICA" */
 export function claveComercio(comercio: string) {
   const sinPrefijo = comercio.toUpperCase().replace(/^.*\*+/, "");
   const palabras = sinPrefijo.replace(/[^A-ZÑ ]/g, " ").split(/\s+/).filter(p => p.length > 1 && !PALABRAS_VACIAS.has(p));

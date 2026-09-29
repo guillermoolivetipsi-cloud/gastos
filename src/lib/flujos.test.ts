@@ -50,35 +50,35 @@ describe("guardar un resumen de tarjeta", () => {
   it("agrega lo que falta, corrige, vincula recurrentes, aprende comercios y guarda el cierre", async () => {
     const { conciliar } = await import("./conciliar");
     const { aplicarResumen } = await import("./aplicarResumen");
-    const claude: Recurrente = { id: "cl", nombre: "Claude", tipo: "gasto", categoriaId: "sus", cuentaId: "visa", monto: 100, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 21, inicio: "2026-09-01", modo: "avisar", activo: true };
-    await db.recurrentes.add(claude);
+    const nube: Recurrente = { id: "cl", nombre: "Nube", tipo: "gasto", categoriaId: "sus", cuentaId: "visa", monto: 100, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 21, inicio: "2026-09-01", modo: "avisar", activo: true };
+    await db.recurrentes.add(nube);
     const yaCargados = [
-      mov({ id: "cl9", cuentaId: "visa", categoriaId: "sus", monto: 100, usd: 100, fecha: "2026-09-21" }), // coincide → se vincula a Claude
-      mov({ id: "lidl", cuentaId: "rev", monto: 52.63, moneda: "EUR", usd: 60.1, fecha: "2026-09-01" }), // en otra cuenta → pasa a Visa
+      mov({ id: "cl9", cuentaId: "visa", categoriaId: "sus", monto: 100, usd: 100, fecha: "2026-09-21" }), // coincide → se vincula a Nube
+      mov({ id: "lidl", cuentaId: "rev", monto: 45.5, moneda: "EUR", usd: 52, fecha: "2026-09-01" }), // en otra cuenta → pasa a Visa
       mov({ id: "book", cuentaId: "rev", monto: 49, moneda: "USD", usd: 49, fecha: "2026-09-10" }), // eran euros → corrige moneda
     ];
     await db.movimientos.bulkAdd(yaCargados);
     const consumos = [
-      { fecha: "2026-09-21", comercio: "ANTHROPIC* CLAUDE", moneda: "USD", importe: 100, usd: 100, columna: "USD" as const },
-      { fecha: "2026-09-01", comercio: "LIDL BCN", moneda: "EUR", importe: 52.63, usd: 61.78, columna: "USD" as const },
+      { fecha: "2026-09-21", comercio: "ACME* NUBE", moneda: "USD", importe: 100, usd: 100, columna: "USD" as const },
+      { fecha: "2026-09-01", comercio: "MERCADO SOL", moneda: "EUR", importe: 45.5, usd: 53.4, columna: "USD" as const },
       { fecha: "2026-09-10", comercio: "Flights by Booking", moneda: "EUR", importe: 49, usd: 57.68, columna: "USD" as const },
-      { fecha: "2026-09-19", comercio: "DLOCAL*SPOTIFY P", moneda: "ARS", importe: 11474.49, usd: null, columna: "ARS" as const },
+      { fecha: "2026-09-19", comercio: "DLOCAL*MUSICA P", moneda: "ARS", importe: 9000, usd: null, columna: "ARS" as const },
     ];
     const { filas } = conciliar(consumos, visa, yaCargados, {}, "2026-08-29", "2026-09-28");
     expect(filas.map(f => f.tipo)).toEqual(["coincide", "otra-cuenta", "moneda", "falta"]);
     const aplicar = Object.fromEntries(filas.map((f, i) => [i, f.tipo !== "coincide"]));
-    const datos = { movimientos: yaCargados, recurrentes: [claude], categorias: cats, tasaRec: () => 1 };
+    const datos = { movimientos: yaCargados, recurrentes: [nube], categorias: cats, tasaRec: () => 1 };
     const r = await aplicarResumen({ filas, aplicar, cats: { 3: "sus" }, tarjeta: visa, cierre: "2026-09-25", vence: "2026-10-06", datos });
     expect(r).toEqual({ nuevos: 1, corregidos: 2 });
     const todo = new Map((await db.movimientos.toArray()).map(m => [m.id, m]));
     expect(todo.get("cl9")!.recurrenteId).toBe("cl");
     expect(todo.get("lidl")!.cuentaId).toBe("visa");
     expect([todo.get("book")!.moneda, todo.get("book")!.usd]).toEqual(["EUR", 57.68]);
-    const spotify = [...todo.values()].find(m => m.comentario === "DLOCAL*SPOTIFY P")!;
-    expect([spotify.cuentaId, spotify.moneda, spotify.usd, spotify.categoriaId]).toEqual(["visa", "ARS", 7.65, "sus"]);
+    const spotify = [...todo.values()].find(m => m.comentario === "DLOCAL*MUSICA P")!;
+    expect([spotify.cuentaId, spotify.moneda, spotify.usd, spotify.categoriaId]).toEqual(["visa", "ARS", 6, "sus"]);
     const cuenta = (await db.cuentas.get("visa"))!;
     expect([cuenta.cierres, cuenta.venceDias]).toEqual([{ "2026-09": 25 }, 11]);
-    expect((await leerAjuste<Record<string, string>>("reglasComercio", {})).SPOTIFY).toBe("sus");
+    expect((await leerAjuste<Record<string, string>>("reglasComercio", {})).MUSICA).toBe("sus");
     expect(Object.keys(await leerAjuste<Record<string, string>>("resumenesCargados", {}))).toEqual(["visa|2026-09"]);
   });
 });
@@ -86,11 +86,11 @@ describe("guardar un resumen de tarjeta", () => {
 describe("sumar un paquete", () => {
   it("dos veces seguidas no duplica nada", async () => {
     const { sumarPaquete } = await import("./archivos");
-    await db.movimientos.add(mov({ id: "pago", categoriaId: "casa", monto: 420, moneda: "EUR", fecha: "2026-09-24" }));
+    await db.movimientos.add(mov({ id: "pago", categoriaId: "casa", monto: 400, moneda: "EUR", fecha: "2026-09-24" }));
     const paquete = {
       app: "gastos-paquete",
       categorias: [{ nombre: "Ventas", tipo: "ingreso", icono: "store", color: "#000" }],
-      recurrentes: [{ id: "alq", nombre: "Alquiler", tipo: "gasto", categoria: "Casa", cuenta: "Revolut", monto: 420, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 24, inicio: "2026-09-01", modo: "avisar", activo: true, pagos: ["pago"] }],
+      recurrentes: [{ id: "alq", nombre: "Alquiler", tipo: "gasto", categoria: "Casa", cuenta: "Revolut", monto: 400, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 24, inicio: "2026-09-01", modo: "avisar", activo: true, pagos: ["pago"] }],
       movimientos: [{ id: "ago1", tipo: "gasto", fecha: "2026-08-30", monto: 23.16, moneda: "USD", usd: 23.16, cuenta: "Visa", categoria: "Super", yaEnFinanzas: true }],
       cuentas: [{ nombre: "Visa", cambios: { cierres: { "2026-08": 26 } } }],
     };

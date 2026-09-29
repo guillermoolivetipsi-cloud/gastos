@@ -51,7 +51,7 @@ describe("tarjeta", () => {
 });
 
 describe("recurrentes", () => {
-  const alquiler: Recurrente = { id: "r", nombre: "Alquiler", tipo: "gasto", categoriaId: "casa", cuentaId: "c", monto: 420, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 31, inicio: "2026-01-01", modo: "avisar", activo: true };
+  const alquiler: Recurrente = { id: "r", nombre: "Alquiler", tipo: "gasto", categoriaId: "casa", cuentaId: "c", monto: 400, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 31, inicio: "2026-01-01", modo: "avisar", activo: true };
 
   it("el día 31 cae el último día en meses cortos", () => {
     expect(instanciasDelMes(alquiler, "2026-09")[0].fecha).toBe("2026-09-30");
@@ -67,7 +67,7 @@ describe("recurrentes", () => {
   });
   it("pagos parciales: pagaste una parte y falta el resto", () => {
     const i = instanciasDelMes(alquiler, "2026-09")[0];
-    const pagos = [mov({ recurrenteId: "r", periodo: "2026-09", monto: 220, moneda: "EUR", fecha: "2026-09-15" })];
+    const pagos = [mov({ recurrenteId: "r", periodo: "2026-09", monto: 200, moneda: "EUR", fecha: "2026-09-15" })];
     const e = estadoDe(i, pagos, 0.88);
     expect(e.estado).toBe("parcial");
     expect(e.falta).toBe(200);
@@ -134,22 +134,22 @@ describe("fechas y números", () => {
 });
 
 describe("vincular un cobro con su recurrente", () => {
-  const claude: Recurrente = { id: "cl", nombre: "Claude", tipo: "gasto", categoriaId: "sus", cuentaId: "mc", monto: 100, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 21, inicio: "2026-09-01", modo: "avisar", activo: true };
-  const gym: Recurrente = { ...claude, id: "gy", nombre: "Gym", categoriaId: "dep", monto: 35.9, moneda: "EUR", dia: 8 };
+  const nube: Recurrente = { id: "cl", nombre: "Nube", tipo: "gasto", categoriaId: "sus", cuentaId: "mc", monto: 100, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 21, inicio: "2026-09-01", modo: "avisar", activo: true };
+  const gym: Recurrente = { ...nube, id: "gy", nombre: "Gym", categoriaId: "dep", monto: 30, moneda: "EUR", dia: 8 };
   it("mismo mes, cuenta y categoría, con monto parecido; compara en USD si la moneda difiere", () => {
-    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 100, moneda: "USD", usd: 100, fecha: "2026-10-21" }), [claude, gym], [], () => 1)).toEqual({ recurrenteId: "cl", periodo: "2026-10" });
-    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "dep", monto: 41.84, moneda: "USD", usd: 41.84, fecha: "2026-10-08" }), [claude, gym], [], () => 0.86)).toEqual({ recurrenteId: "gy", periodo: "2026-10" });
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 100, moneda: "USD", usd: 100, fecha: "2026-10-21" }), [nube, gym], [], () => 1)).toEqual({ recurrenteId: "cl", periodo: "2026-10" });
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "dep", monto: 34.88, moneda: "USD", usd: 34.88, fecha: "2026-10-08" }), [nube, gym], [], () => 0.86)).toEqual({ recurrenteId: "gy", periodo: "2026-10" });
   });
   it("no vincula si esa instancia ya está pagada o si el monto no se parece", () => {
     const pagado = mov({ id: "ya", recurrenteId: "cl", periodo: "2026-10" });
-    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 100, moneda: "USD", usd: 100, fecha: "2026-10-21" }), [claude], [pagado], () => 1)).toBeNull();
-    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 20, moneda: "USD", usd: 20, fecha: "2026-10-21" }), [claude], [], () => 1)).toBeNull();
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 100, moneda: "USD", usd: 100, fecha: "2026-10-21" }), [nube], [pagado], () => 1)).toBeNull();
+    expect(recurrenteDe(mov({ cuentaId: "mc", categoriaId: "sus", monto: 20, moneda: "USD", usd: 20, fecha: "2026-10-21" }), [nube], [], () => 1)).toBeNull();
   });
 });
 
 describe("un recurrente cargado como gasto común", () => {
-  const base: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 20972, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
-  const luz: Recurrente = { ...base, id: "luz", nombre: "Luz", monto: 28716, dia: 8 };
+  const base: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 20000, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
+  const luz: Recurrente = { ...base, id: "luz", nombre: "Luz", monto: 30000, dia: 8 };
   const insts = [base, luz].map(r => estadoDe(instanciasDelMes(r, "2026-10")[0], [], 1545));
 
   it("sugiere cada gasto para el recurrente al que más se parece, uno por recurrente", () => {
@@ -164,15 +164,15 @@ describe("un recurrente cargado como gasto común", () => {
     expect(esClaro(m, insts[0])).toBe(true);
   });
   it("no sugiere gastos de otro mes, ya vinculados o descartados", () => {
-    const otroMes = mov({ categoriaId: "casa", monto: 20972, moneda: "ARS", fecha: "2026-11-09" });
-    const vinculado = mov({ categoriaId: "casa", monto: 20972, moneda: "ARS", fecha: "2026-10-09", recurrenteId: "x" });
-    const libre = mov({ id: "d", categoriaId: "casa", monto: 20972, moneda: "ARS", fecha: "2026-10-09" });
+    const otroMes = mov({ categoriaId: "casa", monto: 20000, moneda: "ARS", fecha: "2026-11-09" });
+    const vinculado = mov({ categoriaId: "casa", monto: 20000, moneda: "ARS", fecha: "2026-10-09", recurrenteId: "x" });
+    const libre = mov({ id: "d", categoriaId: "casa", monto: 20000, moneda: "ARS", fecha: "2026-10-09" });
     expect(sugerirVinculos(insts, [otroMes, vinculado, libre], () => 1545, (m, r) => m === "d" && r === "gas").get("gas2026-10")).toBeUndefined();
   });
 });
 
 it("prefiere la misma moneda aunque la cuenta sea otra", () => {
-  const gas: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 20972, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
+  const gas: Recurrente = { id: "gas", nombre: "Gas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 20000, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true };
   const celular: Recurrente = { ...gas, id: "cel", nombre: "Celular", cuentaId: "revolut", monto: 10, moneda: "EUR", clase: "fijo", dia: 7 };
   const tasas: Record<string, number> = { gas: 1545, cel: 0.878 };
   const insts = [gas, celular].map(r => estadoDe(instanciasDelMes(r, "2026-10")[0], [], tasas[r.id]));
@@ -182,17 +182,17 @@ it("prefiere la misma moneda aunque la cuenta sea otra", () => {
 });
 
 it("un mes marcado en 0 queda resuelto sin pago", () => {
-  const r: Recurrente = { id: "exp", nombre: "Expensas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 179100, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true, enCero: ["2026-10"] };
+  const r: Recurrente = { id: "exp", nombre: "Expensas", tipo: "gasto", categoriaId: "casa", cuentaId: "galicia", monto: 150000, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true, enCero: ["2026-10"] };
   const e = estadoDe(instanciasDelMes(r, "2026-10")[0], [], 1545);
   expect([e.estado, e.cero, e.esperado, e.falta]).toEqual(["cargado", true, 0, 0]);
-  expect(candidatos(e, [mov({ categoriaId: "casa", monto: 179100, moneda: "ARS", fecha: "2026-10-09" })], 1545)).toEqual([]);
+  expect(candidatos(e, [mov({ categoriaId: "casa", monto: 150000, moneda: "ARS", fecha: "2026-10-09" })], 1545)).toEqual([]);
 });
 
 it("recurrentes por mes en USD: fijo, variable con estimado, semanal y anual", async () => {
   const { mensualEnUsd } = await import("./recurrentes");
-  const base: Recurrente = { id: "a", nombre: "Alquiler", tipo: "gasto", categoriaId: "casa", cuentaId: "rev", monto: 420, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 24, inicio: "2026-01-01", modo: "avisar", activo: true };
-  expect(mensualEnUsd(base, [], 0.84)).toBe(500);
-  expect(mensualEnUsd({ ...base, frecuencia: "anual", mes: 3 }, [], 0.84)).toBe(41.67);
+  const base: Recurrente = { id: "a", nombre: "Alquiler", tipo: "gasto", categoriaId: "casa", cuentaId: "rev", monto: 400, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 24, inicio: "2026-01-01", modo: "avisar", activo: true };
+  expect(mensualEnUsd(base, [], 0.8)).toBe(500);
+  expect(mensualEnUsd({ ...base, frecuencia: "anual", mes: 3 }, [], 0.8)).toBe(41.67);
   expect(mensualEnUsd({ ...base, frecuencia: "semanal", dia: 2, monto: 12 }, [], 1)).toBe(52);
   const exp = { ...base, id: "e", clase: "variable" as const, moneda: "ARS" as const, monto: 1 };
   const pagos = ["2026-06", "2026-07", "2026-08"].map((p, i) => mov({ recurrenteId: "e", periodo: p, monto: 150000 + i * 15000, moneda: "ARS" }));
