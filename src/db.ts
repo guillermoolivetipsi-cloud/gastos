@@ -23,6 +23,13 @@ db.version(1).stores({
 });
 // v2: proyecciones (tabla nueva; lo demás queda igual).
 db.version(2).stores({ proyecciones: "id, periodo" });
+// v3: "capricho" pasa a llamarse "opcional", hay proyecciones de ingresos y los
+// seguros también se prenden y apagan (arrancan prendidos).
+db.version(3).stores({}).upgrade(tx => tx.table("proyecciones").toCollection().modify((p: Record<string, unknown>) => {
+  if (p.clase === "capricho") p.clase = "opcional";
+  if (p.clase === "seguro") p.activa = true;
+  p.tipo ??= "gasto";
+}));
 
 export const nuevoId = () => crypto.randomUUID();
 

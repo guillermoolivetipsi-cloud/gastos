@@ -22,7 +22,7 @@ export function Resumen() {
   const nav = useNav();
   const [solapa, setSolapa] = useState<Tipo | "proy">("gasto");
   const tipo: Tipo = solapa === "proy" ? "gasto" : solapa;
-  // En el mes de gastos: sumar lo proyectado (seguros y caprichos prendidos).
+  // En el mes: sumar lo proyectado que esté prendido (seguro en claro, opcional rayado).
   const [conProy, setConProy] = useState(false);
   // Abre siempre en la semana: es lo que se mira todos los días.
   const [vista, setVista] = useState<Vista>("semana");
@@ -51,10 +51,10 @@ export function Resumen() {
   const revisar = usePendientes()?.total ?? 0;
 
   const tasaProy = useMemo(() => tasaDeProyecciones(d), [d]);
-  const proyPorCat = useMemo(() => (esMes && tipo === "gasto" ? proyectadoPorCategoria(periodo, d.proyecciones, tasaProy) : new Map<string, number>()), [esMes, tipo, periodo, d.proyecciones, tasaProy]);
+  const proyPorCat = useMemo(() => (esMes ? proyectadoPorCategoria(periodo, tipo, d.proyecciones, tasaProy) : new Map<string, { seguro: number; opcional: number }>()), [esMes, tipo, periodo, d.proyecciones, tasaProy]);
   const hayProy = proyPorCat.size > 0;
   const verProy = conProy && hayProy;
-  const proyTotal = verProy ? [...proyPorCat.values()].reduce((a, b) => a + b, 0) : 0;
+  const proyTotal = verProy ? [...proyPorCat.values()].reduce((a, b) => a + b.seguro + b.opcional, 0) : 0;
   // Con proyecciones, las categorías que solo tienen lo proyectado también aparecen.
   const catsVer = verProy
     ? [...cats, ...[...proyPorCat.keys()].filter(id => !cats.some(c => c.cat.id === id)).map(id => d.catPorId.get(id)).filter(Boolean).map(cat => ({ cat: cat!, total: 0, pct: 0, n: 0 }))]
@@ -138,12 +138,16 @@ export function Resumen() {
           <button className={`pill${verProy ? " on" : ""}`} style={{ fontSize: 12, padding: "3px 10px" }} onClick={() => setConProy(!conProy)}>Con proyecciones{verProy ? " ✓" : ""}</button>
         </div>
       )}
-      {grafico === "torta" ? (
+      {grafico === "torta" ? (<>
         <Dona
-          partes={catsVer.flatMap(c => [{ valor: c.total, color: c.cat.color }, { valor: verProy ? proyPorCat.get(c.cat.id) ?? 0 : 0, color: c.cat.color, tenue: true }])}
+          partes={catsVer.flatMap(c => {
+            const p = verProy ? proyPorCat.get(c.cat.id) : undefined;
+            return [{ valor: c.total, color: c.cat.color }, { valor: p?.seguro ?? 0, color: c.cat.color, tenue: true }, { valor: p?.opcional ?? 0, color: c.cat.color, rayado: true }];
+          })}
           centro={total + proyTotal ? `${num(total + proyTotal)} USD` : vacio}
           sub={verProy ? `${num(proyTotal, 0)} proyectado` : total ? undefined : enEsto} />
-      ) : (
+          {verProy && <div className="mini tenue centro" style={{ marginTop: -4 }}><span className="ambar">+ claro</span>: seguro · <span className="viol" style={{ textDecoration: "underline dotted" }}>+ rayado</span>: opcional</div>}
+      </>) : (
         <div className="fila" style={{ padding: "4px 2px 10px" }}>
           <span className="tenue chico">{total ? `Total ${enEsto}` : `${vacio} ${enEsto}`}</span>
           {total > 0 && <span className="mediano num">{num(total)} <span className="chico tenue">USD</span></span>}
@@ -167,7 +171,8 @@ export function Resumen() {
                   <span className="tenue chico">{c.total > 0 ? `${Math.round(c.pct * 100)}%` : ""}</span>
                   <span className="num derecha" style={{ minWidth: 82 }}>
                     <span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>
-                    {proy != null && <span className="ambar chico"> +{num(proy, 0)}</span>}
+                    {proy != null && proy.seguro > 0 && <span className="ambar chico"> +{num(proy.seguro, 0)}</span>}
+                    {proy != null && proy.opcional > 0 && <span className="viol chico" style={{ textDecoration: "underline dotted" }}> +{num(proy.opcional, 0)}</span>}
                     {obj != null && <span className="tenue chico"> / {num(obj)}</span>}
                   </span>
                 </div>

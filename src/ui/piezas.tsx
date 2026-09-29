@@ -38,18 +38,24 @@ export function Seg<V extends string>({ opciones, valor, cambiar }: { opciones: 
 }
 
 /** Dona: los segmentos van en el orden dado, arrancando arriba. */
-export function Dona({ partes, centro, sub, tam = 190 }: { partes: { valor: number; color: string; tenue?: boolean }[]; centro: ReactNode; sub?: ReactNode; tam?: number }) {
+export function Dona({ partes, centro, sub, tam = 190 }: { partes: { valor: number; color: string; tenue?: boolean; rayado?: boolean }[]; centro: ReactNode; sub?: ReactNode; tam?: number }) {
   const total = partes.reduce((s, p) => s + p.valor, 0);
   const r = 44, C = 2 * Math.PI * r;
   let acum = 0;
   return (
     <svg className="dona" viewBox="0 0 120 120" width={tam} height={tam} role="img">
+      {/* Rayado (lo opcional proyectado): una trama por color. */}
+      <defs>{[...new Set(partes.filter(p => p.rayado).map(p => p.color))].map(c => (
+        <pattern key={c} id={`ray${c.replace("#", "")}`} width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="4" height="4" fill={c} fillOpacity={0.25} /><rect width="2" height="4" fill={c} fillOpacity={0.8} />
+        </pattern>
+      ))}</defs>
       <circle cx="60" cy="60" r={r} fill="none" stroke="var(--linea)" strokeWidth="15" />
       {total > 0 && partes.filter(p => p.valor > 0).map((p, i) => {
         const largo = (p.valor / total) * C;
         const hueco = partes.length > 1 ? Math.min(1.2, largo / 3) : 0;
         const el = (
-          <circle key={i} cx="60" cy="60" r={r} fill="none" stroke={p.color} strokeWidth="15" strokeOpacity={p.tenue ? 0.4 : 1}
+          <circle key={i} cx="60" cy="60" r={r} fill="none" stroke={p.rayado ? `url(#ray${p.color.replace("#", "")})` : p.color} strokeWidth="15" strokeOpacity={p.tenue ? 0.4 : 1}
             strokeDasharray={`${Math.max(0, largo - hueco)} ${C}`} strokeDashoffset={-acum} transform="rotate(-90 60 60)" />
         );
         acum += largo;

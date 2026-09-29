@@ -2,141 +2,136 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDatos, type Datos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
-import { MONEDAS, type Moneda, type Proyeccion } from "../tipos";
+import { MONEDAS, type Moneda, type Proyeccion, type Tipo } from "../tipos";
 import { fechaEnMes, hoy, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
-import { mesProyectado, promedioGasto, usdDeProyeccion, type TasaMoneda } from "../lib/proyecciones";
-import { Interruptor, Punto, Seg, useToast } from "../ui/piezas";
+import { serie, type PuntoMes, type TasaMoneda, type Vista } from "../lib/proyecciones";
+import { Interruptor, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
-/* Resumen → Proyecciones. Gastos que todavía no pasaron: "seguros" (siempre suman)
-   y "caprichos" (se prenden para ver cómo impactarían). */
-
-const AZUL = "#60A5FA", AMBAR = "#FBBF24";
-const RAYADO = `repeating-linear-gradient(45deg, ${AMBAR} 0 3px, #6b5520 3px 6px)`;
+/* Resumen → Proyecciones: un gráfico de línea mes a mes (tu normal y con lo
+   proyectado) y la lista de proyecciones, cada una con su interruptor. */
 
 export const tasaDeProyecciones = (d: Datos): TasaMoneda => m => d.tasas.de(m);
 
 const proximos = () => Array.from({ length: 6 }, (_, i) => sumarMeses(periodoHoy(), i));
+const VISTAS: [Vista, string][] = [["gasto", "Gastos"], ["ingreso", "Ingresos"], ["queda", "Lo que queda"]];
 
 export function Proyecciones() {
   const d = useDatos();
   const nav = useNav();
   const toast = useToast();
-  const [periodo, setPeriodo] = useState(periodoHoy());
+  const [vista, setVista] = useState<Vista>("gasto");
   const tasa = useMemo(() => tasaDeProyecciones(d), [d]);
-  const meses = proximos();
-  const porMes = useMemo(() => meses.map(p => mesProyectado(p, d.movimientos, d.recurrentes, d.proyecciones, d.tasaRec, tasa)), [d, tasa]); // eslint-disable-line react-hooks/exhaustive-deps
-  const m = porMes.find(x => x.periodo === periodo) ?? mesProyectado(periodo, d.movimientos, d.recurrentes, d.proyecciones, d.tasaRec, tasa);
-  const promedio = useMemo(() => promedioGasto(d.movimientos), [d.movimientos]);
-  const delMes = d.proyecciones.filter(p => p.periodo === periodo).sort((a, b) => a.creado.localeCompare(b.creado));
-  const seguros = delMes.filter(p => p.clase === "seguro"), caprichos = delMes.filter(p => p.clase === "capricho");
-  // Las de meses que ya pasaron: ¿pasó o no?
-  const vencidas = d.proyecciones.filter(p => p.periodo < periodoHoy());
+  const puntos = useMemo(() => serie(vista, proximos(), d.movimientos, d.proyecciones, tasa), [vista, d.movimientos, d.proyecciones, tasa]);
+  const lista = [...d.proyecciones].sort((a, b) => a.periodo.localeCompare(b.periodo) || a.creado.localeCompare(b.creado));
 
-  const prender = (p: Proyeccion, on: boolean) => db.proyecciones.update(p.id, { activa: on });
+  // El mes que más se mueve por lo proyectado.
+  const mayor = puntos.reduce<PuntoMes | null>((m, p) => (Math.abs(p.medio - p.normal) > (m ? Math.abs(m.medio - m.normal) : 0.5) ? p : m), null);
+  const nombreVista = { gasto: "gasto", ingreso: "ingreso", queda: "lo que queda" }[vista];
+
   const noPaso = async (p: Proyeccion) => {
     await db.proyecciones.delete(p.id);
     toast({ texto: `${p.nombre}: no pasó`, deshacer: () => { db.proyecciones.put(p); } });
   };
   const paso = (p: Proyeccion) => nav.abrir({
-    p: "editor", tipo: "gasto", monto: p.montoMax ? undefined : p.monto, categoriaId: p.categoriaId, comentario: p.nombre, proyeccionId: p.id, moneda: p.moneda,
-    fecha: p.periodo === periodoHoy() ? hoy() : p.periodo < periodoHoy() ? fechaEnMes(p.periodo, 31) : `${p.periodo}-01`,
+    p: "editor", tipo: p.tipo, monto: p.montoMax ? undefined : p.monto, categoriaId: p.categoriaId, comentario: p.nombre, proyeccionId: p.id, moneda: p.moneda,
+    fecha: p.periodo === periodoHoy() ? hoy() : fechaEnMes(p.periodo, 31),
   });
-
-  const monto = (p: Proyeccion) => `${num(p.monto)}${p.montoMax && p.montoMax > p.monto ? `–${num(p.montoMax)}` : ""} ${p.moneda}`;
-  const fila = (p: Proyeccion, conSwitch: boolean, conPaso: boolean) => {
-    const cat = d.catPorId.get(p.categoriaId);
-    const u = usdDeProyeccion(p, tasa);
-    return (
-      <div key={p.id} className="fila" style={{ flexWrap: "wrap" }}>
-        <button className="izq" style={{ textAlign: "left", flex: 1 }} onClick={() => nav.abrir({ p: "proyeccion", id: p.id })}>
-          <Punto cat={cat} chico />
-          <span><div>{p.nombre}</div><div className="mini tenue">{cat?.nombre} · {nombreMes(p.periodo, false)}</div></span>
-        </button>
-        <span className="derecha" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span>
-            <div className={`num chico${conSwitch && !p.activa ? " tenue" : ""}`}>{monto(p)}</div>
-            {p.moneda !== "USD" && <div className="mini tenue num">≈ {num(u.medio, 0)} USD</div>}
-          </span>
-          {conSwitch && <Interruptor on={p.activa} cambiar={v => prender(p, v)} />}
-        </span>
-        {conPaso && (
-          <div style={{ width: "100%", display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 4 }}>
-            <span className="mini tenue" style={{ alignSelf: "center", marginRight: "auto" }}>¿Ya pasó?</span>
-            <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => noPaso(p)}>No pasó</button>
-            <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => paso(p)}>Cargarlo como gasto</button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const pct = (x: number) => `${m.total ? (x / m.total) * 100 : 0}%`;
-  const hayRango = m.min !== m.max;
-  const maxBarra = Math.max(1, ...porMes.map(x => x.total));
 
   return (
     <>
-      {vencidas.length > 0 && (
-        <>
-          <div className="titulo-sec"><span>De meses que ya pasaron</span><span>{vencidas.length}</span></div>
-          <div className="caja lista">{vencidas.map(p => fila(p, false, true))}</div>
-        </>
-      )}
-
-      <div className="pills scroll" style={{ marginBottom: 10 }}>
-        {meses.map(p => <button key={p} className={`pill${p === periodo ? " on" : ""}`} onClick={() => setPeriodo(p)}>{nombreMes(p, false)}</button>)}
-      </div>
-
       <div className="caja">
-        <div className="tenue chico">{nombreMes(periodo, false)[0].toUpperCase() + nombreMes(periodo, false).slice(1)}, cómo quedaría</div>
-        <div className="mediano num">{hayRango ? "~" : ""}{num(m.total, 0)} <span className="chico tenue">USD</span></div>
-        {hayRango && <div className="mini tenue">entre {num(m.min, 0)} y {num(m.max, 0)}</div>}
-        <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", margin: "8px 0", background: "var(--linea)" }}>
-          <div style={{ width: pct(m.base), background: AZUL }} />
-          <div style={{ width: pct(m.seguros), background: AMBAR }} />
-          <div style={{ width: pct(m.caprichos), background: RAYADO }} />
+        <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+          {VISTAS.map(([v, t]) => <button key={v} className={`pill${vista === v ? " on" : ""}`} style={{ fontSize: 12, padding: "3px 10px" }} onClick={() => setVista(v)}>{t}</button>)}
         </div>
-        <div className="fila mini" style={{ padding: "2px 0" }}><span className="tenue"><span style={{ color: AZUL }}>■</span> gastado + recurrentes que faltan</span><span className="num">{num(m.base, 0)}</span></div>
-        <div className="fila mini" style={{ padding: "2px 0" }}><span className="tenue"><span style={{ color: AMBAR }}>■</span> seguros</span><span className="num">{num(m.seguros, 0)}</span></div>
-        <div className="fila mini" style={{ padding: "2px 0" }}><span className="tenue"><span style={{ color: AMBAR }}>▨</span> caprichos prendidos</span><span className="num">{num(m.caprichos, 0)}</span></div>
-        {(m.caprichosTodos > m.caprichos || promedio != null) && (
-          <div className="mini tenue sep" style={{ marginTop: 6, paddingTop: 6 }}>
-            {m.caprichosTodos > m.caprichos && <>Con todos los caprichos: <span className="ambar">{num(m.total - m.caprichos + m.caprichosTodos, 0)} USD</span>. </>}
-            {promedio != null && <>Tu promedio de gasto es {num(promedio, 0)} USD.</>}
-          </div>
-        )}
+        <div className="mini tenue" style={{ display: "flex", gap: 12 }}>
+          <span><span style={{ color: "var(--tenue)" }}>━</span> normal</span>
+          <span><span className="viol">┅</span> con proyecciones</span>
+        </div>
+        <GraficoLinea puntos={puntos} />
+        <div className="mini tenue" style={{ marginTop: 4 }}>
+          {mayor
+            ? <>El mes que más cambia: <span className="ambar">{nombreMes(mayor.periodo, false)}, {mayor.medio > mayor.normal ? "+" : "−"}{num(Math.abs(mayor.medio - mayor.normal), 0)} USD</span> de {nombreVista}.</>
+            : "Sin proyecciones prendidas: ves solo tu normal."}
+          {" "}El normal es tu promedio de los últimos 3 meses.
+        </div>
       </div>
 
-      <div className="titulo-sec"><span>Seguros</span><span className="mini">siempre cuentan</span></div>
-      {seguros.length ? <div className="caja lista">{seguros.map(p => fila(p, false, p.periodo === periodoHoy()))}</div>
-        : <div className="mini tenue" style={{ margin: "0 2px 8px" }}>Lo que es muy probable que pase: el service, un regalo, un impuesto.</div>}
-
-      <div className="titulo-sec"><span>Caprichos</span><span className="mini">prendé para ver el impacto</span></div>
-      {caprichos.length ? <div className="caja lista">{caprichos.map(p => fila(p, true, p.periodo === periodoHoy()))}</div>
-        : <div className="mini tenue" style={{ margin: "0 2px 8px" }}>Lo que te gustaría y podría no pasar. Puede tener un rango.</div>}
-
-      <button className="btn1" style={{ width: "100%", marginTop: 4 }} onClick={() => nav.abrir({ p: "proyeccion", periodo })}>+ Nueva proyección</button>
-
-      <div className="caja" style={{ marginTop: 12, padding: "10px 12px 6px" }}>
-        <div className="mini tenue" style={{ marginBottom: 4 }}>Próximos 6 meses · USD</div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 110, borderBottom: "1px solid var(--linea)" }}>
-          {porMes.map(x => (
-            <button key={x.periodo} onClick={() => setPeriodo(x.periodo)} style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "stretch", minWidth: 0 }}>
-              <span className="mini num" style={{ textAlign: "center", color: x.periodo === periodo ? "var(--tinta)" : "var(--tenue)", fontSize: 10 }}>{num(x.total, 0)}</span>
-              <span style={{ height: `${(x.caprichos / maxBarra) * 78}%`, background: RAYADO, borderRadius: "3px 3px 0 0" }} />
-              <span style={{ height: `${(x.seguros / maxBarra) * 78}%`, background: AMBAR }} />
-              <span style={{ height: `${(x.base / maxBarra) * 78}%`, background: AZUL, opacity: x.periodo === periodo ? 1 : 0.7 }} />
-            </button>
-          ))}
+      <div className="titulo-sec"><span>Tus proyecciones</span><span className="mini">prendé para sumar al gráfico</span></div>
+      {!lista.length && <div className="mini tenue" style={{ margin: "0 2px 8px" }}>Algo que va a pasar (el service, un cobro) o que podría pasar (un viaje, unas zapatillas).</div>}
+      {lista.length > 0 && (
+        <div className="caja lista">
+          {lista.map(p => {
+            const cat = d.catPorId.get(p.categoriaId);
+            const termino = p.periodo < periodoHoy();
+            const ing = p.tipo === "ingreso";
+            return (
+              <div key={p.id} className="fila" style={{ flexWrap: "wrap" }}>
+                <button className="izq" style={{ textAlign: "left", flex: 1, minWidth: 0 }} onClick={() => nav.abrir({ p: "proyeccion", id: p.id })}>
+                  <span style={{ minWidth: 0 }}>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nombre}</div>
+                    <div className="mini tenue"><span className={`etiq ${p.clase === "seguro" ? "e-fijo" : "e-variable"}`}>{p.clase}</span> {cat?.nombre} · {nombreMes(p.periodo, false)}</div>
+                  </span>
+                </button>
+                <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span className={`num chico${p.activa ? (ing ? " ok" : "") : " tenue"}`}>{ing ? "+" : ""}{num(p.monto)}{p.montoMax && p.montoMax > p.monto ? `–${num(p.montoMax)}` : ""} {p.moneda}</span>
+                  {!termino && <Interruptor on={p.activa} cambiar={v => db.proyecciones.update(p.id, { activa: v })} />}
+                </span>
+                {termino && (
+                  <div style={{ width: "100%", display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 4 }}>
+                    <span className="mini ambar" style={{ alignSelf: "center", marginRight: "auto" }}>Terminó {nombreMes(p.periodo, false)}: ¿pasó?</span>
+                    <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => noPaso(p)}>No pasó</button>
+                    <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => paso(p)}>Sí, cargarlo</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {porMes.map(x => <span key={x.periodo} className="mini tenue" style={{ flex: 1, textAlign: "center" }}>{mesCorto(x.periodo)}</span>)}
-        </div>
-        <div className="mini tenue" style={{ marginTop: 4 }}>Azul: lo gastado y los recurrentes. Amarillo: seguros. Rayado: caprichos prendidos.</div>
-      </div>
+      )}
+      <button className="btn1" style={{ width: "100%", marginTop: 4 }} onClick={() => nav.abrir({ p: "proyeccion" })}>+ Nueva proyección</button>
     </>
+  );
+}
+
+/** Línea gris: el normal. Línea violeta punteada: con lo proyectado. Franja: del mínimo
+ *  al máximo si hay rangos. El número de cada mes va arriba del punto. */
+function GraficoLinea({ puntos }: { puntos: PuntoMes[] }) {
+  const W = 320, H = 170, izq = 26, der = 12, arriba = 18, abajo = 22;
+  const valores = puntos.flatMap(p => [p.normal, p.min, p.max]);
+  // No arranca en 0: las diferencias entre meses son lo que importa.
+  const minV = Math.min(...valores), maxV = Math.max(...valores);
+  const aire = Math.max((maxV - minV) * 0.25, Math.abs(maxV) * 0.1, 1);
+  let lo = minV - aire, hi = maxV + aire * 0.6;
+  if (minV >= 0) lo = Math.max(0, lo);
+  const X = (i: number) => izq + (i * (W - izq - der)) / Math.max(1, puntos.length - 1);
+  const Y = (v: number) => arriba + ((hi - v) * (H - arriba - abajo)) / (hi - lo || 1);
+  const linea = (k: keyof PuntoMes) => puntos.map((p, i) => `${X(i)},${Y(p[k] as number)}`).join(" ");
+  // Unas 3 líneas guía en números redondos (100, 200, 500, 1000…).
+  const crudo = (hi - lo) / 3, mag = Math.pow(10, Math.floor(Math.log10(crudo || 1)));
+  const paso = ([1, 2, 5, 10].find(m => m * mag >= crudo) ?? 10) * mag;
+  const guias: number[] = [];
+  for (let v = Math.ceil(lo / paso) * paso; v <= hi; v += paso) guias.push(v);
+  const k = (v: number) => (Math.abs(v) >= 1000 ? `${num(v / 1000, 1)}k` : num(v, 0));
+  const hayRango = puntos.some(p => p.max - p.min > 0.5);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label="Gasto por mes, normal y con proyecciones">
+      {guias.map(v => <g key={v}><line x1={izq - 4} x2={W - der} y1={Y(v)} y2={Y(v)} stroke="var(--linea)" /><text x={0} y={Y(v) + 3} fill="var(--tenue)" fontSize="9">{k(v)}</text></g>)}
+      {hayRango && <polygon points={`${linea("max")} ${puntos.map((p, i) => `${X(i)},${Y(p.min)}`).reverse().join(" ")}`} fill="var(--viol)" fillOpacity={0.18} />}
+      <polyline points={linea("normal")} fill="none" stroke="var(--tenue)" strokeWidth={2} />
+      <polyline points={linea("medio")} fill="none" stroke="var(--viol)" strokeWidth={2} strokeDasharray="4 3" />
+      {puntos.map((p, i) => {
+        const cambia = Math.abs(p.medio - p.normal) > 0.5;
+        return (
+          <g key={p.periodo}>
+            <circle cx={X(i)} cy={Y(p.medio)} r={3} fill={cambia ? "var(--viol)" : "var(--tenue)"} />
+            <text x={X(i)} y={Y(Math.max(p.max, p.medio, p.normal)) - 7} textAnchor="middle" fill={cambia ? "var(--viol-claro)" : "var(--tenue)"} fontSize="10">{num(p.medio, 0)}</text>
+            <text x={X(i)} y={H - 6} textAnchor="middle" fill="var(--tenue)" fontSize="10">{mesCorto(p.periodo)}</text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -146,29 +141,33 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
   const toast = useToast();
   const existente = props.id ? d.proyecciones.find(p => p.id === props.id) : undefined;
   const listo = useRef(false);
-  const [f, setF] = useState({ nombre: "", clase: "seguro" as Proyeccion["clase"], montoTxt: "", maxTxt: "", moneda: "USD" as Moneda, periodo: props.periodo ?? periodoHoy(), categoriaId: "" });
+  const [f, setF] = useState({ nombre: "", tipo: "gasto" as Tipo, clase: "seguro" as Proyeccion["clase"], montoTxt: "", maxTxt: "", moneda: "USD" as Moneda, periodo: props.periodo ?? periodoHoy(), categoriaId: "" });
   const [rango, setRango] = useState(false);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF(x => ({ ...x, [k]: v }));
 
   useEffect(() => {
     if (listo.current || !d.listo || !existente) return;
     listo.current = true;
-    setF({ nombre: existente.nombre, clase: existente.clase, montoTxt: String(existente.monto).replace(".", ","), maxTxt: existente.montoMax ? String(existente.montoMax).replace(".", ",") : "", moneda: existente.moneda, periodo: existente.periodo, categoriaId: existente.categoriaId });
-    setRango(!!existente.montoMax);
+    const e = existente;
+    setF({ nombre: e.nombre, tipo: e.tipo, clase: e.clase, montoTxt: String(e.monto).replace(".", ","), maxTxt: e.montoMax ? String(e.montoMax).replace(".", ",") : "", moneda: e.moneda, periodo: e.periodo, categoriaId: e.categoriaId });
+    setRango(!!e.montoMax);
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const monto = leerNumero(f.montoTxt), max = rango ? leerNumero(f.maxTxt) : 0;
   const valido = !!f.nombre.trim() && monto > 0 && !!f.categoriaId && (!rango || max > monto);
-  const cats = d.categorias.filter(c => c.tipo === "gasto" && (!c.archivada || c.id === f.categoriaId));
+  const cats = d.categorias.filter(c => c.tipo === f.tipo && (!c.archivada || c.id === f.categoriaId));
   const meses = proximos();
 
   async function guardar() {
     if (!valido) return;
+    // Nueva: los seguros arrancan prendidos y los opcionales apagados. Si cambiás de
+    // seguro a opcional (o al revés), también.
+    const activa = existente && existente.clase === f.clase ? existente.activa : f.clase === "seguro";
     await db.proyecciones.put({
-      id: existente?.id ?? nuevoId(), nombre: f.nombre.trim(), clase: f.clase, monto, montoMax: rango ? max : undefined, moneda: f.moneda,
-      periodo: f.periodo, categoriaId: f.categoriaId, activa: existente?.activa ?? false, creado: existente?.creado ?? new Date().toISOString(),
+      id: existente?.id ?? nuevoId(), nombre: f.nombre.trim(), tipo: f.tipo, clase: f.clase, monto, montoMax: rango ? max : undefined, moneda: f.moneda,
+      periodo: f.periodo, categoriaId: f.categoriaId, activa, creado: existente?.creado ?? new Date().toISOString(),
     });
-    toast({ texto: existente ? "Proyección guardada" : f.clase === "capricho" ? "Capricho agregado (apagado)" : "Seguro agregado" });
+    toast({ texto: existente ? "Proyección guardada" : f.clase === "opcional" ? "Agregada (apagada: prendela para verla en el gráfico)" : "Proyección agregada" });
     nav.volver();
   }
   async function borrar() {
@@ -185,10 +184,11 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
         <h1>{existente ? "Editar proyección" : "Nueva proyección"}</h1>
         {existente && <button className="accion peligro" aria-label="Eliminar" onClick={borrar}><T.IconTrash size={21} /></button>}
       </div>
-      <div className="campo"><label>Nombre</label><input value={f.nombre} onChange={e => set("nombre", e.target.value)} placeholder="Service del auto, zapatillas…" autoFocus={!existente} /></div>
+      <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={f.tipo} cambiar={t => setF(x => ({ ...x, tipo: t, categoriaId: "" }))} />
+      <div className="campo"><label>Nombre</label><input value={f.nombre} onChange={e => set("nombre", e.target.value)} placeholder={f.tipo === "gasto" ? "Service del auto, zapatillas…" : "Cobro de un proyecto…"} autoFocus={!existente} /></div>
       <div className="campo">
-        <Seg opciones={[["seguro", "Seguro"], ["capricho", "Capricho"]]} valor={f.clase} cambiar={v => set("clase", v)} />
-        <div className="mini tenue" style={{ marginTop: 4 }}>{f.clase === "seguro" ? "Muy probable: siempre suma en la proyección." : "Opcional: arranca apagado y lo prendés para ver cómo impactaría."}</div>
+        <Seg opciones={[["seguro", "Seguro"], ["opcional", "Opcional"]]} valor={f.clase} cambiar={v => set("clase", v)} />
+        <div className="mini tenue" style={{ marginTop: 4 }}>{f.clase === "seguro" ? "Muy probable: arranca prendido en el gráfico." : "Puede no pasar: arranca apagado y lo prendés para ver cómo impactaría."}</div>
       </div>
       <div className="campo">
         <label>¿Cuánto?</label>
