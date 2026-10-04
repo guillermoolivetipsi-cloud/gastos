@@ -12,10 +12,11 @@ export function Mas() {
 /** En la app: además, actualizar (se fija al entrar a Más). */
 function MasConVersion() {
   const a = useActualizacion();
-  return <Menu arriba={a.nueva ? <ItemActualizar a={a} /> : null} abajo={a.nueva ? null : <ItemActualizar a={a} />} />;
+  return <Menu arriba={a.nueva ? <ItemActualizar a={a} /> : null} abajo={a.nueva ? null : <ItemActualizar a={a} />}
+    pie={<>Gastos <b style={{ fontWeight: 500 }}>{a.version ?? ""}</b> · app de Android</>} />;
 }
 
-function Menu({ arriba, abajo }: { arriba?: ReactNode; abajo?: ReactNode }) {
+function Menu({ arriba, abajo, pie = "Gastos · versión web vieja" }: { arriba?: ReactNode; abajo?: ReactNode; pie?: ReactNode }) {
   const nav = useNav();
   const revisar = usePendientes()?.total ?? 0;
   const item = (p: Pantalla, icono: ReactNode, texto: string, extra?: ReactNode) => (
@@ -47,7 +48,9 @@ function Menu({ arriba, abajo }: { arriba?: ReactNode; abajo?: ReactNode }) {
         {item({ p: "ajustes" }, <T.IconSettings size={20} />, "Ajustes")}
         {abajo}
       </div>
-      <div className="mini tenue centro" style={{ marginTop: 20 }}>Los totales se muestran en USD. Tus datos quedan solo en este celular.</div>
+      {/* Para saber cuál es cuál si quedaron instaladas las dos. */}
+      <div className="chico centro" style={{ marginTop: 20 }}>{pie}</div>
+      <div className="mini tenue centro" style={{ marginTop: 4 }}>Los totales se muestran en USD. Tus datos quedan solo en este celular.</div>
     </div>
   );
 }

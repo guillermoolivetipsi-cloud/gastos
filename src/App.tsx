@@ -148,6 +148,15 @@ export function App() {
   const arriba = nav.pila[nav.pila.length - 1];
   return (
     <>
+      {/* La PWA quedó vieja: que se note, para no confundirla con la app de Android. */}
+      {!Capacitor.isNativePlatform() && (
+        <div style={{ maxWidth: 520, margin: "0 auto", padding: "calc(var(--arriba) + 10px) 16px 0" }}>
+          <div style={{ background: "var(--mal-fondo)", border: "1px solid rgba(240,138,138,.4)", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontWeight: 500 }}>Esta es la versión vieja (web)</div>
+            <div className="chico tenue" style={{ marginTop: 2 }}>Ya no se actualiza. Usá la app nueva y borrá esta: mantené apretado el ícono → Desinstalar.</div>
+          </div>
+        </div>
+      )}
       {nueva && <AvisoVersion nueva={nueva} cerrar={() => setNueva(null)} />}
       {!nueva && respuesta && (
         <AvisoRespuesta envio={respuesta}
