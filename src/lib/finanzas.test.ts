@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Categoria, Cuenta, Movimiento } from "../tipos";
-import { armarEnvio, interpretar, mesesAMandar, normalizarDireccion } from "./finanzas";
+import { armarEnvio, interpretar, mesesAMandar, nombreDeEnvio } from "./finanzas";
 
 const cuentas: Cuenta[] = [
   { id: "rev", nombre: "Revolut", moneda: "EUR", dolar: "blue", esTarjeta: false, orden: 0 },
@@ -30,17 +30,14 @@ it("los meses: el anterior y el que corre", () => {
   expect(mesesAMandar("2026-01")).toEqual(["2025-12", "2026-01"]);
 });
 
-it("la dirección de la Mac, como la escribas", () => {
-  expect(["192.168.1.17", "http://192.168.1.17:3005/", " 192.168.1.17:4000 ", ""].map(normalizarDireccion)).toEqual(["192.168.1.17:3005", "192.168.1.17:3005", "192.168.1.17:4000", ""]);
+it("el nombre del archivo del envío", () => {
+  expect(nombreDeEnvio(new Date("2026-09-29T12:40:05.123Z"))).toBe("2026-09-29T12-40-05Z.json");
 });
 
-it("lee lo que contesta Finanzas", () => {
-  const vista = { ok: true, avisos: [{ nivel: "atencion", texto: "Bizum: esa cuenta no existe" }, { nivel: "info", texto: "x" }], desde: "2026-08", hasta: "2026-09", leidos: 85, nuevos: 24, cambian: 3, iguales: 58, sinCuenta: ["Bizum"], porMes: [{ periodo: "2026-08", nuevos: 6, cambian: 3, iguales: 40 }] };
-  expect(interpretar({ status: 200, data: { ok: true, vista, nuevos: 24, corregidos: 3, iguales: 58 } }, "d", false))
-    .toEqual({ tipo: "listo", nuevos: 24, corregidos: 3, iguales: 58, porMes: vista.porMes, avisos: [vista.avisos[0]] });
-  expect(interpretar({ status: 200, data: { ok: true, vista } }, "d", true).tipo).toBe("revisado");
-  expect(interpretar({ status: 401, data: { ok: false, mensaje: "clave equivocada" } }, "d", false)).toEqual({ tipo: "clave" });
-  expect(interpretar(null, "192.168.1.17:3005", false)).toEqual({ tipo: "sin-respuesta", direccion: "192.168.1.17:3005" });
-  const rechazo = { ok: false, mensaje: "un id repetido", vista: { ...vista, ok: false, avisos: [{ nivel: "error", texto: "el id a está repetido" }] } };
-  expect(interpretar({ status: 400, data: rechazo }, "d", false)).toEqual({ tipo: "rechazado", mensaje: "el id a está repetido" });
+it("lee la respuesta de Finanzas", () => {
+  const resp = { app: "finanzas", respondido: "2026-09-29T21:30:02.000Z", envio: "x.json", ok: true, mensaje: "24 nuevos", nuevos: 24, corregidos: 3, iguales: 58,
+    avisos: [{ nivel: "atencion", texto: "Bizum: esa cuenta no existe" }, { nivel: "info", texto: "x" }], porMes: [{ periodo: "2026-09", nuevos: 18, cambian: 0, iguales: 40 }] };
+  expect(interpretar(resp)).toEqual({ tipo: "listo", nuevos: 24, corregidos: 3, iguales: 58, porMes: resp.porMes, avisos: [resp.avisos[0]] });
+  expect(interpretar({ ok: false, mensaje: "un id repetido", avisos: [{ nivel: "error", texto: "el id a está repetido" }] })).toEqual({ tipo: "rechazado", mensaje: "el id a está repetido" });
+  expect(interpretar({ ok: false, mensaje: "contrato desconocido" })).toEqual({ tipo: "rechazado", mensaje: "contrato desconocido" });
 });

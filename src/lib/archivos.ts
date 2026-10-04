@@ -51,11 +51,11 @@ export async function exportar(meses: string[]) {
     XLSX.utils.book_append_sheet(wb, ws, hoja);
   }
   const nombre = `gastos-${meses[0]}${meses.length > 1 ? `-a-${meses[meses.length - 1]}` : ""}.xlsx`;
-  const donde = await guardarArchivo(new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombre, { compartir: true, titulo: "Gastos para Finanzas" });
+  const guardado = await guardarArchivo(new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nombre);
   const ahora = new Date().toISOString();
   await db.movimientos.bulkUpdate(movs.map(m => ({ key: m.id, changes: { exportado: ahora } })));
   await guardarAjuste("ultimaExportacion", ahora);
-  return { cantidad: movs.length, donde };
+  return { cantidad: movs.length, guardado };
 }
 
 /* ── Importar desde la app anterior ─────────────────────────────────────── */
@@ -160,8 +160,8 @@ export async function importarXlsx(archivo: File, avance?: (t: string) => void, 
 
 /* ── Copia de seguridad ─────────────────────────────────────────────────── */
 
-/** La copia de seguridad: todo en un .json. `compartir`: además abre "Compartir" (en Android). */
-export async function copiaDeSeguridad(compartir = true) {
+/** La copia de seguridad: todo en un .json. */
+export async function copiaDeSeguridad() {
   // Todo leído en una sola transacción: una foto consistente aunque algo se esté guardando.
   const datos = await db.transaction("r", [db.cuentas, db.categorias, db.movimientos, db.recurrentes, db.descartes, db.ajustes, db.proyecciones], async () => ({
     app: "gastos", version: 1, fecha: new Date().toISOString(),
@@ -173,9 +173,9 @@ export async function copiaDeSeguridad(compartir = true) {
     proyecciones: await db.proyecciones.toArray(),
     ajustes: (await db.ajustes.toArray()).filter(a => a.clave !== "cotizaciones"),
   }));
-  const donde = await guardarArchivo(new Blob([JSON.stringify(datos)], { type: "application/json" }), `gastos-respaldo-${aTexto(new Date())}.json`, { compartir, titulo: "Copia de seguridad de Gastos" });
+  const guardado = await guardarArchivo(new Blob([JSON.stringify(datos)], { type: "application/json" }), `gastos-respaldo-${aTexto(new Date())}.json`);
   await guardarAjuste("ultimoRespaldo", datos.fecha);
-  return donde;
+  return guardado;
 }
 
 export async function restaurar(archivo: File) {

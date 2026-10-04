@@ -24,7 +24,8 @@ import { SubirResumen } from "./pantallas/SubirResumen";
 import { Etiquetas } from "./pantallas/Etiquetas";
 import { ComoVenis } from "./pantallas/ComoVenis";
 import { EditorProyeccion } from "./pantallas/Proyecciones";
-import { ConectarFinanzas, MandarFinanzas } from "./pantallas/Finanzas";
+import { AvisoRespuesta, ConectarFinanzas, MandarFinanzas, RespuestaFinanzas } from "./pantallas/Finanzas";
+import { buscarRespuestas, marcarVisto, type EnvioHecho } from "./lib/finanzas";
 import { T } from "./ui/Icono";
 
 function Encima({ p }: { p: Pantalla }) {
@@ -50,6 +51,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "proyeccion": return <EditorProyeccion {...p} />;
     case "finanzas-conectar": return <ConectarFinanzas />;
     case "finanzas-mandar": return <MandarFinanzas />;
+    case "finanzas-respuesta": return <RespuestaFinanzas nombre={p.nombre} />;
   }
 }
 
@@ -121,10 +123,17 @@ export function App() {
     return () => window.clearTimeout(t);
   }, [d.listo, d.movimientos, d.cuentas, d.descartes]);
 
+  // Respuestas de Finanzas a lo que dejaste en el buzón: se buscan al abrir y al volver.
+  const [respuesta, setRespuesta] = useState<EnvioHecho | null>(null);
+  const traerRespuestas = async () => {
+    const llegaron = (await buscarRespuestas()).filter(e => !e.visto);
+    if (llegaron.length) setRespuesta(llegaron[llegaron.length - 1]);
+  };
+
   // Al abrir y al volver a la app: completar cotizaciones pendientes y cargar
   // los recurrentes automáticos que ya vencieron.
   useEffect(() => {
-    const ponerAlDia = async () => { await sembrar(); await cargarAutomaticos(); await completarPendientes(); };
+    const ponerAlDia = async () => { await sembrar(); await cargarAutomaticos(); await completarPendientes(); traerRespuestas(); };
     ponerAlDia();
     navigator.storage?.persist?.();
     // Si los avisos están activados, se vuelve a registrar la revisión periódica.
@@ -140,6 +149,11 @@ export function App() {
   return (
     <>
       {nueva && <AvisoVersion nueva={nueva} cerrar={() => setNueva(null)} />}
+      {!nueva && respuesta && (
+        <AvisoRespuesta envio={respuesta}
+          abrir={() => { nav.abrir({ p: "finanzas-respuesta", nombre: respuesta.nombre }); setRespuesta(null); }}
+          cerrar={() => { marcarVisto(respuesta.nombre); setRespuesta(null); }} />
+      )}
       {arriba && <div className="app" key={nav.pila.length}><Encima p={arriba} /></div>}
       <div className="app" style={arriba ? { display: "none" } : undefined}>
       {nav.solapa === "resumen" && <Resumen />}

@@ -28,7 +28,8 @@ export type Pantalla =
   | { p: "clases" }
   | { p: "proyeccion"; id?: string; periodo?: string }
   | { p: "finanzas-conectar" }
-  | { p: "finanzas-mandar" };
+  | { p: "finanzas-mandar" }
+  | { p: "finanzas-respuesta"; nombre: string };
 
 type Nav = {
   solapa: Solapa;

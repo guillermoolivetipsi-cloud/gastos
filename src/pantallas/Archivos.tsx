@@ -4,8 +4,8 @@ import { db, leerAjuste } from "../db";
 import { useNav } from "../nav";
 import { copiaDeSeguridad, editadosDespues, exportar, importarXlsx, mesesSinExportar, restaurar, sumarPaquete, type ResultadoImport } from "../lib/archivos";
 import { diaLocal, fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
-import { Seg, useToast } from "../ui/piezas";
-import { esApp } from "../lib/guardar";
+import { Hoja, Seg, useToast } from "../ui/piezas";
+import { abrirArchivo, compartirArchivo, esApp, type Guardado } from "../lib/guardar";
 import { TarjetaMandar } from "./Finanzas";
 import { T } from "../ui/Icono";
 
@@ -21,13 +21,14 @@ export function Exportar() {
   const delMes = useLiveQuery(() => db.movimientos.where("fecha").startsWith(mes).count(), [mes]);
   const elegidos = modo === "nuevo" ? meses ?? [] : [mes];
   const cantidad = modo === "nuevo" ? sinExportar ?? 0 : delMes ?? 0;
+  const [listo, setListo] = useState<{ g: Guardado; cantidad: number } | null>(null);
 
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Exportar a Finanzas</h1></div>
       <TarjetaMandar />
       <div className="titulo-sec"><span>Exportar a Excel</span></div>
-      <div className="mini tenue" style={{ margin: "-4px 2px 8px" }}>El archivo de siempre, por si no hay Wi-Fi.</div>
+      <div className="mini tenue" style={{ margin: "-4px 2px 8px" }}>El archivo de siempre, por si hace falta.</div>
       <div className="dos">
         <div className="caja"><div className="etq">Sin exportar</div><div className="mediano num">{sinExportar ?? "…"}</div></div>
         <div className="caja"><div className="etq">Última vez</div><div className="mediano">{ultima ? fechaCorta(diaLocal(ultima)) : "nunca"}</div></div>
@@ -57,16 +58,18 @@ export function Exportar() {
       )}
       <div className="pie-fijo">
         <button className="btn" disabled={!cantidad} onClick={async () => {
-          const { cantidad: n, donde } = await exportar(elegidos);
-          // Una vez por mes se exporta: se aprovecha para guardar también la copia de
-          // seguridad (en Android queda en Documentos/Gastos, sin abrir "Compartir" otra vez).
-          if (!donde) await new Promise(r => setTimeout(r, 800));
-          await copiaDeSeguridad(!donde);
-          toast({ texto: donde ? `Exportados ${n} movimientos · el Excel y la copia quedaron en Documentos/Gastos` : `Exportados ${n} movimientos · copia de seguridad descargada` });
+          const { cantidad: n, guardado } = await exportar(elegidos);
+          // Una vez por mes se exporta: se aprovecha para guardar también la copia de seguridad.
+          if (!guardado) await new Promise(r => setTimeout(r, 800));
+          await copiaDeSeguridad();
+          if (guardado) setListo({ g: guardado, cantidad: n });
+          else toast({ texto: `Exportados ${n} movimientos · copia de seguridad descargada` });
         }}>
           Exportar a Excel {cantidad ? `(${cantidad} movimientos)` : ""}
         </button>
       </div>
+      <HojaArchivo g={listo?.g ?? null} titulo="Excel listo" detalle={listo ? `${listo.cantidad} movimientos` : ""}
+        nota="Quedó en Documentos/Gastos, junto con la copia de seguridad." conAbrir compartirComo="Gastos para Finanzas" cerrar={() => setListo(null)} />
     </div>
   );
 }
@@ -82,6 +85,7 @@ export function Respaldo() {
   const [sumado, setSumado] = useState<Awaited<ReturnType<typeof sumarPaquete>> | null>(null);
   const [persistente, setPersistente] = useState<boolean | null>(null);
   const [yaEnFinanzas, setYaEnFinanzas] = useState(true);
+  const [copia, setCopia] = useState<Guardado | null>(null);
   useEffect(() => { navigator.storage?.persisted?.().then(setPersistente); }, []);
 
   async function importar(f: File | undefined) {
@@ -114,8 +118,8 @@ export function Respaldo() {
         <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(diaLocal(ultimo)) : "nunca"} · se {esApp() ? "guarda en Documentos/Gastos" : "baja sola"} cada vez que exportás a Finanzas.</div>
         {persistente === false && !esApp() && <div className="mini ambar" style={{ marginTop: 4 }}>Instalá la app en la pantalla de inicio para que Android no borre los datos si le falta espacio.</div>}
         <div className="botones"><button className="btn1" onClick={async () => {
-          const donde = await copiaDeSeguridad();
-          if (donde) toast({ texto: `Copia guardada en ${donde}` });
+          const g = await copiaDeSeguridad();
+          if (g) setCopia(g);
         }}>Hacer copia ahora</button></div>
         {/* Sin filtro de tipo: Android a veces no reconoce el .json que llega por
             WhatsApp o Drive y lo muestra deshabilitado. El contenido se valida al leerlo. */}
@@ -155,7 +159,35 @@ export function Respaldo() {
         )}
         {error && <div className="mal chico" style={{ marginTop: 8 }}>{error}</div>}
       </div>
+      <HojaArchivo g={copia} titulo="Copia lista" detalle="Copia de seguridad de Gastos"
+        nota="Quedó en Documentos/Gastos. Guardala también fuera del celular: Drive o mail." compartirComo="Copia de seguridad de Gastos" cerrar={() => setCopia(null)} />
     </div>
   );
 }
 
+/** Después de guardar un archivo en la app: abrirlo o compartirlo. */
+function HojaArchivo({ g, titulo, detalle, nota, conAbrir, compartirComo, cerrar }: { g: Guardado | null; titulo: string; detalle: string; nota: string; conAbrir?: boolean; compartirComo: string; cerrar: () => void }) {
+  const toast = useToast();
+  return (
+    <Hoja abierta={!!g} cerrar={cerrar}>
+      {g && (
+        <>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 4 }}>
+            <span style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ok-fondo)", color: "var(--ok)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {conAbrir ? <T.IconFileSpreadsheet size={20} /> : <T.IconShieldCheck size={20} />}
+            </span>
+            <div><div style={{ fontSize: 16 }}>{titulo}</div><div className="mini tenue">{g.nombre} · {detalle}</div></div>
+          </div>
+          <div className="mini tenue" style={{ margin: "8px 0 14px" }}>{nota}</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {conAbrir && <button className="btn2" style={{ flex: 1, display: "flex", gap: 6, alignItems: "center", justifyContent: "center" }}
+              onClick={() => abrirArchivo(g).catch(() => toast({ texto: "No hay ninguna app para abrir planillas. Compartilo." }))}><T.IconExternalLink size={16} /> Abrir</button>}
+            <button className="btn1" style={{ flex: 1, display: "flex", gap: 6, alignItems: "center", justifyContent: "center" }}
+              onClick={() => compartirArchivo(g, compartirComo)}><T.IconShare size={16} /> Compartir</button>
+          </div>
+          <button className="tenue chico" style={{ width: "100%", marginTop: 14, padding: 6 }} onClick={cerrar}>Listo</button>
+        </>
+      )}
+    </Hoja>
+  );
+}
