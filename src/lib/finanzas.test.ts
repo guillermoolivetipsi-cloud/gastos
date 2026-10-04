@@ -26,8 +26,8 @@ it("manda los meses completos, en su moneda, con el id de la app; sin cobros de 
   expect(JSON.stringify(e)).not.toContain("33.1"); // nunca en dólares convertidos
 });
 
-it("los meses: el anterior y el que corre", () => {
-  expect(mesesAMandar("2026-01")).toEqual(["2025-12", "2026-01"]);
+it("los meses: los últimos 6, el que corre incluido", () => {
+  expect(mesesAMandar("2026-03")).toEqual(["2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03"]);
 });
 
 it("el nombre del archivo del envío", () => {
@@ -40,4 +40,14 @@ it("lee la respuesta de Finanzas", () => {
   expect(interpretar(resp)).toEqual({ tipo: "listo", nuevos: 24, corregidos: 3, iguales: 58, porMes: resp.porMes, avisos: [resp.avisos[0]] });
   expect(interpretar({ ok: false, mensaje: "un id repetido", avisos: [{ nivel: "error", texto: "el id a está repetido" }] })).toEqual({ tipo: "rechazado", mensaje: "el id a está repetido" });
   expect(interpretar({ ok: false, mensaje: "contrato desconocido" })).toEqual({ tipo: "rechazado", mensaje: "contrato desconocido" });
+});
+
+it("cada movimiento lleva con qué se pagó; las tarjetas se llaman Visa y Mastercard", () => {
+  const ctas = [...cuentas, { id: "mc", nombre: "Mastercard", moneda: "ARS", dolar: "oficial", esTarjeta: true, orden: 2 } as Cuenta];
+  const movs = [mov({ cuentaId: "rev" }), mov({ cuentaId: "visa" }), mov({ cuentaId: "mc" }), mov({ cuentaId: "borrada" })];
+  const e = armarEnvio(["2026-09"], movs, cats, ctas);
+  expect(e.movimientos.map(m => m.cuenta)).toEqual(["Revolut", "Visa", "Mastercard", undefined]);
+  // Sin cuenta conocida no se inventa: el campo no viaja.
+  expect(JSON.parse(JSON.stringify(e.movimientos[3]))).not.toHaveProperty("cuenta");
+  expect(e.contrato).toBe("1.0");
 });

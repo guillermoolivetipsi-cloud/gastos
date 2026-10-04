@@ -16,6 +16,8 @@ const OK = caja("--ok-fondo", "rgba(93,211,158,.35)"), MAL = caja("--mal-fondo",
 
 const mes = (p: string) => nombreMes(p, false);
 const cuando = (iso: string) => `${fechaCorta(diaLocal(iso))} a las ${new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+/** ["2026-05", …, "2026-10"] → "de mayo a octubre" */
+const deA = (ms: string[]) => ms.length === 1 ? mes(ms[0]) : `de ${mes(ms[0])} a ${mes(ms[ms.length - 1])}`;
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 export const resumenDe = (r: Resultado) => r.tipo === "listo"
   ? `${plural(r.nuevos, "nuevo", "nuevos")} · ${plural(r.corregidos, "corregido", "corregidos")} · ${r.iguales} ya estaban`
@@ -27,11 +29,11 @@ export function TarjetaMandar() {
   const token = useLiveQuery(leerToken, []);
   const envios = useLiveQuery(leerEnvios, []);
   const ultimo = envios?.[envios.length - 1];
-  const [anterior, actual] = mesesAMandar();
+  const meses = mesesAMandar();
   return (
     <div className="caja">
       <div style={{ fontSize: 17, fontWeight: 500 }}>Mandar a Finanzas</div>
-      <div className="chico tenue">{mes(actual)[0].toUpperCase() + mes(actual).slice(1)} y {mes(anterior)}, lo que falta mandar.</div>
+      <div className="chico tenue">Los últimos {meses.length} meses, {deA(meses)}, completos.</div>
       <button className="btn" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
         onClick={() => nav.abrir({ p: token ? "finanzas-mandar" : "finanzas-conectar" })}>
         <T.IconArrowRight size={18} /> Mandar
@@ -121,7 +123,7 @@ export function MandarFinanzas() {
           <div style={OK}>
             <span style={{ fontSize: 16, fontWeight: 500 }}>Quedó en el buzón</span>
             <span className="num" style={{ fontSize: 30, fontWeight: 200 }}>{plural(res.envio.cantidad, "movimiento", "movimientos")}</span>
-            <span className="chico tenue">{res.envio.meses.map(mes).join(" y ")}, completos.</span>
+            <span className="chico tenue">{deA(res.envio.meses)[0].toUpperCase() + deA(res.envio.meses).slice(1)}, completos.</span>
           </div>
           <div className="caja chico tenue">Finanzas lo levanta a las 9:30 y a las 21:30, o cuando tocás «Traer lo del celular». Cuando conteste, te muestro qué entró la próxima vez que abras la app.</div>
           <button className="btn2" style={{ width: "100%" }} onClick={nav.volver}>Listo</button>

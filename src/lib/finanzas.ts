@@ -9,7 +9,9 @@ import { periodoDe, periodoHoy, sumarMeses } from "./fecha";
    negocia: los importes van en su moneda (nunca en dólares), el id es el de la base de
    la app y no cambia, y los meses van completos.
 
-   Por ahora: el mes en curso y el anterior. Sin borrados, sin recurrentes. */
+   Cada envío: los últimos 6 meses, completos. `cuenta` va siempre que el movimiento
+   tenga cuenta: es el medio de pago, y las tarjetas se llaman "Visa" y "Mastercard"
+   (Finanzas las reconoce por el nombre). Sin borrados, sin recurrentes. */
 
 export const CONTRATO = "1.0";
 export const REPO = "guillermoolivetipsi-cloud/gastos-buzon";
@@ -46,8 +48,10 @@ export interface EnvioHecho {
 /** Cómo salió dejarlo en el buzón. */
 export type Subida = { tipo: "dejado"; envio: EnvioHecho } | { tipo: "token" } | { tipo: "sin-respuesta" };
 
-/** Los dos meses que se mandan: el anterior y el que corre. */
-export const mesesAMandar = (hoy = periodoHoy()) => [sumarMeses(hoy, -1), hoy];
+/** Los meses que se mandan, completos: los últimos 6, el que corre incluido. Así cada
+ *  envío también corrige lo de meses anteriores (por el id: no duplica). */
+export const MESES = 6;
+export const mesesAMandar = (hoy = periodoHoy()) => Array.from({ length: MESES }, (_, i) => sumarMeses(hoy, i - MESES + 1));
 
 /** "2026-09-29T12:40:05.123Z" → "2026-09-29T12-40-05Z.json" */
 export const nombreDeEnvio = (d: Date) => `${d.toISOString().slice(0, 19).replace(/:/g, "-")}Z.json`;
@@ -132,7 +136,7 @@ export async function mandar(token: string): Promise<Subida> {
   try {
     const r = await fetch(`${API}/contents/envios/${nombre}`, {
       method: "PUT", headers: { ...cabeceras(token), "Content-Type": "application/json" },
-      body: JSON.stringify({ message: `Envío del celular: ${envio.movimientos.length} movimientos (${meses.join(", ")})`, content: aBase64(JSON.stringify(envio, null, 1)) }),
+      body: JSON.stringify({ message: `Envío del celular: ${envio.movimientos.length} movimientos (${meses[0]} a ${meses[meses.length - 1]})`, content: aBase64(JSON.stringify(envio, null, 1)) }),
     });
     if (r.status === 401 || r.status === 403 || r.status === 404) return { tipo: "token" };
     if (!r.ok) return { tipo: "sin-respuesta" };
