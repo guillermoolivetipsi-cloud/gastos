@@ -5,7 +5,6 @@ import { useNav } from "../nav";
 import { RECORDATORIOS, type Recordatorios } from "../lib/recordatorios";
 import { activar, estado, probar, registrar, type Estado } from "../lib/notificaciones";
 import { esApp } from "../lib/guardar";
-import { Actualizaciones } from "./Actualizaciones";
 import { Interruptor } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -84,7 +83,6 @@ export function Ajustes() {
           </div>
         )}
       </div>
-      {esApp() && <Actualizaciones />}
     </div>
   );
 }

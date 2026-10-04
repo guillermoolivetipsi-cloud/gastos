@@ -2,8 +2,20 @@ import type { ReactNode } from "react";
 import { usePendientes } from "../datos";
 import { useNav, type Pantalla } from "../nav";
 import { T } from "../ui/Icono";
+import { esApp } from "../lib/guardar";
+import { ItemActualizar, useActualizacion } from "./Actualizaciones";
 
 export function Mas() {
+  return esApp() ? <MasConVersion /> : <Menu />;
+}
+
+/** En la app: además, actualizar (se fija al entrar a Más). */
+function MasConVersion() {
+  const a = useActualizacion();
+  return <Menu arriba={a.nueva ? <ItemActualizar a={a} /> : null} abajo={a.nueva ? null : <ItemActualizar a={a} />} />;
+}
+
+function Menu({ arriba, abajo }: { arriba?: ReactNode; abajo?: ReactNode }) {
   const nav = useNav();
   const revisar = usePendientes()?.total ?? 0;
   const item = (p: Pantalla, icono: ReactNode, texto: string, extra?: ReactNode) => (
@@ -15,6 +27,7 @@ export function Mas() {
   return (
     <div className="pantalla">
       <div className="enc"><h1>Más</h1></div>
+      {arriba && <div className="caja lista">{arriba}</div>}
       <div className="caja lista">
         {item({ p: "revisar" }, <T.IconInbox size={20} />, "Para revisar", revisar ? <span className="badge">{revisar}</span> : undefined)}
       </div>
@@ -32,6 +45,7 @@ export function Mas() {
       </div>
       <div className="caja lista">
         {item({ p: "ajustes" }, <T.IconSettings size={20} />, "Ajustes")}
+        {abajo}
       </div>
       <div className="mini tenue centro" style={{ marginTop: 20 }}>Los totales se muestran en USD. Tus datos quedan solo en este celular.</div>
     </div>
