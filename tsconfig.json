@@ -15,15 +15,11 @@
     "skipLibCheck": true,
     "noEmit": true,
     "types": [
-      "vite/client",
-      "vite-plugin-pwa/client"
+      "vite/client"
     ]
   },
   "include": [
     "src",
     "vite.config.ts"
-  ],
-  "exclude": [
-    "src/sw.ts"
   ]
 }

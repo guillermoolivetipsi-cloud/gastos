@@ -54,8 +54,8 @@ describe("importar", () => {
   });
 });
 
-describe("pasar los datos de la PWA a la app", () => {
-  it("la copia de la PWA restaurada en una app recién instalada deja todo igual, sin duplicar cuentas ni categorías", async () => {
+describe("restaurar una copia", () => {
+  it("una copia restaurada en una app recién instalada deja todo igual, sin duplicar cuentas ni categorías", async () => {
     const { copiaDeSeguridad, restaurar } = await import("./archivos");
     const cta = (await db.cuentas.toArray())[0], cat = (await db.categorias.toArray())[0];
     await db.recurrentes.put({ id: "r", nombre: "Luz", tipo: "gasto", categoriaId: cat.id, cuentaId: cta.id, monto: 10, moneda: "ARS", clase: "variable", frecuencia: "mensual", dia: 9, inicio: "2026-09-01", modo: "avisar", activo: true });

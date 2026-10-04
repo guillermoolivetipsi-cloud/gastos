@@ -76,14 +76,8 @@ export function App() {
     if (accion === "exportar") n.abrir({ p: "exportar" });
   };
 
-  // Accesos directos del ícono: en la PWA llegan como ?accion=gasto | resumen; en la
-  // app de Android, como gastos://gasto | gastos://resumen.
+  // Accesos directos del ícono (gastos://gasto | gastos://resumen) y tocar un aviso.
   useEffect(() => {
-    const accion = new URLSearchParams(location.search).get("accion");
-    if (accion) {
-      history.replaceState(null, "", location.pathname);
-      abrirAccion(accion);
-    }
     if (!Capacitor.isNativePlatform()) return;
     const desdeUrl = (url?: string) => { const m = url?.match(/^gastos:\/\/(\w+)/); if (m) abrirAccion(m[1]); };
     CapApp.getLaunchUrl().then(u => desdeUrl(u?.url));
@@ -135,8 +129,7 @@ export function App() {
   useEffect(() => {
     const ponerAlDia = async () => { await sembrar(); await cargarAutomaticos(); await completarPendientes(); traerRespuestas(); };
     ponerAlDia();
-    navigator.storage?.persist?.();
-    // Si los avisos están activados, se vuelve a registrar la revisión periódica.
+    // Si los avisos están activados, se reprograman.
     leerAjuste<boolean>("notificaciones", false).then(on => { if (on) registrar(); });
     const alVolver = () => document.visibilityState === "visible" && ponerAlDia();
     document.addEventListener("visibilitychange", alVolver);
@@ -148,15 +141,6 @@ export function App() {
   const arriba = nav.pila[nav.pila.length - 1];
   return (
     <>
-      {/* La PWA quedó vieja: que se note, para no confundirla con la app de Android. */}
-      {!Capacitor.isNativePlatform() && (
-        <div style={{ maxWidth: 520, margin: "0 auto", padding: "calc(var(--arriba) + 10px) 16px 0" }}>
-          <div style={{ background: "var(--mal-fondo)", border: "1px solid rgba(240,138,138,.4)", borderRadius: 12, padding: "10px 12px" }}>
-            <div style={{ fontWeight: 500 }}>Esta es la versión vieja (web)</div>
-            <div className="chico tenue" style={{ marginTop: 2 }}>Ya no se actualiza. Usá la app nueva y borrá esta: mantené apretado el ícono → Desinstalar.</div>
-          </div>
-        </div>
-      )}
       {nueva && <AvisoVersion nueva={nueva} cerrar={() => setNueva(null)} />}
       {!nueva && respuesta && (
         <AvisoRespuesta envio={respuesta}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, leerAjuste } from "../db";
 import { useNav } from "../nav";
@@ -83,10 +83,8 @@ export function Respaldo() {
   const [error, setError] = useState<string | null>(null);
   const [errorCopia, setErrorCopia] = useState<string | null>(null);
   const [sumado, setSumado] = useState<Awaited<ReturnType<typeof sumarPaquete>> | null>(null);
-  const [persistente, setPersistente] = useState<boolean | null>(null);
   const [yaEnFinanzas, setYaEnFinanzas] = useState(true);
   const [copia, setCopia] = useState<Guardado | null>(null);
-  useEffect(() => { navigator.storage?.persisted?.().then(setPersistente); }, []);
 
   async function importar(f: File | undefined) {
     if (!f) return;
@@ -116,7 +114,6 @@ export function Respaldo() {
       <div className="caja">
         <div className="chico">Tus datos viven solo en este celular. La copia es un archivo: guardalo en Drive o mandátelo por mail.</div>
         <div className="mini tenue" style={{ marginTop: 4 }}>Última: {ultimo ? fechaCorta(diaLocal(ultimo)) : "nunca"} · se {esApp() ? "guarda en Documentos/Gastos" : "baja sola"} cada vez que exportás a Finanzas.</div>
-        {persistente === false && !esApp() && <div className="mini ambar" style={{ marginTop: 4 }}>Instalá la app en la pantalla de inicio para que Android no borre los datos si le falta espacio.</div>}
         <div className="botones"><button className="btn1" onClick={async () => {
           const g = await copiaDeSeguridad();
           if (g) setCopia(g);

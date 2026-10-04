@@ -4,7 +4,6 @@ import { guardarAjuste, leerAjuste } from "../db";
 import { useNav } from "../nav";
 import { RECORDATORIOS, type Recordatorios } from "../lib/recordatorios";
 import { activar, estado, probar, registrar, type Estado } from "../lib/notificaciones";
-import { esApp } from "../lib/guardar";
 import { Interruptor } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -33,15 +32,12 @@ export function Ajustes() {
       <div className="titulo-sec"><span>Notificaciones</span></div>
       <div className="caja">
         <div className="fila" style={{ padding: 0 }}><span>Avisarme lo pendiente</span><Interruptor on={!!avisos} cambiar={cambiarAvisos} /></div>
-        <div className="mini tenue" style={{ marginTop: 6 }}>{esApp()
-          ? "Te aviso a la hora que elijas abajo. Los avisos se preparan para los próximos 14 días cada vez que abrís la app: si no la abrís en dos semanas, dejan de llegar."
-          : "Android despierta la app más o menos una vez al día y, si hay algo pendiente, te avisa. No es a una hora exacta: el aviso diario puede llegar más tarde o saltearse un día."}</div>
+        <div className="mini tenue" style={{ marginTop: 6 }}>Te aviso a la hora que elijas abajo. Los avisos se preparan para los próximos 14 días cada vez que abrís la app: si no la abrís en dos semanas, dejan de llegar.</div>
         {avisos && est && (
           <div className="chico" style={{ marginTop: 8 }}>
             {est.permiso === "denied" && <div className="mal">Las notificaciones están bloqueadas. Activalas en Ajustes de Android → Apps → Gastos → Notificaciones.</div>}
-            {est.permiso === "granted" && !est.soportado && <div className="ambar">Este navegador no despierta la app en segundo plano. Instalala desde Chrome para recibir los avisos.</div>}
-            {est.permiso === "granted" && est.soportado && !est.sincroniza && <div className="ambar">Android todavía no habilitó la revisión en segundo plano. Suele activarse después de usar la app unos días.</div>}
-            {est.permiso === "granted" && est.sincroniza && <div className="ok">Activadas.</div>}
+            {!est.soportado && <div className="ambar">En el navegador no hay avisos: solo en la app de Android.</div>}
+            {est.permiso === "granted" && <div className="ok">Activadas.</div>}
             {est.permiso === "default" && <button className="btn1" style={{ marginTop: 6 }} onClick={async () => setEst(await activar())}>Dar permiso</button>}
             {est.permiso === "granted" && <button className="btn2" style={{ marginTop: 8, width: "100%" }} onClick={probar}>Probar un aviso</button>}
           </div>

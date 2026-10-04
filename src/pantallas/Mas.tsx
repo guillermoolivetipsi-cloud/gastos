@@ -16,7 +16,7 @@ function MasConVersion() {
     pie={<>Gastos <b style={{ fontWeight: 500 }}>{a.version ?? ""}</b> · app de Android</>} />;
 }
 
-function Menu({ arriba, abajo, pie = "Gastos · versión web vieja" }: { arriba?: ReactNode; abajo?: ReactNode; pie?: ReactNode }) {
+function Menu({ arriba, abajo, pie = "Gastos · prueba en el navegador" }: { arriba?: ReactNode; abajo?: ReactNode; pie?: ReactNode }) {
   const nav = useNav();
   const revisar = usePendientes()?.total ?? 0;
   const item = (p: Pantalla, icono: ReactNode, texto: string, extra?: ReactNode) => (
