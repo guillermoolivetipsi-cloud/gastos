@@ -37,31 +37,6 @@ export function claseProvisoria(cats: Categoria[], movs: Movimiento[]) {
   return (c: Categoria | undefined): Clase => (c ? map.get(c.id) : undefined) ?? "variable";
 }
 
-/** Qué tan avanzado está el mes: 1 = terminado. Para la marca de "dónde deberías ir hoy". */
-export function avanceDelMes(periodo: string) {
-  const ph = periodoHoy();
-  if (periodo < ph) return 1;
-  if (periodo > ph) return 0;
-  return Number(hoy().slice(8)) / diasDelMes(periodo);
-}
-
-/** Cuánto de una categoría tendrías que llevar gastado hoy (USD), para la marca blanca:
- *  lo que tiene fecha (sus recurrentes de gasto del mes) cuenta entero desde que vence,
- *  y el resto del objetivo se reparte parejo en el mes. */
-export function esperadoHoy(categoriaId: string, objetivo: number, avance: number, insts: EstadoInstancia[], tasa: (r: Recurrente) => number | null, dia = hoy()) {
-  let conFecha = 0, vencido = 0;
-  for (const i of insts) {
-    if (i.rec.tipo !== "gasto" || i.rec.categoriaId !== categoriaId) continue;
-    const t = tasa(i.rec);
-    if (!t) continue;
-    const usd = (i.estado === "cargado" ? i.pagado : i.esperado) / t;
-    conFecha += usd;
-    // Vencido: entero. Antes de su fecha: lo que ya pagaste (si lo adelantaste).
-    vencido += i.estado === "cargado" || i.fecha <= dia ? usd : Math.min(i.pagado / t, usd);
-  }
-  return redondear(vencido + Math.max(0, objetivo - conFecha) * avance);
-}
-
 export interface Bloques {
   fijos: { total: number; pagado: number; falta: number };
   variables: { gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };

@@ -4,7 +4,7 @@ import { useDatos, usePendientes } from "../datos";
 import { db } from "../db";
 import { useNav } from "../nav";
 import type { Categoria, Movimiento, Tipo } from "../tipos";
-import { avanceDelMes, bloques, claseProvisoria, esperadoHoy, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
+import { bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { enUsdDe } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
@@ -15,6 +15,8 @@ import { PorTiempo } from "../ui/Graficos";
 import { useInsights } from "./ComoVenis";
 import { T } from "../ui/Icono";
 
+/** La marca de las barras con objetivo: avisa que ya vas por el 80%. */
+const ALERTA = 0.8;
 const VISTAS: [Vista, string][] = [["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"], ["anio", "Año"], ["periodo", "Período"]];
 
 export function Resumen() {
@@ -39,7 +41,6 @@ export function Resumen() {
   const total = suma(movs);
   const esMes = vista === "mes";
   const periodo = periodoDe(desde);
-  const avance = esMes ? avanceDelMes(periodo) : undefined;
 
   const tasa = d.tasaRec;
   const instancias = esMes ? recurrentesDelMes(d.recurrentes, d.movimientos, periodo, tasa) : [];
@@ -123,7 +124,7 @@ export function Resumen() {
           <div className="caja">
             <span className="etiq e-variable">Variables</span>
             <div className="mediano num" style={{ marginTop: 6 }}>{num(b.variables.gastado)}{b.variables.objetivo > 0 && <span className="tenue chico"> / {num(b.variables.objetivo)}</span>}</div>
-            {b.variables.objetivo > 0 && <Barra valor={b.variables.gastado / b.variables.objetivo} color={b.variables.queda < 0 ? "var(--mal)" : "var(--ambar)"} marca={avance} />}
+            {b.variables.objetivo > 0 && <Barra valor={b.variables.gastado / b.variables.objetivo} color={b.variables.queda < 0 ? "var(--mal)" : b.variables.gastado >= b.variables.objetivo * ALERTA ? "var(--ambar)" : "var(--viol)"} marca={ALERTA} />}
             <div className="mini tenue">
               {b.variables.porDia != null ? <><span className="viol">{num(b.variables.porDia)} USD</span> por día</> : b.variables.objetivo > 0 ? (b.variables.queda >= 0 ? `sobraron ${num(b.variables.queda)}` : `te pasaste ${num(-b.variables.queda)}`) : "sin objetivos"}
             </div>
@@ -164,9 +165,8 @@ export function Resumen() {
             const proy = verProy ? proyPorCat.get(c.cat.id) : undefined;
             const obj = esMes && c.cat.objetivo ? c.cat.objetivo : null;
             const pasado = obj != null && c.total > obj;
-            // Lo esperado a hoy, propio de la categoría (solo en el mes en curso).
-            const esperado = obj != null && avance != null && avance > 0 && avance < 1 ? esperadoHoy(c.cat.id, obj, avance, instancias, tasa) : null;
-            const ritmo = esperado != null && c.total > esperado * 1.05 && !pasado;
+            // Cerca del objetivo: pasó la marca del 80%.
+            const ritmo = obj != null && c.total >= obj * ALERTA && !pasado;
             const ranking = obj == null && grafico === "dia";
             return (
               <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
@@ -181,15 +181,15 @@ export function Resumen() {
                     {obj != null && <span className="tenue chico"> / {num(obj)}</span>}
                   </span>
                 </div>
-                {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} marca={esperado != null ? Math.min(esperado / obj, 0.995) : undefined} /></div>}
+                {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} marca={ALERTA} /></div>}
                 {ranking && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / cats[0].total} color={c.cat.color} /></div>}
               </button>
             );
           })}
         </div>
       )}
-      {esMes && avance != null && avance < 1 && cats.some(c => c.cat.objetivo) && (
-        <div className="mini tenue centro">La marca blanca es donde deberías ir hoy</div>
+      {esMes && cats.some(c => c.cat.objetivo) && (
+        <div className="mini tenue centro">La marca es el 80% del objetivo</div>
       )}
 
 
