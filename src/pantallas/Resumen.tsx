@@ -109,6 +109,9 @@ export function Resumen() {
         </button>
       )}
 
+      {/* "Cómo venís" arriba de todo en el mes, antes de los números. */}
+      {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
+
       {b && (
         <div className="dos">
           <div className="caja">
@@ -189,7 +192,6 @@ export function Resumen() {
         <div className="mini tenue centro">La marca blanca es donde deberías ir hoy</div>
       )}
 
-      {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
 
       </>}
 
@@ -242,7 +244,7 @@ function TarjetaComoVenis({ periodo }: { periodo: string }) {
   ].filter(Boolean);
   if (!partes.length) return null;
   return (
-    <button className="caja" style={{ width: "100%", textAlign: "left", borderColor: "#3A2F5C", marginTop: 10 }} onClick={() => nav.abrir({ p: "como-venis", periodo })}>
+    <button className="caja" style={{ width: "100%", textAlign: "left", borderColor: "#3A2F5C" }} onClick={() => nav.abrir({ p: "como-venis", periodo })}>
       <div className="fila" style={{ padding: 0 }}><span className="viol">✦ Cómo venís en {nombreMes(periodo, false)}</span><T.IconChevronRight size={16} className="tenue" /></div>
       <div className="mini tenue" style={{ marginTop: 4, lineHeight: 1.5 }}>{partes.join(" · ")}</div>
     </button>

@@ -56,7 +56,8 @@ export function esperadoHoy(categoriaId: string, objetivo: number, avance: numbe
     if (!t) continue;
     const usd = (i.estado === "cargado" ? i.pagado : i.esperado) / t;
     conFecha += usd;
-    if (i.estado === "cargado" || i.fecha <= dia) vencido += usd;
+    // Vencido: entero. Antes de su fecha: lo que ya pagaste (si lo adelantaste).
+    vencido += i.estado === "cargado" || i.fecha <= dia ? usd : Math.min(i.pagado / t, usd);
   }
   return redondear(vencido + Math.max(0, objetivo - conFecha) * avance);
 }

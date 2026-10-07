@@ -214,3 +214,13 @@ it("la marca de cada categoría: lo que tiene fecha cuenta entero al vencer, el 
   // Con la luz vencida también.
   expect(esperadoHoy("casa", 1400, 0.7, insts, () => 1, "2026-10-21")).toBe(1160);
 });
+
+it("la marca: un recurrente pagado antes de su fecha cuenta lo pagado", async () => {
+  const { esperadoHoy } = await import("./analisis");
+  const { estadoDe, instanciasDelMes } = await import("./recurrentes");
+  const alq: Recurrente = { id: "alq", nombre: "Alquiler", tipo: "gasto", categoriaId: "casa", cuentaId: "rev", monto: 500, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 24, inicio: "2026-01-01", modo: "avisar", activo: true };
+  const pago = { id: "p", tipo: "gasto", fecha: "2026-10-02", monto: 200, moneda: "USD", usd: 200, cuentaId: "rev", categoriaId: "casa", etiquetas: [], creado: "", modificado: "", recurrenteId: "alq", periodo: "2026-10" } as Movimiento;
+  const parcial = [estadoDe(instanciasDelMes(alq, "2026-10")[0], [pago], 1)];
+  // 200 pagados + (1.000 − 500) × 0,2 = 300
+  expect(esperadoHoy("casa", 1000, 0.2, parcial, () => 1, "2026-10-07")).toBe(300);
+});
