@@ -45,6 +45,22 @@ export function avanceDelMes(periodo: string) {
   return Number(hoy().slice(8)) / diasDelMes(periodo);
 }
 
+/** Cuánto de una categoría tendrías que llevar gastado hoy (USD), para la marca blanca:
+ *  lo que tiene fecha (sus recurrentes de gasto del mes) cuenta entero desde que vence,
+ *  y el resto del objetivo se reparte parejo en el mes. */
+export function esperadoHoy(categoriaId: string, objetivo: number, avance: number, insts: EstadoInstancia[], tasa: (r: Recurrente) => number | null, dia = hoy()) {
+  let conFecha = 0, vencido = 0;
+  for (const i of insts) {
+    if (i.rec.tipo !== "gasto" || i.rec.categoriaId !== categoriaId) continue;
+    const t = tasa(i.rec);
+    if (!t) continue;
+    const usd = (i.estado === "cargado" ? i.pagado : i.esperado) / t;
+    conFecha += usd;
+    if (i.estado === "cargado" || i.fecha <= dia) vencido += usd;
+  }
+  return redondear(vencido + Math.max(0, objetivo - conFecha) * avance);
+}
+
 export interface Bloques {
   fijos: { total: number; pagado: number; falta: number };
   variables: { gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };

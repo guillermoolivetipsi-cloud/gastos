@@ -199,3 +199,18 @@ it("recurrentes por mes en USD: fijo, variable con estimado, semanal y anual", a
   expect(mensualEnUsd(exp, pagos, 1500)).toBe(110);
   expect(mensualEnUsd({ ...base, frecuencia: "una-vez" }, [], 1)).toBeNull();
 });
+
+it("la marca de cada categoría: lo que tiene fecha cuenta entero al vencer, el resto parejo", async () => {
+  const { esperadoHoy } = await import("./analisis");
+  const { estadoDe, instanciasDelMes } = await import("./recurrentes");
+  const base: Recurrente = { id: "alq", nombre: "Alquiler", tipo: "gasto", categoriaId: "casa", cuentaId: "rev", monto: 500, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 5, inicio: "2026-01-01", modo: "avisar", activo: true };
+  const luz: Recurrente = { ...base, id: "luz", nombre: "Luz", monto: 100, dia: 20 };
+  const insts = [base, luz].map(r => estadoDe(instanciasDelMes(r, "2026-10")[0], [], 1));
+  // 7 de octubre (avance 0,25 para simplificar): el alquiler ya venció, la luz no.
+  // 500 + (1.400 − 600) × 0,25 = 700
+  expect(esperadoHoy("casa", 1400, 0.25, insts, () => 1, "2026-10-07")).toBe(700);
+  // Sin recurrentes: parejo.
+  expect(esperadoHoy("ocio", 400, 0.25, insts, () => 1, "2026-10-07")).toBe(100);
+  // Con la luz vencida también.
+  expect(esperadoHoy("casa", 1400, 0.7, insts, () => 1, "2026-10-21")).toBe(1160);
+});

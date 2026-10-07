@@ -4,7 +4,7 @@ import { useDatos, usePendientes } from "../datos";
 import { db } from "../db";
 import { useNav } from "../nav";
 import type { Categoria, Movimiento, Tipo } from "../tipos";
-import { avanceDelMes, bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
+import { avanceDelMes, bloques, claseProvisoria, esperadoHoy, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { enUsdDe } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
@@ -161,7 +161,9 @@ export function Resumen() {
             const proy = verProy ? proyPorCat.get(c.cat.id) : undefined;
             const obj = esMes && c.cat.objetivo ? c.cat.objetivo : null;
             const pasado = obj != null && c.total > obj;
-            const ritmo = obj != null && avance != null && c.total > obj * avance * 1.05 && !pasado;
+            // Lo esperado a hoy, propio de la categoría (solo en el mes en curso).
+            const esperado = obj != null && avance != null && avance > 0 && avance < 1 ? esperadoHoy(c.cat.id, obj, avance, instancias, tasa) : null;
+            const ritmo = esperado != null && c.total > esperado * 1.05 && !pasado;
             const ranking = obj == null && grafico === "dia";
             return (
               <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
@@ -176,7 +178,7 @@ export function Resumen() {
                     {obj != null && <span className="tenue chico"> / {num(obj)}</span>}
                   </span>
                 </div>
-                {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} marca={avance} /></div>}
+                {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} marca={esperado != null ? Math.min(esperado / obj, 0.995) : undefined} /></div>}
                 {ranking && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / cats[0].total} color={c.cat.color} /></div>}
               </button>
             );
