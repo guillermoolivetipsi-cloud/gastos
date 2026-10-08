@@ -31,6 +31,38 @@ db.version(3).stores({}).upgrade(tx => tx.table("proyecciones").toCollection().m
   p.tipo ??= "gasto";
 }));
 
+// v4: las cuentas que tenés en Finanzas y faltaban (para "Entró en" de los ingresos) y
+// las categorías de ingreso Ventas, Licencias y Alquiler. Se buscan por nombre: si ya
+// estaban no se tocan, y si estaban archivadas vuelven.
+export const CUENTAS_DE_FINANZAS: Omit<Cuenta, "id" | "orden">[] = [
+  { nombre: "Nexo", moneda: "USD", dolar: "blue", esTarjeta: false },
+  { nombre: "Invertir Online", moneda: "ARS", dolar: "blue", esTarjeta: false },
+  { nombre: "Cocos", moneda: "ARS", dolar: "blue", esTarjeta: false },
+  { nombre: "ARQ", moneda: "USD", dolar: "blue", esTarjeta: false },
+];
+export const INGRESOS_NUEVOS: [string[], string, string, string][] = [
+  [["Ventas", "Venta"], "Ventas", "store", "#2F9E6B"],
+  [["Licencias", "Licencia"], "Licencias", "certificate", "#3AA8E0"],
+  [["Alquiler"], "Alquiler", "home-dollar", "#1F8A70"],
+];
+db.version(4).stores({}).upgrade(async tx => {
+  const cuentas = tx.table<Cuenta, string>("cuentas"), categorias = tx.table<Categoria, string>("categorias");
+  const cs = await cuentas.toArray();
+  let orden = Math.max(-1, ...cs.map(c => c.orden)) + 1;
+  for (const c of CUENTAS_DE_FINANZAS) {
+    const ya = cs.find(x => x.nombre.toLowerCase() === c.nombre.toLowerCase());
+    if (!ya) await cuentas.add({ ...c, id: crypto.randomUUID(), orden: orden++ });
+    else if (ya.archivada) await cuentas.update(ya.id, { archivada: false });
+  }
+  const cats = await categorias.toArray();
+  let ordenCat = Math.max(-1, ...cats.map(c => c.orden)) + 1;
+  for (const [nombres, nombre, icono, color] of INGRESOS_NUEVOS) {
+    const ya = cats.find(c => c.tipo === "ingreso" && nombres.some(n => n.toLowerCase() === c.nombre.toLowerCase()));
+    if (!ya) await categorias.add({ id: crypto.randomUUID(), nombre, tipo: "ingreso", icono, color, orden: ordenCat++ });
+    else if (ya.archivada) await categorias.update(ya.id, { archivada: false });
+  }
+});
+
 export const nuevoId = () => crypto.randomUUID();
 
 export async function leerAjuste<T>(clave: string, porDefecto: T): Promise<T> {
@@ -64,6 +96,8 @@ const CATEGORIAS_GASTO: [string, string, string][] = [
 const CATEGORIAS_INGRESO: [string, string, string][] = [
   ["Trabajo", "briefcase", "#2F9E6B"],
   ["Alquiler", "home-dollar", "#1F8A70"],
+  ["Ventas", "store", "#2F9E6B"],
+  ["Licencias", "certificate", "#3AA8E0"],
   ["Intereses", "trending-up", "#3AA8E0"],
   ["Otros ingresos", "coin", "#6B6880"],
 ];
@@ -86,6 +120,7 @@ async function sembrarUnaVez() {
       { nombre: "Mercado Pago", moneda: "ARS", dolar: "blue", esTarjeta: false },
       { nombre: "Banco Galicia", moneda: "ARS", dolar: "blue", esTarjeta: false },
       { nombre: "Efectivo", moneda: "EUR", dolar: "blue", esTarjeta: false },
+      ...CUENTAS_DE_FINANZAS,
       { nombre: "Visa", moneda: "ARS", dolar: "oficial", esTarjeta: true, cierreDesde: 5, cierreHasta: 10, venceDias: 10, cierres: {} },
       { nombre: "Mastercard", moneda: "ARS", dolar: "oficial", esTarjeta: true, cierreDesde: 5, cierreHasta: 10, venceDias: 10, cierres: {} },
     ];

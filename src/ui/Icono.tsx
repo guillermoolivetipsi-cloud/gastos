@@ -22,7 +22,7 @@ export const ICONOS: Record<string, ComponentType<Props>> = {
   "ball": T.IconBallFootball, "ticket": T.IconTicket, "store": T.IconBuildingStore, "bike": T.IconBike,
   "train": T.IconTrain, "medicine": T.IconMedicineSyrup, "dental": T.IconDental, "plant": T.IconPlant,
   "cat": T.IconCat, "cake": T.IconCake, "glass": T.IconGlass, "tv": T.IconDeviceTv,
-  "percentage": T.IconPercentage, "report-money": T.IconReportMoney, "happy": T.IconMoodHappy, "users": T.IconUsers,
+  "percentage": T.IconPercentage, "report-money": T.IconReportMoney, "certificate": T.IconCertificate, "happy": T.IconMoodHappy, "users": T.IconUsers,
 };
 
 export function Icono({ nombre, size = 18, className }: { nombre: string; size?: number; className?: string }) {
