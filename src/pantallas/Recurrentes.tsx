@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
-import { MONEDAS, type Clase, type Frecuencia, type Moneda, type Recurrente, type Tipo } from "../tipos";
+import type { Clase, Frecuencia, Recurrente, Tipo } from "../tipos";
 import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincular, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
-import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, mesCorto, nombreDia, nombreMes } from "../lib/fecha";
+import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, mesCorto, nombreDia, nombreMes, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { candidatos, enUsdDe, estadoDe, fechaDePago, mensualEnUsd, montoHabitual } from "../lib/recurrentes";
 import { Barra, Dia, Hoja, Montos, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 import { cuentaDiaria } from "./Editor";
+import { categoriasPorUso } from "./editorLogica";
+import { FechaEnTitulo, GrillaCategorias, MontoConMoneda } from "../ui/formulario";
 
 
 export function cadaCuanto(r: Recurrente) {
@@ -109,7 +111,6 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
 
   const monto = leerNumero(f.montoTxt);
   const valido = f.nombre.trim() && f.categoriaId && f.cuentaId && monto > 0;
-  const cats = d.categorias.filter(c => c.tipo === f.tipo && (!c.archivada || c.id === f.categoriaId));
 
   async function guardar() {
     if (!valido) return;
@@ -146,25 +147,41 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
     <div className="pantalla sin-tabs">
       <div className="enc">
         <button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button>
-        <h1>{existente ? "Editar recurrente" : "Nuevo recurrente"}</h1>
+        <h1>{existente ? "Editar recurrente" : "Nuevo recurrente"}
+          <FechaEnTitulo titulo="¿Desde cuándo?" texto={`desde ${f.inicio === hoy() ? "hoy" : fechaCorta(f.inicio, false)}`}>
+            {cerrar => {
+              const p = hoy().slice(0, 7), opciones: [string, string][] = [[hoy(), "hoy"], [`${p}-01`, "el 1 de este mes"], [`${sumarMeses(p, 1)}-01`, "el 1 del que viene"]];
+              return <>
+                {opciones.map(([v, t]) => <button key={t} className={`pill${f.inicio === v ? " on" : ""}`} onClick={() => { set("inicio", v); cerrar(); }}>{t}</button>)}
+                <label className={`pill${!opciones.some(([v]) => v === f.inicio) ? " on" : ""}`} style={{ position: "relative" }}>otro día
+                  <input type="date" value={f.inicio} onChange={e => { if (e.target.value) { set("inicio", e.target.value); cerrar(); } }} style={{ position: "absolute", inset: 0, opacity: 0 }} aria-label="Elegir el día de inicio" />
+                </label>
+              </>;
+            }}
+          </FechaEnTitulo>
+        </h1>
         {existente && <button className="accion peligro" aria-label="Eliminar" onClick={() => setBorrar(true)}><T.IconTrash size={21} /></button>}
       </div>
       <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={f.tipo} cambiar={(t: Tipo) => setF(x => ({ ...x, tipo: t, categoriaId: "" }))} />
       <div className="campo"><label>Nombre</label><input value={f.nombre} onChange={e => set("nombre", e.target.value)} placeholder="Expensas, alquiler, Netflix…" /></div>
 
+
+      {/* Reglas de carga: el monto con la moneda al lado, la categoría justo después. */}
+      <MontoConMoneda texto={f.montoTxt} cambiarTexto={t => set("montoTxt", t)} moneda={f.moneda} cambiarMoneda={m => set("moneda", m)} etiqueta={f.clase === "variable" ? "Monto estimado" : "Monto"} />
+      {f.clase === "variable" && <div className="mini tenue centro" style={{ marginTop: -4 }}>Estimado: después se ajusta solo con el promedio de las últimas 3 veces.</div>}
+
+      <div className="titulo-sec"><span>Categoría</span></div>
+      <GrillaCategorias categorias={categoriasPorUso(d.movimientos, d.categorias, f.tipo, f.categoriaId)} valor={f.categoriaId} cambiar={id => set("categoriaId", id)} />
+      <div className="campo"><label>{f.tipo === "gasto" ? "Se paga con" : "Entra en"}</label>
+        <select value={f.cuentaId} onChange={e => { const c = d.cuentas.find(c => c.id === e.target.value); setF(x => ({ ...x, cuentaId: e.target.value, moneda: c?.moneda ?? x.moneda })); }}>
+          <option value="">Elegir…</option>
+          {d.cuentas.filter(c => (!c.archivada || c.id === f.cuentaId) && (f.tipo === "gasto" || !c.esTarjeta)).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+      </div>
       <div className="campo">
         <label>El monto</label>
         <Seg opciones={[["fijo", "Siempre igual"], ["variable", "Cambia cada mes"]] as [Clase, string][]} valor={f.clase} cambiar={v => set("clase", v)} />
       </div>
-      <div className="campo">
-        <label>{f.clase === "variable" ? "Monto estimado" : "Monto"}</label>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <input inputMode="decimal" value={f.montoTxt} onChange={e => set("montoTxt", e.target.value.replace(/[^\d.,]/g, ""))} placeholder="0" style={{ flex: 1 }} />
-          <div style={{ width: 170 }}><Seg opciones={MONEDAS.map(m => [m, m] as [Moneda, string])} valor={f.moneda} cambiar={v => set("moneda", v)} /></div>
-        </div>
-        {f.clase === "variable" && <div className="mini tenue">Después se ajusta solo con el promedio de las últimas 3 veces.</div>}
-      </div>
-
       <div className="campo">
         <label>Cada cuánto</label>
         <select value={f.frecuencia} onChange={e => set("frecuencia", e.target.value as Frecuencia)}>
@@ -183,21 +200,7 @@ export function EditorRecurrente(props: Extract<Pantalla, { p: "recurrente" }>) 
         </div>
       )}
 
-      <div className="campo"><label>Categoría</label>
-        <select value={f.categoriaId} onChange={e => set("categoriaId", e.target.value)}>
-          <option value="">Elegir…</option>
-          {cats.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        </select>
-      </div>
-      <div className="campo"><label>Cuenta</label>
-        <select value={f.cuentaId} onChange={e => { const c = d.cuentas.find(c => c.id === e.target.value); setF(x => ({ ...x, cuentaId: e.target.value, moneda: c?.moneda ?? x.moneda })); }}>
-          <option value="">Elegir…</option>
-          {d.cuentas.filter(c => !c.archivada || c.id === f.cuentaId).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        </select>
-      </div>
-
-      <div className="dos">
-        <div className="campo"><label>Empieza</label><input type="date" value={f.inicio} onChange={e => e.target.value && set("inicio", e.target.value)} /></div>
+      <div>
         {f.frecuencia !== "una-vez" && <div className="campo"><label>Termina</label><input type="date" value={f.fin ?? ""} onChange={e => set("fin", e.target.value || undefined)} /><div className="mini tenue">{f.fin ? "" : "nunca"}</div></div>}
       </div>
       {f.frecuencia !== "una-vez" && (

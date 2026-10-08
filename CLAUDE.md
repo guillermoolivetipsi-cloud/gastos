@@ -36,6 +36,7 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Comentario:** en "Más detalles", como estaba.
   - **Guardar:** un botón grande fijo abajo, como estaba.
   - **"Repetir con un toque":** debajo de las categorías.
+  - **Piezas compartidas** en `src/ui/formulario.tsx`: `MontoConMoneda`, `GrillaCategorias` y `FechaEnTitulo`. Las usan "Nuevo gasto", el recurrente ("· desde hoy ▾") y la proyección ("· oct ▾"); cualquier formulario nuevo las usa también.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura

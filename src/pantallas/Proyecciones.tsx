@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDatos, type Datos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
-import { MONEDAS, type Moneda, type Proyeccion, type Tipo } from "../tipos";
+import type { Moneda, Proyeccion, Tipo } from "../tipos";
 import { fechaEnMes, hoy, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { serie, type PuntoMes, type TasaMoneda, type Vista } from "../lib/proyecciones";
 import { Interruptor, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
+import { categoriasPorUso } from "./editorLogica";
+import { FechaEnTitulo, GrillaCategorias, MontoConMoneda } from "../ui/formulario";
 
 /* Resumen → Proyecciones: un gráfico de línea mes a mes (tu normal y con lo
    proyectado) y la lista de proyecciones, cada una con su interruptor. */
@@ -162,7 +164,6 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
 
   const monto = leerNumero(f.montoTxt), max = rango ? leerNumero(f.maxTxt) : 0;
   const valido = !!f.nombre.trim() && monto > 0 && !!f.categoriaId && (!rango || max > monto);
-  const cats = d.categorias.filter(c => c.tipo === f.tipo && (!c.archivada || c.id === f.categoriaId));
   const meses = proximos();
 
   async function guardar() {
@@ -188,40 +189,42 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
     <div className="pantalla sin-tabs">
       <div className="enc">
         <button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button>
-        <h1>{existente ? "Editar proyección" : "Nueva proyección"}</h1>
+        <h1>{existente ? "Editar proyección" : "Nueva proyección"}
+          {/* El mes en el título, como la fecha al cargar un gasto. */}
+          <FechaEnTitulo titulo="¿En qué mes?" texto={meses.includes(f.periodo) ? mesCorto(f.periodo) : nombreMes(f.periodo, false)}>
+            {cerrar => <>
+              {meses.map(p => <button key={p} className={`pill${f.periodo === p ? " on" : ""}`} onClick={() => { set("periodo", p); cerrar(); }}>{nombreMes(p, false)}</button>)}
+              <label className={`pill${!meses.includes(f.periodo) ? " on" : ""}`} style={{ position: "relative" }}>
+                otro mes
+                <input type="month" value={f.periodo} onChange={e => { if (e.target.value) { set("periodo", e.target.value); cerrar(); } }} style={{ position: "absolute", inset: 0, opacity: 0 }} aria-label="Elegir mes" />
+              </label>
+            </>}
+          </FechaEnTitulo>
+        </h1>
         {existente && <button className="accion peligro" aria-label="Eliminar" onClick={borrar}><T.IconTrash size={21} /></button>}
       </div>
       <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={f.tipo} cambiar={t => setF(x => ({ ...x, tipo: t, categoriaId: "" }))} />
       <div className="campo"><label>Nombre</label><input value={f.nombre} onChange={e => set("nombre", e.target.value)} placeholder={f.tipo === "gasto" ? "Service del auto, zapatillas…" : "Cobro de un proyecto…"} autoFocus={!existente} /></div>
+
+      {/* Reglas de carga: el monto con la moneda al lado, la categoría justo después. */}
+      <MontoConMoneda texto={f.montoTxt} cambiarTexto={t => set("montoTxt", t)} moneda={f.moneda} cambiarMoneda={m => set("moneda", m)} etiqueta={rango ? "Desde" : "Monto"} />
+      {rango && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: -6 }}>
+          <span className="tenue">hasta</span>
+          <input inputMode="decimal" value={f.maxTxt} onChange={e => set("maxTxt", e.target.value.replace(/[^\d.,]/g, ""))} placeholder="0" aria-label="Hasta"
+            style={{ width: 110, fontSize: 22, textAlign: "center", borderBottom: "1px solid var(--linea-2)" }} />
+          <span className="tenue">{f.moneda}</span>
+        </div>
+      )}
+      <div className="centro"><button className="mini viol" onClick={() => setRango(!rango)}>{rango ? "− un solo monto" : "+ es un rango (entre … y …)"}</button></div>
+      {rango && max > 0 && max <= monto && <div className="mini ambar centro">El "hasta" tiene que ser mayor.</div>}
+
+      <div className="titulo-sec"><span>Categoría</span></div>
+      <GrillaCategorias categorias={categoriasPorUso(d.movimientos, d.categorias, f.tipo, f.categoriaId)} valor={f.categoriaId} cambiar={id => set("categoriaId", id)} />
+
       <div className="campo">
         <Seg opciones={[["seguro", "Seguro"], ["opcional", "Opcional"]]} valor={f.clase} cambiar={v => set("clase", v)} />
         <div className="mini tenue" style={{ marginTop: 4 }}>{f.clase === "seguro" ? "Muy probable: arranca prendido en el gráfico." : "Puede no pasar: arranca apagado y lo prendés para ver cómo impactaría."}</div>
-      </div>
-      <div className="campo">
-        <label>¿Cuánto?</label>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input inputMode="decimal" value={f.montoTxt} onChange={e => set("montoTxt", e.target.value.replace(/[^\d.,]/g, ""))} placeholder={rango ? "Desde" : "0"} style={{ flex: 1, minWidth: 0 }} />
-          {rango && <><span className="tenue">a</span><input inputMode="decimal" value={f.maxTxt} onChange={e => set("maxTxt", e.target.value.replace(/[^\d.,]/g, ""))} placeholder="Hasta" style={{ flex: 1, minWidth: 0 }} /></>}
-        </div>
-        <div style={{ marginTop: 6 }}><Seg opciones={MONEDAS.map(m => [m, m] as [Moneda, string])} valor={f.moneda} cambiar={v => set("moneda", v)} /></div>
-        <button className="mini viol" style={{ marginTop: 4 }} onClick={() => setRango(!rango)}>{rango ? "− un solo monto" : "+ es un rango (entre … y …)"}</button>
-        {rango && max > 0 && max <= monto && <div className="mini ambar">El "hasta" tiene que ser mayor.</div>}
-      </div>
-      <div className="campo">
-        <label>¿En qué mes?</label>
-        <div className="pills">
-          {meses.map(p => <button key={p} className={`pill${f.periodo === p ? " on" : ""}`} onClick={() => set("periodo", p)}>{mesCorto(p)}</button>)}
-          <label className={`pill${!meses.includes(f.periodo) ? " on" : ""}`} style={{ position: "relative" }}>
-            {!meses.includes(f.periodo) ? nombreMes(f.periodo, false) : "otro…"}
-            <input type="month" value={f.periodo} onChange={e => e.target.value && set("periodo", e.target.value)} style={{ position: "absolute", inset: 0, opacity: 0 }} aria-label="Elegir mes" />
-          </label>
-        </div>
-      </div>
-      <div className="campo"><label>Categoría</label>
-        <select value={f.categoriaId} onChange={e => set("categoriaId", e.target.value)}>
-          <option value="">Elegir…</option>
-          {cats.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        </select>
       </div>
       <div className="pie-fijo"><button className="btn" disabled={!valido} onClick={guardar}>Guardar</button></div>
     </div>

@@ -3,15 +3,16 @@ import { useDatos } from "../datos";
 import { db, guardarAjuste, leerAjuste, nuevoId } from "../db";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useNav, type Pantalla } from "../nav";
-import { MONEDAS, type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
+import { type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
 import { eliminarMovimiento, guardarMovimiento } from "../lib/acciones";
 import { esClaro } from "../lib/recurrentes";
 import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias } from "../lib/fecha";
 import { leerNumero, num, redondear, simbolo } from "../lib/formato";
 import { cuotasDe, esDudosa, resumenDe, vencimiento } from "../lib/tarjeta";
-import { Hoja, Interruptor, Punto, Seg, useToast } from "../ui/piezas";
+import { Hoja, Interruptor, Seg, useToast } from "../ui/piezas";
 import { categoriasDeEtiquetas, categoriasPorUso, etiquetasParaCategoria, gastosFrecuentes, useRecurrenteSugerido } from "./editorLogica";
 import { T } from "../ui/Icono";
+import { GrillaCategorias, MontoConMoneda } from "../ui/formulario";
 
 type Props = Extract<Pantalla, { p: "editor" }>;
 
@@ -40,7 +41,6 @@ export function Editor(props: Props) {
   const [vinculo, setVinculo] = useState<{ recurrenteId: string; periodo: string } | null>(props.recurrenteId ? { recurrenteId: props.recurrenteId, periodo: props.periodo! } : null);
   const [rechazados, setRechazados] = useState<string[]>([]);
   const [detalles, setDetalles] = useState(false);
-  const [todas, setTodas] = useState(false);
   const [enPartes, setEnPartes] = useState(false);
   const [totalTxt, setTotalTxt] = useState("");
   const [nuevaEtq, setNuevaEtq] = useState<string | null>(null);
@@ -112,11 +112,6 @@ export function Editor(props: Props) {
 
   // Categorías: primero las que más usás para este tipo en los últimos 90 días.
   const cats = useMemo(() => categoriasPorUso(d.movimientos, d.categorias, tipo, categoriaId), [d.categorias, d.movimientos, tipo, categoriaId]);
-  const visibles = todas ? cats : (() => {
-    const top = cats.slice(0, 9);
-    const sel = cats.find(c => c.id === categoriaId);
-    return sel && !top.includes(sel) ? [...top.slice(0, 8), sel] : top;
-  })();
 
   // Lo que más repetís: se carga con un toque (no al editar ni al pagar un recurrente).
   const frecuentes = useMemo(() => (existente || props.recurrenteId ? [] : gastosFrecuentes(d.movimientos)), [d.movimientos, existente, props.recurrenteId]);
@@ -212,28 +207,13 @@ export function Editor(props: Props) {
       <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={tipo} cambiar={cambiarTipo} />
 
       {/* La moneda al lado del número: un toque y pasa a la siguiente. */}
-      <div className="monto-grande" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-        <input inputMode="decimal" placeholder="0" value={montoTxt} autoFocus={!existente && !props.monto}
-          onChange={e => setMontoTxt(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto"
-          style={{ width: `${Math.max(1.2, montoTxt.length * 0.62 + 0.4)}em`, maxWidth: "70%", textAlign: "right" }} />
-        <button type="button" className="chip-moneda" aria-label={`Moneda: ${moneda}. Tocá para cambiar`}
-          onClick={() => setMoneda(MONEDAS[(MONEDAS.indexOf(moneda) + 1) % MONEDAS.length])}>{moneda} ▾</button>
-      </div>
+      <MontoConMoneda texto={montoTxt} cambiarTexto={setMontoTxt} moneda={moneda} cambiarMoneda={setMoneda} autoFocus={!existente && !props.monto} />
       <div className="conversion num">
         {moneda === "USD" ? "" : monto > 0 ? (enUsd != null ? `≈ ${num(enUsd)} USD${moneda === "ARS" ? ` · dólar ${cuenta?.dolar ?? "blue"}` : ""}` : "se convierte al tener conexión") : ""}
       </div>
 
       <div className="titulo-sec"><span>Categoría</span></div>
-      <div className="cats cinco">
-        {visibles.map(c => (
-          <button key={c.id} className={`cat${c.id === categoriaId ? " on" : ""}`} onClick={() => setCategoriaId(c.id)}>
-            <Punto cat={c} grande /><span>{c.nombre}</span>
-          </button>
-        ))}
-        {!todas && cats.length > 9 && (
-          <button className="cat" onClick={() => setTodas(true)}><Punto icono="question-mark" color="#2A2A36" grande /><span>Todas</span></button>
-        )}
-      </div>
+      <GrillaCategorias categorias={cats} valor={categoriaId} cambiar={setCategoriaId} />
 
       {tipo === "gasto" && frecuentes.length > 0 && !montoTxt && (
         <div style={{ marginTop: 4 }}>
