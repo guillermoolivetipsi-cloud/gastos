@@ -4,7 +4,7 @@ import { useDatos } from "../datos";
 import { leerAjuste } from "../db";
 import { useNav } from "../nav";
 import { calcularInsights } from "../lib/insights";
-import { nombreMes, sumarMeses } from "../lib/fecha";
+import { nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num } from "../lib/formato";
 import { Barra, Punto } from "../ui/piezas";
 import { T } from "../ui/Icono";
@@ -14,7 +14,7 @@ export function useInsights(periodo: string) {
   const d = useDatos();
   const cache = useLiveQuery(() => leerAjuste<Record<string, number>>("cotizaciones", {}), []);
   return useMemo(() => (!d.listo || !cache ? null
-    : calcularInsights(periodo, d.movimientos, d.categorias, d.cuentas, d.recurrentes, d.tasaRec, f => cache[`EUR|${f}`] ?? null)), [d, cache, periodo]);
+    : calcularInsights(periodo, d.movimientos, d.categorias, d.cuentas, d.recurrentes, d.tasaRec, f => cache[`EUR|${f}`] ?? null, d.resumenesCargados)), [d, cache, periodo]);
 }
 
 const Num = ({ n }: { n: number }) => <span className="num">{num(n, 0)}</span>;
@@ -25,6 +25,7 @@ export function ComoVenis({ periodo }: { periodo: string }) {
   const x = useInsights(periodo);
   if (!x) return <div className="pantalla sin-tabs" />;
   const { tarjeta: t, comprometido: c, suscripciones: s, cambios } = x;
+  const enCurso = periodo === periodoHoy();
   const difTarjeta = t.anterior != null ? t.total - t.anterior : null;
 
   return (
@@ -35,7 +36,7 @@ export function ComoVenis({ periodo }: { periodo: string }) {
         <div className="fila" style={{ padding: 0 }}><span className="chico">1 · Tarjeta</span><span className="mini tenue">mejor si baja</span></div>
         <div className="fila" style={{ paddingBottom: 0 }}><span className="mediano"><Num n={t.total} /> <span className="chico tenue">USD</span></span><span className="ambar chico">{t.pct}% del mes</span></div>
         <Barra valor={t.pct / 100} />
-        <div className="fila chico"><span className="tenue">Contra {nombreMes(sumarMeses(periodo, -1), false)}</span>
+        <div className="fila chico"><span className="tenue">Contra {nombreMes(sumarMeses(periodo, -1), false)}{enCurso ? " a esta altura" : ""}</span>
           <span>{difTarjeta == null ? <span className="tenue">todavía sin comparar</span> : difTarjeta <= 0 ? <span className="ok">−{num(-difTarjeta, 0)} USD</span> : <span className="ambar">+{num(difTarjeta, 0)} USD</span>}</span>
         </div>
         {t.categorias.length > 0 && <div className="fila chico" style={{ paddingTop: 0 }}><span className="tenue">Lo que más va a tarjeta</span><span>{t.categorias.map(k => k.cat.nombre).join(", ")}</span></div>}
@@ -48,7 +49,7 @@ export function ComoVenis({ periodo }: { periodo: string }) {
 
       <div className="caja">
         <div className="chico">2 · {nombreMes(c.periodo, false)[0].toUpperCase() + nombreMes(c.periodo, false).slice(1)} ya comprometido</div>
-        <div className="fila" style={{ paddingBottom: 0 }}><span className="mediano">~<Num n={c.total} /> <span className="chico tenue">USD</span></span><span className="tenue chico">antes de gastar nada</span></div>
+        <div className="fila" style={{ paddingBottom: 0 }}><span className="mediano">~<Num n={c.total} /> <span className="chico tenue">USD</span></span><span className="tenue chico">con lo cargado hasta hoy</span></div>
         <div className="fila chico"><span className="tenue">Resúmenes de tarjeta</span><span><Num n={c.tarjetas} /></span></div>
         <div className="fila chico" style={{ paddingTop: 0 }}><span className="tenue">Recurrentes de tus cuentas</span><span><Num n={c.recurrentes} /></span></div>
         {c.entra > 0 && <div className="fila chico" style={{ paddingTop: 0 }}><span className="tenue">Entra fijo</span><span className="ok">+<Num n={c.entra} /></span></div>}
@@ -68,7 +69,7 @@ export function ComoVenis({ periodo }: { periodo: string }) {
 
       <div className="caja">
         <div className="chico">4 · Qué cambió contra tu promedio</div>
-        <div className="mini tenue" style={{ marginBottom: 4 }}>Contra los 3 meses anteriores. Solo lo que se movió bastante.</div>
+        <div className="mini tenue" style={{ marginBottom: 4 }}>Contra los 3 meses anteriores{enCurso ? ", hasta el mismo día" : ""}. Solo lo que se movió bastante.</div>
         {!cambios.length && <div className="tenue chico">Nada cambió mucho: venís parecido a tu promedio.</div>}
         {cambios.map(k => (
           <div key={k.cat.id} className="fila chico">

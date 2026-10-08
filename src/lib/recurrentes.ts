@@ -219,13 +219,17 @@ export function sugerirVinculos(insts: EstadoInstancia[], movs: Movimiento[], ta
   return out;
 }
 
-/** Cuánto pesa un recurrente por mes, en USD. Los variables usan el estimado (el
- *  promedio de las últimas veces); los semanales y anuales se llevan a un mes. */
+/** Lo que suele costar cada vez, en su moneda: los fijos, su monto; los variables, el
+ *  promedio de las últimas veces (sin contar un "Fue 0" de este mes). */
+export function montoHabitual(r: Recurrente, movs: Movimiento[], tasa: number | null) {
+  if (r.clase !== "variable") return r.monto;
+  return estadoDe({ rec: { ...r, enCero: [] }, clave: periodoDe(hoy()), fecha: hoy() }, (pagosPorRecurrente(movs).get(r.id) ?? []).filter(m => m.periodo !== periodoDe(hoy())), tasa).esperado;
+}
+
+/** Cuánto pesa un recurrente por mes, en USD. Los semanales y anuales se llevan a un mes. */
 export function mensualEnUsd(r: Recurrente, movs: Movimiento[], tasa: number | null): number | null {
   if (!tasa || r.frecuencia === "una-vez") return null;
-  const base = r.clase === "variable"
-    ? estadoDe({ rec: r, clave: periodoDe(hoy()), fecha: hoy() }, (pagosPorRecurrente(movs).get(r.id) ?? []).filter(m => m.periodo !== periodoDe(hoy())), tasa).esperado
-    : r.monto;
+  const base = montoHabitual(r, movs, tasa);
   const porMes = r.frecuencia === "semanal" ? (base * 52) / 12 : r.frecuencia === "anual" ? base / 12 : base;
   return redondear(porMes / tasa);
 }

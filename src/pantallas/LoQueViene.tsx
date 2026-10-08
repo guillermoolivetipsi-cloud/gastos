@@ -59,10 +59,11 @@ function Recurrentes({ periodo }: { periodo: string }) {
   const { todos: porPagar, vencidos } = porCargarDelMes(insts, d.cuentas);
   const pagados = deCuenta.filter(i => i.estado === "cargado");
 
-  const total = redondear(deCuenta.reduce((s, i) => s + enUsd(i, i.esperado), 0));
+  // Lo pagado si ya está (aunque haya sido más de lo previsto); si no, lo esperado.
+  const total = redondear(deCuenta.reduce((s, i) => s + enUsd(i, i.estado === "cargado" ? i.pagado : i.esperado), 0));
   const totalTarjeta = redondear(aTarjeta.reduce((s, i) => s + enUsd(i, i.estado === "cargado" ? i.pagado : i.esperado), 0));
   const tarjetaPendientes = aTarjeta.filter(i => i.estado !== "cargado").length;
-  const pagado = redondear(deCuenta.reduce((s, i) => s + enUsd(i, Math.min(i.pagado, i.esperado)), 0));
+  const pagado = redondear(deCuenta.reduce((s, i) => s + enUsd(i, i.pagado), 0));
 
   const toast = useToast();
   const descartados = descartesSet(d.descartes);
@@ -223,11 +224,11 @@ function Tarjetas({ periodo }: { periodo: string }) {
   const nav = useNav();
   const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada);
   const tasaR = d.tasaRec;
-  const aPagar = tarjetas.map(c => aPagarTarjeta(c, d.movimientos, d.recurrentes, periodo, tasaR));
+  const aPagar = tarjetas.map(c => aPagarTarjeta(c, d.movimientos, d.recurrentes, periodo, tasaR, d.resumenesCargados));
   const total = redondear(aPagar.reduce((s, x) => s + x.total, 0));
-  const hayEstimados = aPagar.some(x => (x.resumen.items.length || x.insts.length) && !x.resumen.confirmado);
+  const hayEstimados = aPagar.some(x => (x.resumen.items.length || x.insts.length) && !x.real);
   const siguiente = sumarMeses(periodo, 1);
-  const juntando = redondear(tarjetas.reduce((s, c) => s + aPagarTarjeta(c, d.movimientos, d.recurrentes, siguiente, tasaR).total, 0));
+  const juntando = redondear(tarjetas.reduce((s, c) => s + aPagarTarjeta(c, d.movimientos, d.recurrentes, siguiente, tasaR, d.resumenesCargados).total, 0));
 
   if (!tarjetas.length) return <div className="vacio">No tenés tarjetas cargadas.</div>;
   return (
@@ -238,27 +239,27 @@ function Tarjetas({ periodo }: { periodo: string }) {
         {hayEstimados && <div className="mini tenue">Estimado con lo que cargaste. Se confirma al subir cada resumen.</div>}
       </div>
 
-      {aPagar.map(({ resumen: r, insts, previsto, total: totalR, desde }) => {
+      {aPagar.map(({ resumen: r, insts, previsto, real, total: totalR, desde }) => {
         return (
           <div key={r.cuenta.id} className="caja">
             <div className="fila" style={{ padding: 0 }}>
               <span className="izq"><T.IconCreditCard size={18} /><span>{r.cuenta.nombre}</span></span>
-              {r.items.length > 0 && <span className={`etiq ${r.confirmado ? "e-ok" : "e-pend"}`}>{r.confirmado ? "confirmado" : "estimado"}</span>}
+              {r.items.length > 0 && <span className={`etiq ${real ? "e-ok" : "e-pend"}`}>{real ? "confirmado" : "estimado"}</span>}
             </div>
             {r.items.length === 0 && !insts.length ? <div className="tenue chico" style={{ marginTop: 6 }}>Nada para pagar en {nombreMes(periodo, false)}.</div> : (
               <>
                 <div className="fila" style={{ paddingBottom: 0 }}>
-                  <span className="mediano num">{r.confirmado ? "" : "~"}{num(totalR)} <span className="chico tenue">USD</span></span>
+                  <span className="mediano num">{real ? "" : "~"}{num(totalR)} <span className="chico tenue">USD</span></span>
                   <span className="tenue chico">vence ~{fechaCorta(r.vence, false)}</span>
                 </div>
                 <div className="mini tenue">compras del {fechaCorta(desde, false)} al {fechaCorta(r.cierre, false)} · {r.items.length} consumos{r.enCuotas > 0 ? ` · ${num(r.enCuotas)} en cuotas` : ""}</div>
                 {insts.length > 0 && (
                   <div className="sep" style={{ marginTop: 8, paddingTop: 6 }}>
-                    <div className="mini tenue" style={{ marginBottom: 2 }}>Recurrentes de este resumen{previsto > 0 && !r.confirmado ? ` · ${num(previsto, 0)} USD previstos incluidos` : ""}</div>
+                    <div className="mini tenue" style={{ marginBottom: 2 }}>Recurrentes de este resumen{previsto > 0 && !real ? ` · ${num(previsto, 0)} USD previstos incluidos` : ""}</div>
                     {insts.map(i => (
                       <div key={i.rec.id + i.clave} className="fila mini" style={{ padding: "2px 0" }}>
                         <span>{i.estado === "cargado" ? <span className="ok"><T.IconCheck size={12} style={{ verticalAlign: -2 }} /> </span> : <span className="ambar">◷ </span>}{i.rec.nombre} <span className="tenue">· {fechaCorta(i.fecha, false)}</span></span>
-                        <span className={`num ${i.estado === "cargado" ? "" : "tenue"}`}>{i.estado === "cargado" ? `${num(i.pagado)} ${i.rec.moneda}` : `previsto ~${num(i.esperado)} ${i.rec.moneda}`}</span>
+                        <span className={`num ${i.estado === "cargado" ? "" : "tenue"}`}>{i.estado === "cargado" ? `${num(i.pagado)} ${i.rec.moneda}` : `${i.estado === "parcial" ? "falta" : "previsto"} ~${num(i.falta)} ${i.rec.moneda}`}</span>
                       </div>
                     ))}
                   </div>

@@ -55,9 +55,16 @@ export function bloques(periodo: string, gastos: Movimiento[], cats: Categoria[]
   const faltaFijos = redondear(pendientes
     .filter(e => e.rec.tipo === "gasto" && e.rec.clase === "fijo")
     .reduce((s, e) => { const t = tasaUsd(e.rec); return s + (t ? e.falta / t : 0); }, 0));
-  const gastadoVar = suma(gastos.filter(m => claseMov(m) === "variable"));
-  const objetivo = cats.filter(c => c.tipo === "gasto" && !c.archivada && clase(c) === "variable").reduce((s, c) => s + (c.objetivo ?? 0), 0);
-  const queda = redondear(objetivo - gastadoVar);
+  const conObjetivo = new Set(cats.filter(c => c.tipo === "gasto" && !c.archivada && clase(c) === "variable" && (c.objetivo ?? 0) > 0).map(c => c.id));
+  const objetivo = cats.filter(c => conObjetivo.has(c.id)).reduce((s, c) => s + (c.objetivo ?? 0), 0);
+  // Contra los objetivos se compara solo lo de las categorías que tienen objetivo, y se
+  // descuenta lo que falta pagar de sus recurrentes variables (la luz, las expensas).
+  const variables = gastos.filter(m => claseMov(m) === "variable");
+  const gastadoVar = suma(objetivo ? variables.filter(m => conObjetivo.has(m.categoriaId)) : variables);
+  const faltaVar = redondear(pendientes
+    .filter(e => e.rec.tipo === "gasto" && e.rec.clase === "variable" && conObjetivo.has(e.rec.categoriaId))
+    .reduce((s, e) => { const t = tasaUsd(e.rec); return s + (t ? e.falta / t : 0); }, 0));
+  const queda = redondear(objetivo - gastadoVar - faltaVar);
   const ph = periodoHoy();
   const dias = periodo === ph ? diasDelMes(periodo) - Number(hoy().slice(8)) + 1 : 0;
   return {
@@ -170,6 +177,9 @@ export function cambiosDePrecio(recs: Recurrente[], movs: Movimiento[], descarte
     const claves = [...porClave.keys()].sort();
     if (claves.length < 2) continue;
     const antes = porClave.get(claves[claves.length - 2])!, ahora = porClave.get(claves[claves.length - 1])!;
+    // Si el último es de este mes y es menos, puede ser un pago en partes: se espera a
+    // que termine el mes. Una suba sí se avisa enseguida.
+    if (claves[claves.length - 1] >= periodoHoy() && ahora < antes) continue;
     const clave = `precio|${r.id}|${claves[claves.length - 1]}`;
     if (Math.abs(ahora - antes) / antes > 0.01 && !descartes.has(clave)) out.push({ rec: r, antes, ahora, clave });
   }
@@ -209,17 +219,20 @@ export function recurrentesDelMes(recs: Recurrente[], movs: Movimiento[], period
 export const descartesSet = (ds: Descarte[]) => new Set(ds.map(d => d.clave));
 
 /** Lo que se paga de una tarjeta en `periodo`: el resumen que vence ese mes y, mientras
- *  sea estimado, los recurrentes de esa tarjeta que todavía no se cobraron pero caen
- *  en ese resumen. Única fuente para "Lo que viene" y "Cómo venís". */
-export function aPagarTarjeta(c: Cuenta, movs: Movimiento[], recs: Recurrente[], periodo: string, tasa: (r: Recurrente) => number | null) {
+ *  no subiste ese resumen, lo que falta cobrar de los recurrentes de esa tarjeta que caen
+ *  en él. `real`: el resumen ya se subió (no alcanza con confirmar el día de cierre a
+ *  mano). Única fuente para "Lo que viene", la tarjeta y "Cómo venís". */
+export function aPagarTarjeta(c: Cuenta, movs: Movimiento[], recs: Recurrente[], periodo: string, tasa: (r: Recurrente) => number | null, subidos: Record<string, string> = {}) {
   const r = resumenQueVence(c, movs, periodo);
   const desde = sumarDias(fechaCierre(c, sumarMeses(r.periodo, -1)), 1);
   const propios = recs.filter(x => x.cuentaId === c.id && x.tipo === "gasto");
   const insts = [sumarMeses(r.periodo, -1), r.periodo]
     .flatMap(q => recurrentesDelMes(propios, movs, q, tasa))
     .filter(i => i.fecha >= desde && i.fecha <= r.cierre);
-  const previsto = redondear(insts.filter(i => i.estado !== "cargado").reduce((s, i) => { const t = tasa(i.rec); return s + (t ? i.esperado / t : 0); }, 0));
-  return { resumen: r, desde, insts, previsto, total: redondear(r.total + (r.confirmado ? 0 : previsto)) };
+  // Lo que falta (no el total): un pago parcial ya está dentro del resumen.
+  const previsto = redondear(insts.filter(i => i.estado !== "cargado").reduce((s, i) => { const t = tasa(i.rec); return s + (t ? i.falta / t : 0); }, 0));
+  const real = !!subidos[`${c.id}|${r.periodo}`];
+  return { resumen: r, desde, insts, previsto, real, total: redondear(r.total + (real ? 0 : previsto)) };
 }
 
 /** Los recurrentes de gasto que se pagan desde una cuenta (no tarjeta) y faltan

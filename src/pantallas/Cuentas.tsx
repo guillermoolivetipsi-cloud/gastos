@@ -121,10 +121,11 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
         {/* Mientras no está confirmado, suma los recurrentes que todavía no se cobraron
             (igual que "Lo que viene"). */}
         {(() => {
-          const ap = aPagarTarjeta(c, d.movimientos, d.recurrentes, periodoDe(r.vence), d.tasaRec);
-          const previsto = ap.resumen.periodo === periodo && !r.confirmado ? ap.previsto : 0;
+          const ap = aPagarTarjeta(c, d.movimientos, d.recurrentes, periodoDe(r.vence), d.tasaRec, d.resumenesCargados);
+          const real = ap.resumen.periodo === periodo && ap.real;
+          const previsto = ap.resumen.periodo === periodo && !real ? ap.previsto : 0;
           return <>
-            <div className="mediano num">{r.confirmado ? "" : "~"}{num(redondear(r.total + previsto))} USD</div>
+            <div className="mediano num">{real ? "" : "~"}{num(redondear(r.total + previsto))} USD</div>
             {previsto > 0 && <>
               <div className="fila chico" style={{ padding: "4px 0 0" }}><span className="tenue">consumos</span><span className="num">{num(r.total)}</span></div>
               <div className="fila chico" style={{ padding: 0 }}><span className="tenue">recurrentes que faltan cobrar</span><span className="num ambar">+{num(previsto)}</span></div>

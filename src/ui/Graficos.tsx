@@ -27,7 +27,10 @@ export function PorTiempo({ movs, desde, hasta }: { movs: Movimiento[]; desde: s
     if (i != null) tramos[i].total += m.usd ?? 0;
   }
   const max = Math.max(1, ...tramos.map(t => t.total));
-  const pasados = tramos.filter(t => !t.futuro);
+  // El promedio, con lo terminado: el mes (o el día) en curso todavía no está completo.
+  const enCurso = porMes ? hoy().slice(0, 7) : hoy();
+  const terminados = tramos.filter(t => !t.futuro && t.clave !== enCurso);
+  const pasados = terminados.length ? terminados : tramos.filter(t => !t.futuro);
   const promedio = pasados.length ? pasados.reduce((s, t) => s + t.total, 0) / pasados.length : 0;
   const pocos = tramos.length <= 12;
   // La barra más alta ocupa el 78%: el resto del alto es para su número.

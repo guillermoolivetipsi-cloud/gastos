@@ -7,7 +7,7 @@ import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurren
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
-import { candidatos, enUsdDe, estadoDe, fechaDePago, mensualEnUsd } from "../lib/recurrentes";
+import { candidatos, enUsdDe, estadoDe, fechaDePago, mensualEnUsd, montoHabitual } from "../lib/recurrentes";
 import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 import { cuentaDiaria } from "./Editor";
@@ -42,7 +42,7 @@ export function ListaRecurrentes() {
         <div className="mini tenue">{cadaCuanto(r)} · <span className={`etiq e-${r.clase}`}>{r.clase}</span></div>
       </span></span>
       <span className="derecha">
-        <div className={`num ${r.tipo === "ingreso" ? "ok" : ""}`}>{r.clase === "variable" ? "~" : ""}{r.tipo === "ingreso" ? "+" : ""}{num(r.monto)} {r.moneda}</div>
+        <div className={`num ${r.tipo === "ingreso" ? "ok" : ""}`}>{r.clase === "variable" ? "~" : ""}{r.tipo === "ingreso" ? "+" : ""}{num(montoHabitual(r, d.movimientos, d.tasaRec(r)))} {r.moneda}</div>
         {r.moneda !== "USD" && usd(r) != null && <div className="mini tenue num">≈ {num(usd(r)!, 0)} USD{r.frecuencia !== "mensual" ? "/mes" : ""}</div>}
       </span>
     </button>
