@@ -193,3 +193,7 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 /* Fondo fijo detrás de la barra de estado: lo que scrollea no pasa por debajo de la hora. */
 body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--arriba); background: var(--bg); z-index: 40; }
 .aviso-version { position: fixed; top: calc(var(--arriba) + 8px); left: 12px; right: 12px; max-width: 496px; margin: 0 auto; z-index: 60; display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--viol); border-radius: 14px; padding: 10px 12px; }
+/* Día a la izquierda en las listas con fecha (Lo que viene, Recurrentes, tarjeta). */
+.dia-col { width: 30px; flex: none; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.dia-col > span:first-child { font-size: 18px; }
+.dia-col > span:last-child { font-size: 12px; color: var(--tenue); }

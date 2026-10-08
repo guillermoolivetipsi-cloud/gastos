@@ -5,10 +5,10 @@ import { useNav, type Pantalla } from "../nav";
 import { MONEDAS, type Clase, type Frecuencia, type Moneda, type Recurrente, type Tipo } from "../tipos";
 import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincular, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
-import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, nombreDia, nombreMes } from "../lib/fecha";
+import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, mesCorto, nombreDia, nombreMes } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { candidatos, enUsdDe, estadoDe, fechaDePago, mensualEnUsd, montoHabitual } from "../lib/recurrentes";
-import { Barra, Hoja, Punto, Seg, useToast } from "../ui/piezas";
+import { Barra, Dia, Hoja, Montos, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 import { cuentaDiaria } from "./Editor";
 
@@ -35,18 +35,29 @@ export function ListaRecurrentes() {
   const usd = (r: Recurrente) => mensualEnUsd(r, d.movimientos, d.tasaRec(r));
   const total = (tipo: Recurrente["tipo"]) => activos.filter(r => r.tipo === tipo).reduce((s, r) => s + (usd(r) ?? 0), 0);
   const gastos = total("gasto"), ingresos = total("ingreso");
-  const fila = (r: Recurrente) => (
-    <button key={r.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>
-      <span className="izq"><Punto cat={cat.get(r.categoriaId)} chico /><span>
-        <div>{r.nombre}</div>
-        <div className="mini tenue">{cadaCuanto(r)} · <span className={`etiq e-${r.clase}`}>{r.clase}</span></div>
-      </span></span>
-      <span className="derecha">
-        <div className={`num ${r.tipo === "ingreso" ? "ok" : ""}`}>{r.clase === "variable" ? "~" : ""}{r.tipo === "ingreso" ? "+" : ""}{num(montoHabitual(r, d.movimientos, d.tasaRec(r)))} {r.moneda}</div>
-        {r.moneda !== "USD" && usd(r) != null && <div className="mini tenue num">≈ {num(usd(r)!, 0)} USD{r.frecuencia !== "mensual" ? "/mes" : ""}</div>}
-      </span>
-    </button>
-  );
+  // Reglas de las listas: el día a la izquierda (cuándo toca), los dólares arriba y la
+  // moneda original abajo. Lo semanal y lo anual se muestran por mes en dólares.
+  const fila = (r: Recurrente) => {
+    const habitual = montoHabitual(r, d.movimientos, d.tasaRec(r));
+    const u = usd(r);
+    const ing = r.tipo === "ingreso" ? "+" : "";
+    const aprox = r.clase === "variable" ? "~" : "";
+    const dia = r.frecuencia === "semanal" ? DIAS_CORTOS[r.dia] : r.frecuencia === "una-vez" ? Number(r.inicio.slice(8)) : r.dia;
+    const abajo = r.frecuencia === "semanal" ? "c/sem" : r.frecuencia === "anual" ? MESES[(r.mes ?? 1) - 1].slice(0, 3) : r.frecuencia === "una-vez" ? mesCorto(r.inicio.slice(0, 7)) : "c/mes";
+    return (
+      <button key={r.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>
+        <span className="izq"><Dia dia={dia} abajo={abajo} /><Punto cat={cat.get(r.categoriaId)} chico /><span style={{ minWidth: 0 }}>
+          <div>{r.nombre}</div>
+          <div className="mini tenue">{d.cuentaPorId.get(r.cuentaId)?.nombre} · <span className={`etiq e-${r.clase}`}>{r.clase}</span></div>
+        </span></span>
+        <span className="derecha">
+          {r.moneda !== "USD" && u != null
+            ? <><div className={`num chico ${ing ? "ok" : ""}`}>{aprox}{ing}{num(u, 0)} USD{r.frecuencia !== "mensual" ? "/mes" : ""}</div><div className="mini tenue num">{aprox}{ing}{num(habitual)} {r.moneda}</div></>
+            : <div className={`num chico ${ing ? "ok" : ""}`}>{aprox}{ing}{num(habitual)} {r.moneda}</div>}
+        </span>
+      </button>
+    );
+  };
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Recurrentes</h1><button className="accion" aria-label="Nuevo" onClick={() => nav.abrir({ p: "recurrente" })}><T.IconPlus size={22} /></button></div>
@@ -253,7 +264,8 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
       </div>
       <div className="caja">
         <div className="etq">{e.estimado ? "Estimado del mes" : r.tipo === "gasto" ? "Total a pagar" : "Total a cobrar"}</div>
-        <div className="mediano num">{e.estimado ? "~" : ""}{num(e.esperado)} {r.moneda}{totalUsd != null && <span className="chico tenue"> · ≈ {num(totalUsd, 0)} USD</span>}</div>
+        <div className="mediano num">{totalUsd != null ? `~${num(totalUsd, 0)} USD` : `${e.estimado ? "~" : ""}${num(e.esperado)} ${r.moneda}`}</div>
+        {totalUsd != null && <div className="mini tenue num">{e.estimado ? "~" : ""}{num(e.esperado)} {r.moneda}</div>}
         <Barra valor={e.esperado ? e.pagado / e.esperado : 0} color="#60A5FA" />
         <div className="fila chico" style={{ padding: 0 }}>
           <span className="tenue">{ing ? "cobrado" : "pagado"} {num(e.pagado)}</span>
@@ -266,7 +278,8 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
         <div className="caja lista">
           {e.pagos.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(p => (
             <button key={p.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: p.id })}>
-              <span>{fechaCorta(p.fecha, false)} · {cta.get(p.cuentaId)}</span><span className="num">{num(p.monto)} {p.moneda}</span>
+              <span className="izq"><Dia dia={Number(p.fecha.slice(8))} abajo={mesCorto(p.fecha.slice(0, 7))} /><span className="chico">{cta.get(p.cuentaId)}</span></span>
+              <span className="derecha"><Montos usd={p.usd} monto={p.monto} moneda={p.moneda} /></span>
             </button>
           ))}
         </div>

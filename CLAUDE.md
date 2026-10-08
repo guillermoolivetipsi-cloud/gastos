@@ -22,6 +22,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
 - **Números que todavía no pasaron:** con "~" y en gris, con la palabra "previsto" o "estimado". Nunca mezclar lo real con lo previsto sin marcarlo.
 - **Comparaciones de un mes en curso:** siempre contra los meses anteriores hasta el mismo día, y el texto lo dice ("a esta altura").
 - **Proyecciones:** "seguro" y "opcional" (nunca "capricho"); en la torta, lo seguro en tono claro y lo opcional rayado.
+- **Listas** (decididas sobre Lo que viene, octubre 2026; valen para toda la app):
+  - **Fecha:** en las listas con fecha, el día grande a la izquierda con el mes abajo (`<Dia />`); en rojo si venció. En Recurrentes, el día de cobro con "c/mes", "c/sem" o el mes. Movimientos no lo lleva porque ya agrupa por día.
+  - **Montos:** los dólares arriba y la moneda original abajo en gris (`<Montos />`), igual que los totales. Si el monto está en USD, una sola línea.
+  - **Acciones:** una sola por fila ("Cargar", o "Cobrar" en los ingresos). Lo demás ("Fue 0", saltear, elegir un gasto ya cargado) va en la pantalla que se abre tocando la fila.
+  - **Estado:** como texto de color en la línea gris (· vencido en rojo, · parcial en amarillo), sin píldoras.
+  - **Resumen de arriba:** tres números uno al lado del otro (en Lo que viene: Por pagar · Pagado · A cobrar; en Tarjetas: A pagar · Se junta · Cuotas después).
+  - **Orden:** por secciones, como estaba (de tus cuentas, a la tarjeta, a cobrar, ya pagados).
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura

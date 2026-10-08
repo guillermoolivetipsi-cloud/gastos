@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import type { Categoria, Clase } from "../tipos";
 import { Icono, T } from "./Icono";
+import { num } from "../lib/formato";
 
 /** El circulito de color con el ícono de la categoría. `grande`: el de la grilla de
  *  categorías (al cargar un gasto y en Categorías), con el ícono de 24 px. */
@@ -148,5 +149,31 @@ export function BotonAgregar({ tipo, abrir }: { tipo: "gasto" | "ingreso"; abrir
     <button className="fab" aria-label={tipo === "ingreso" ? "Nuevo ingreso" : "Nuevo gasto"} onClick={() => abrir(tipo)}>
       <T.IconPlus size={28} />
     </button>
+  );
+}
+
+/** Regla de las listas con fecha: el día grande a la izquierda, con el mes (o la
+ *  frecuencia) abajo. `vencido`: el día en rojo. */
+export function Dia({ dia, abajo, vencido }: { dia: string | number; abajo: string; vencido?: boolean }) {
+  return (
+    <span className="dia-col" aria-hidden="true">
+      <span className="num" style={vencido ? { color: "var(--mal)" } : undefined}>{dia}</span>
+      <span>{abajo}</span>
+    </span>
+  );
+}
+
+/** Regla de los montos: los dólares arriba (como los totales) y la moneda original
+ *  abajo, en gris, solo si no es USD. `estimado`: con "~" (lo que todavía no pasó o va
+ *  con la cotización de hoy). `signo`: "+" en ingresos. */
+export function Montos({ usd, monto, moneda, estimado, signo = "", clase = "" }: { usd: number | null; monto: number | string; moneda: string; estimado?: boolean; signo?: string; clase?: string }) {
+  const t = estimado ? "~" : "";
+  const original = `${t}${signo}${typeof monto === "number" ? num(monto) : monto} ${moneda}`;
+  const enUsd = moneda !== "USD" && usd != null;
+  return (
+    <>
+      <div className={`num chico ${clase}`}>{enUsd ? `${t}${signo}${num(usd!, usd! >= 100 ? 0 : 2)} USD` : original}</div>
+      {enUsd && <div className="mini tenue num">{original}</div>}
+    </>
   );
 }

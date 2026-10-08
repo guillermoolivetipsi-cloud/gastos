@@ -120,7 +120,12 @@ export function Resumen() {
           {vencidos.slice(0, 3).map(i => (
             <div className="fila chico" key={i.rec.id + i.clave} style={{ padding: "3px 0" }}>
               <span>{i.rec.nombre} · {fechaCorta(i.fecha)}</span>
-              <span className="tenue">{i.estado === "parcial" ? `faltan ${num(i.falta)}` : `~${num(i.esperado)}`} {i.rec.moneda}{(() => { const u = enUsdDe(i.rec, i.estado === "parcial" ? i.falta : i.esperado, tasa(i.rec)); return u != null ? ` · ≈ ${num(u, 0)} USD` : ""; })()}</span>
+              <span className="tenue">{(() => {
+                // Dólares primero; la moneda original después.
+                const x = i.estado === "parcial" ? i.falta : i.esperado, u = enUsdDe(i.rec, x, tasa(i.rec));
+                const pre = i.estado === "parcial" ? "faltan " : "~";
+                return u != null ? `${pre}${num(u, 0)} USD · ${num(x)} ${i.rec.moneda}` : `${pre}${num(x)} ${i.rec.moneda}`;
+              })()}</span>
             </div>
           ))}
         </button>

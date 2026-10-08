@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
 import { aPagarTarjeta, descartesSet, porCargarDelMes, recurrentesDelMes } from "../lib/analisis";
-import { cuotasFuturas, resumenQueVence } from "../lib/tarjeta";
-import { fechaCorta, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
+import { cuotasFuturas } from "../lib/tarjeta";
+import { fechaCorta, hoy, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import type { EstadoInstancia } from "../lib/recurrentes";
-import { Barra, Punto, useToast } from "../ui/piezas";
-import { descartar, marcarEnCero, vincular } from "../lib/acciones";
-import { enUsdDe, fechaDePago, sugerirVinculos } from "../lib/recurrentes";
+import { Dia, Montos, Punto, useToast } from "../ui/piezas";
+import { descartar, vincular } from "../lib/acciones";
+import { fechaDePago, sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
 
 /* Lo que está por salir o entrar, en dos pestañas:
@@ -59,8 +59,6 @@ function Recurrentes({ periodo }: { periodo: string }) {
   const { todos: porPagar, vencidos } = porCargarDelMes(insts, d.cuentas);
   const pagados = deCuenta.filter(i => i.estado === "cargado");
 
-  // Lo pagado si ya está (aunque haya sido más de lo previsto); si no, lo esperado.
-  const total = redondear(deCuenta.reduce((s, i) => s + enUsd(i, i.estado === "cargado" ? i.pagado : i.esperado), 0));
   const totalTarjeta = redondear(aTarjeta.reduce((s, i) => s + enUsd(i, i.estado === "cargado" ? i.pagado : i.esperado), 0));
   const tarjetaPendientes = aTarjeta.filter(i => i.estado !== "cargado").length;
   const pagado = redondear(deCuenta.reduce((s, i) => s + enUsd(i, i.pagado), 0));
@@ -72,16 +70,6 @@ function Recurrentes({ periodo }: { periodo: string }) {
     const deshacer = await vincular(m.id, i.rec.id, i.clave);
     toast({ texto: `Vinculado como pago de ${i.rec.nombre}`, deshacer });
   }
-  async function enCero(i: EstadoInstancia) {
-    await marcarEnCero(i.rec, i.clave, true);
-    toast({ texto: `${i.rec.nombre}: este mes en 0`, deshacer: () => { marcarEnCero(i.rec, i.clave, false); } });
-  }
-  const monto = (i: EstadoInstancia) => `${i.estimado ? "~" : ""}${num(i.estado === "parcial" ? i.falta : i.esperado)} ${i.rec.moneda}`;
-  /** "≈ X USD" debajo del monto, si está en otra moneda. */
-  const usd = (i: EstadoInstancia, x = i.estado === "cargado" ? i.pagado : i.estado === "parcial" ? i.falta : i.esperado) => {
-    const u = enUsdDe(i.rec, x, tasa(i.rec));
-    return u != null ? <div className="mini tenue num">≈ {num(u, 0)} USD</div> : null;
-  };
   const totalCobrar = redondear(ingresos.reduce((s, i) => s + enUsd(i, i.estado === "cargado" ? i.pagado : i.esperado), 0));
   const cargar = (i: EstadoInstancia) => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: fechaDePago(i) });
 
@@ -92,21 +80,60 @@ function Recurrentes({ periodo }: { periodo: string }) {
     </div>
   );
 
+  // Una fila de recurrente, con las reglas de las listas: el día a la izquierda, los
+  // dólares arriba, el estado como texto de color y una sola acción (Cargar / Cobrar).
+  const fila = (i: EstadoInstancia, accion?: "Cargar" | "Cobrar") => {
+    const c = cuenta.get(i.rec.cuentaId);
+    const vencido = i.estado !== "cargado" && i.estado !== "proximo" && i.fecha <= hoy();
+    const valor = i.estado === "cargado" ? i.pagado : i.estado === "parcial" ? i.falta : i.esperado;
+    const t = tasa(i.rec);
+    const ing = i.rec.tipo === "ingreso";
+    return (
+      <div className="fila">
+        <button className="izq" style={{ textAlign: "left", flex: 1, minWidth: 0 }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
+          <Dia dia={Number(i.fecha.slice(8))} abajo={mesCorto(i.fecha.slice(0, 7))} vencido={vencido} />
+          <Punto cat={cat.get(i.rec.categoriaId)} chico />
+          <span style={{ minWidth: 0 }}>
+            <div>{i.rec.nombre}</div>
+            <div className="mini tenue">
+              {c?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {c?.nombre}
+              {i.estado === "parcial" && <span className="ambar"> · parcial</span>}
+              {vencido && i.estado !== "parcial" && <span className="mal"> · vencido</span>}
+              {i.cero && <span> · fue 0</span>}
+            </div>
+          </span>
+        </button>
+        <span className="derecha">
+          {i.cero ? <div className="tenue chico">0</div>
+            : <Montos usd={t ? redondear(valor / t) : null} monto={valor} moneda={i.rec.moneda} estimado={i.estimado} signo={ing ? "+" : ""} clase={i.estado === "cargado" ? "ok" : ""} />}
+          {accion && i.estado !== "cargado" && <button className="btn1" style={{ padding: "3px 10px", fontSize: 12, marginTop: 3 }} onClick={() => cargar(i)}>{accion}</button>}
+        </span>
+      </div>
+    );
+  };
+  const porPagarUsd = redondear(porPagar.reduce((s, i) => s + enUsd(i, i.estado === "parcial" ? i.falta : i.esperado), 0));
+  const aCobrar = redondear(ingresos.filter(i => i.estado !== "cargado").reduce((s, i) => s + enUsd(i, i.esperado - i.pagado), 0));
+
   return (
     <>
-      {deCuenta.length > 0 && (
-        <div className="caja">
-          <div className="fila" style={{ padding: 0 }}><span className="tenue chico">De tus cuentas en {nombreMes(periodo, false)}</span><span className="mediano num">{num(total, 0)} <span className="chico tenue">USD</span></span></div>
-          <Barra valor={total ? pagado / total : 0} color="#60A5FA" />
-          <div className="fila mini" style={{ padding: 0 }}><span className="tenue">pagado {num(pagado, 0)}</span>{porPagar.length > 0 ? <span className="ambar">{porPagar.length} por cargar{vencidos.length && vencidos.length < porPagar.length ? ` (${vencidos.length} ${vencidos.length === 1 ? "vencido" : "vencidos"})` : ""}</span> : <span className="ok">todo pagado</span>}</div>
-          {aTarjeta.length > 0 && (
-            <div className="fila chico sep" style={{ paddingBottom: 0, marginTop: 6 }}>
-              <span className="tenue"><T.IconCreditCard size={13} style={{ verticalAlign: -2 }} /> Con tarjeta: {aTarjeta.length} {tarjetaPendientes ? `(${tarjetaPendientes} por cobrar)` : "(ya cobrados)"}</span>
-              <span className="num">~{num(totalTarjeta, 0)} USD</span>
-            </div>
-          )}
+      {/* Tres números arriba: lo que falta pagar, lo pagado y lo que entra. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginBottom: 4 }}>
+        <div className="caja" style={{ padding: "8px 10px" }}>
+          <div className="mini tenue">Por pagar</div>
+          <div className="num" style={{ fontSize: 20, color: porPagarUsd > 0 ? "var(--ambar)" : undefined }}>{num(porPagarUsd, 0)}</div>
+          <div className="mini tenue">{porPagar.length ? `${porPagar.length} · ` : ""}{vencidos.length ? <span className="mal">{vencidos.length} vencido{vencidos.length > 1 ? "s" : ""}</span> : "USD"}</div>
         </div>
-      )}
+        <div className="caja" style={{ padding: "8px 10px" }}>
+          <div className="mini tenue">Pagado</div>
+          <div className="num" style={{ fontSize: 20 }}>{num(pagado, 0)}</div>
+          <div className="mini tenue">{porPagar.length ? "USD" : <span className="ok">todo pagado</span>}</div>
+        </div>
+        <div className="caja" style={{ padding: "8px 10px" }}>
+          <div className="mini tenue">A cobrar</div>
+          <div className="num ok" style={{ fontSize: 20 }}>{aCobrar ? `+${num(aCobrar, 0)}` : "0"}</div>
+          <div className="mini tenue">USD</div>
+        </div>
+      </div>
 
       {porPagar.length > 0 && <div className="titulo-sec"><span>Por pagar de tus cuentas</span><span>{porPagar.length}</span></div>}
       {porPagar.length > 0 && (
@@ -115,23 +142,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
             const ya = sugeridos.get(i.rec.id + i.clave);
             return (
             <div key={i.rec.id + i.clave}>
-            <div className="fila">
-              <button className="izq" style={{ textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
-                <Punto cat={cat.get(i.rec.categoriaId)} chico />
-                <span>
-                  <div>{i.rec.nombre}</div>
-                  <div className="mini tenue">{fechaCorta(i.fecha, false)} · {cuenta.get(i.rec.cuentaId)?.nombre}{i.estado === "parcial" ? <span className="ambar"> · parcial</span> : ""}</div>
-                </span>
-              </button>
-              <span className="derecha">
-                <div className="num chico">{monto(i)}</div>
-                {usd(i)}
-                <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 3 }}>
-                  <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => enCero(i)}>Fue 0</button>
-                  <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => cargar(i)}>Cargar</button>
-                </span>
-              </span>
-            </div>
+            {fila(i, "Cargar")}
             {ya && (
               <div className="caja sug" style={{ margin: "0 0 8px", padding: "8px 10px" }}>
                 <div className="mini">¿Ya lo cargaste? <span className="tenue">{fechaCorta(ya.fecha, false)} · {cat.get(ya.categoriaId)?.nombre}{ya.comentario ? ` · ${ya.comentario}` : ""} · {num(ya.monto)} {ya.moneda}</span></div>
@@ -148,47 +159,16 @@ function Recurrentes({ periodo }: { periodo: string }) {
 
       {aTarjeta.length > 0 && (
         <>
-          <div className="titulo-sec"><span>Van a la tarjeta</span><span>{aTarjeta.length}</span></div>
+          <div className="titulo-sec"><span>Van a la tarjeta · {aTarjeta.length}{tarjetaPendientes ? ` (${tarjetaPendientes} por cobrar)` : ""}</span><span className="num">~{num(totalTarjeta, 0)} USD</span></div>
           <div className="mini tenue" style={{ margin: "-4px 2px 8px" }}>Se pagan con el resumen de {nombreMes(sumarMeses(periodo, 1), false)}: no se suman acá.</div>
-          <div className="caja lista">
-            {aTarjeta.map(i => (
-              <button key={i.rec.id + i.clave} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
-                <span className="izq"><Punto cat={cat.get(i.rec.categoriaId)} chico /><span>
-                  <div>{i.rec.nombre}</div>
-                  <div className="mini tenue"><T.IconCreditCard size={11} style={{ verticalAlign: -1 }} /> {cuenta.get(i.rec.cuentaId)?.nombre} · {fechaCorta(i.fecha, false)}</div>
-                </span></span>
-                <span className="derecha num chico">{i.estado === "cargado" ? <span className="ok"><T.IconCheck size={13} style={{ verticalAlign: -2 }} /> {num(i.pagado)} {i.rec.moneda}</span> : monto(i)}{usd(i)}</span>
-              </button>
-            ))}
-          </div>
+          <div className="caja lista">{aTarjeta.map(i => <div key={i.rec.id + i.clave}>{fila(i)}</div>)}</div>
         </>
       )}
 
       {ingresos.length > 0 && (
         <>
           <div className="titulo-sec"><span>A cobrar</span><span className="ok num">+{num(totalCobrar, 0)} USD</span></div>
-          <div className="caja lista">
-            {ingresos.map(i => (
-              <div key={i.rec.id + i.clave} className="fila">
-                <button className="izq" style={{ textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
-                  <Punto cat={cat.get(i.rec.categoriaId)} chico />
-                  <span><div>{i.rec.nombre}</div><div className="mini tenue">{fechaCorta(i.fecha, false)} · {cuenta.get(i.rec.cuentaId)?.nombre}</div></span>
-                </button>
-                <span className="derecha">
-                  {i.estado === "cargado"
-                    ? <div className="ok num chico">{i.cero ? "0 · no se cobró" : `+${num(i.pagado)} ${i.rec.moneda}`}</div>
-                    : <div className="num chico">+{monto(i)}</div>}
-                  {!i.cero && usd(i)}
-                  {i.estado !== "cargado" && (
-                    <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 3 }}>
-                      <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => enCero(i)}>Fue 0</button>
-                      <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => cargar(i)}>Cargar</button>
-                    </span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
+          <div className="caja lista">{ingresos.map(i => <div key={i.rec.id + i.clave}>{fila(i, "Cobrar")}</div>)}</div>
           <button className="mini viol" style={{ margin: "-4px 2px 0" }} onClick={() => nav.abrir({ p: "recurrente", tipo: "ingreso" })}>+ Agregar ingreso</button>
         </>
       )}
@@ -198,16 +178,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
           <button className="titulo-sec" style={{ width: "100%" }} onClick={() => setVerPagados(!verPagados)}>
             <span>Ya pagados ({pagados.length})</span>{verPagados ? <T.IconChevronDown size={16} /> : <T.IconChevronRight size={16} />}
           </button>
-          {verPagados && (
-            <div className="caja lista">
-              {pagados.map(i => (
-                <button key={i.rec.id + i.clave} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
-                  <span className="izq"><Punto cat={cat.get(i.rec.categoriaId)} chico /><span>{i.rec.nombre}</span></span>
-                  {i.cero ? <span className="tenue chico">0 · no se pagó</span> : <span className="ok num chico"><T.IconCheck size={13} style={{ verticalAlign: -2 }} /> {num(i.pagado)} {i.rec.moneda}</span>}
-                </button>
-              ))}
-            </div>
-          )}
+          {verPagados && <div className="caja lista">{pagados.map(i => <div key={i.rec.id + i.clave}>{fila(i)}</div>)}</div>}
         </>
       )}
 
@@ -229,15 +200,32 @@ function Tarjetas({ periodo }: { periodo: string }) {
   const hayEstimados = aPagar.some(x => (x.resumen.items.length || x.insts.length) && !x.real);
   const siguiente = sumarMeses(periodo, 1);
   const juntando = redondear(tarjetas.reduce((s, c) => s + aPagarTarjeta(c, d.movimientos, d.recurrentes, siguiente, tasaR, d.resumenesCargados).total, 0));
+  // Las mismas que "Cuotas que siguen" de Cómo venís: después del resumen que se junta.
+  const cuotas = redondear(tarjetas.flatMap(c => cuotasFuturas(c, d.movimientos, periodo)).reduce((s, q) => s + q.usd, 0));
 
   if (!tarjetas.length) return <div className="vacio">No tenés tarjetas cargadas.</div>;
   return (
     <>
-      <div className="caja">
-        <div className="tenue chico">Tarjetas a pagar en {nombreMes(periodo, false)}</div>
-        <div className="mediano num">{hayEstimados ? "~" : ""}{num(total, 0)} <span className="chico tenue">USD</span></div>
-        {hayEstimados && <div className="mini tenue">Estimado con lo que cargaste. Se confirma al subir cada resumen.</div>}
+      {/* Tres números arriba: lo que se paga este mes, lo que se junta para el que viene
+          y las cuotas que siguen después. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+        <div className="caja" style={{ padding: "8px 10px" }}>
+          <div className="mini tenue">A pagar en {mesCorto(periodo)}</div>
+          <div className="num" style={{ fontSize: 20 }}>{hayEstimados ? "~" : ""}{num(total, 0)}</div>
+          <div className="mini tenue">{hayEstimados ? "estimado" : "USD"}</div>
+        </div>
+        <div className="caja" style={{ padding: "8px 10px" }}>
+          <div className="mini tenue">Se junta para {mesCorto(siguiente)}</div>
+          <div className="num" style={{ fontSize: 20 }}>{num(juntando, 0)}</div>
+          <div className="mini tenue">USD</div>
+        </div>
+        <div className="caja" style={{ padding: "8px 10px" }}>
+          <div className="mini tenue">Cuotas después</div>
+          <div className="num" style={{ fontSize: 20 }}>{num(cuotas, 0)}</div>
+          <div className="mini tenue">USD</div>
+        </div>
       </div>
+      {hayEstimados && <div className="mini tenue" style={{ margin: "6px 2px 0" }}>Estimado con lo que cargaste. Se confirma al subir cada resumen.</div>}
 
       {aPagar.map(({ resumen: r, insts, previsto, real, total: totalR, desde }) => {
         return (
@@ -259,7 +247,7 @@ function Tarjetas({ periodo }: { periodo: string }) {
                     {insts.map(i => (
                       <div key={i.rec.id + i.clave} className="fila mini" style={{ padding: "2px 0" }}>
                         <span>{i.estado === "cargado" ? <span className="ok"><T.IconCheck size={12} style={{ verticalAlign: -2 }} /> </span> : <span className="ambar">◷ </span>}{i.rec.nombre} <span className="tenue">· {fechaCorta(i.fecha, false)}</span></span>
-                        <span className={`num ${i.estado === "cargado" ? "" : "tenue"}`}>{i.estado === "cargado" ? `${num(i.pagado)} ${i.rec.moneda}` : `${i.estado === "parcial" ? "falta" : "previsto"} ~${num(i.falta)} ${i.rec.moneda}`}</span>
+                        <span className={`num ${i.estado === "cargado" ? "" : "tenue"}`}>{i.estado === "cargado" ? (() => { const t = tasaR(i.rec); return t && i.rec.moneda !== "USD" ? `${num(i.pagado / t, 0)} USD` : `${num(i.pagado)} ${i.rec.moneda}`; })() : `${i.estado === "parcial" ? "falta" : "previsto"} ~${(() => { const t = tasaR(i.rec); return t && i.rec.moneda !== "USD" ? `${num(i.falta / t, 0)} USD` : `${num(i.falta)} ${i.rec.moneda}`; })()}`}</span>
                       </div>
                     ))}
                   </div>
@@ -274,14 +262,7 @@ function Tarjetas({ periodo }: { periodo: string }) {
         );
       })}
 
-      <div className="caja">
-        <div className="fila" style={{ padding: 0 }}><span className="chico">Se va juntando para {nombreMes(siguiente, false)}</span><span className="num">{num(juntando, 0)} USD</span></div>
-        <div className="mini tenue">Lo que compraste después del cierre, más cuotas.</div>
-      </div>
-      {(() => {
-        const cuotas = redondear(tarjetas.flatMap(c => cuotasFuturas(c, d.movimientos, resumenQueVence(c, d.movimientos, periodo).periodo)).reduce((s, q) => s + q.usd, 0));
-        return cuotas > 0 ? <div className="mini tenue centro">Cuotas comprometidas a futuro: {num(cuotas)} USD</div> : null;
-      })()}
+      <div className="mini tenue centro">"Se junta": lo que compraste después del cierre, más cuotas. "Cuotas después": las que siguen en los resúmenes siguientes.</div>
     </>
   );
 }

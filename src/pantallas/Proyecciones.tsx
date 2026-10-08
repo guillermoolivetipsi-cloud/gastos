@@ -75,7 +75,14 @@ export function Proyecciones() {
                   </span>
                 </button>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span className={`num chico${p.activa ? (ing ? " ok" : "") : " tenue"}`}>{ing ? "+" : ""}{num(p.monto)}{p.montoMax && p.montoMax > p.monto ? `–${num(p.montoMax)}` : ""} {p.moneda}</span>
+                  <span className="derecha">{(() => {
+                    // Dólares primero; la moneda original abajo.
+                    const rango = (a: number, b?: number) => `${num(a)}${b && b > a ? `–${num(b)}` : ""}`;
+                    const t = tasa(p.moneda), clase = `num chico${p.activa ? (ing ? " ok" : "") : " tenue"}`;
+                    const original = `${ing ? "+" : ""}${rango(p.monto, p.montoMax)} ${p.moneda}`;
+                    if (p.moneda === "USD" || !t) return <div className={clase}>{original}</div>;
+                    return <><div className={clase}>~{ing ? "+" : ""}{rango(Math.round(p.monto / t), p.montoMax ? Math.round(p.montoMax / t) : undefined)} USD</div><div className="mini tenue num">{original}</div></>;
+                  })()}</span>
                   {!termino && <Interruptor on={p.activa} cambiar={v => db.proyecciones.update(p.id, { activa: v })} />}
                 </span>
                 {termino && (

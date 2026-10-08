@@ -3,11 +3,11 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav } from "../nav";
 import { MONEDAS, type Cuenta, type Dolar, type Moneda } from "../tipos";
-import { fechaCorta, nombreMes, periodoDe, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
+import { fechaCorta, mesCorto, nombreMes, periodoDe, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import { aPagarTarjeta } from "../lib/analisis";
 import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
-import { Interruptor, Seg, useToast } from "../ui/piezas";
+import { Dia, Interruptor, Montos, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 export function ListaCuentas() {
@@ -159,11 +159,13 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
         <div className="caja lista">
           {r.items.map(q => (
             <button key={q.mov.id + q.numero} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: q.mov.id })}>
-              <span className="izq"><span>
+              <span className="izq"><Dia dia={Number(q.mov.fecha.slice(8))} abajo={mesCorto(q.mov.fecha.slice(0, 7))} /><span style={{ minWidth: 0 }}>
                 <div>{cat.get(q.mov.categoriaId)}{q.mov.comentario ? <span className="tenue"> · {q.mov.comentario}</span> : ""}</div>
-                <div className="mini tenue">{fechaCorta(q.mov.fecha, false)}{q.de > 1 ? ` · cuota ${q.numero} de ${q.de}` : ""}{q.numero === 1 && esDudosa(c, q.mov.fecha) ? <span className="ambar"> · puede ir al próximo</span> : ""}</div>
+                <div className="mini tenue">{q.de > 1 ? `cuota ${q.numero} de ${q.de}` : "un pago"}{q.numero === 1 && esDudosa(c, q.mov.fecha) ? <span className="ambar"> · puede ir al próximo</span> : ""}</div>
               </span></span>
-              <span className="num">{num(q.usd)}</span>
+              <span className="derecha">{q.de > 1
+                ? <div className="num chico">{num(q.usd)} USD</div>
+                : <Montos usd={q.mov.usd} monto={q.mov.monto} moneda={q.mov.moneda} />}</span>
             </button>
           ))}
         </div>
