@@ -163,17 +163,24 @@ export function Resumen() {
           <button className={`pill${verProy ? " on" : ""}`} style={{ fontSize: 12, padding: "3px 10px" }} onClick={() => setConProy(!conProy)}>Con proyecciones{verProy ? " ✓" : ""}</button>
         </div>
       )}
-      {grafico === "torta" ? (<>
-        <Dona
-          partes={catsVer.flatMap(c => {
-            const p = verProy ? proyPorCat.get(c.cat.id) : undefined;
-            return [{ valor: c.total, color: c.cat.color }, { valor: p?.seguro ?? 0, color: c.cat.color, tenue: true }, { valor: p?.opcional ?? 0, color: c.cat.color, rayado: true }];
-          })}
-          centro={total + proyTotal ? `${num(total + proyTotal)} USD` : vacio}
-          sub={verProy ? `${num(proyTotal, 0)} proyectado` : total ? undefined : enEsto} />
-          {verProy && <div className="mini tenue centro" style={{ marginTop: -4 }}><span className="ambar">+ claro</span>: seguro · <span className="viol" style={{ textDecoration: "underline dotted" }}>+ rayado</span>: opcional</div>}
-          {previstoTotal >= 1 && <div className="mini tenue centro" style={{ marginTop: 2 }}>+ ~{num(previstoTotal, 0)} previsto</div>}
-      </>) : (
+      {grafico === "torta" ? (
+        // La torta chica y el total grande al lado (regla de Resumen): entra más sin bajar.
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, margin: "4px 0 6px" }}>
+          <Dona tam={120} centro=""
+            partes={catsVer.flatMap(c => {
+              const p = verProy ? proyPorCat.get(c.cat.id) : undefined;
+              return [{ valor: c.total, color: c.cat.color }, { valor: p?.seguro ?? 0, color: c.cat.color, tenue: true }, { valor: p?.opcional ?? 0, color: c.cat.color, rayado: true }];
+            })} />
+          <div style={{ minWidth: 0 }}>
+            {total + proyTotal
+              ? <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(total + proyTotal, 0)} <span className="chico tenue">USD</span></div>
+              : <div className="chico tenue">{vacio}</div>}
+            <div className="mini tenue">{enEsto}</div>
+            {verProy && <div className="mini tenue">{num(proyTotal, 0)} proyectado: <span className="ambar">claro</span> seguro · <span className="viol" style={{ textDecoration: "underline dotted" }}>rayado</span> opcional</div>}
+            {previstoTotal >= 1 && <div className="mini tenue">+ ~{num(previstoTotal, 0)} previsto</div>}
+          </div>
+        </div>
+      ) : (
         <div className="fila" style={{ padding: "4px 2px 10px" }}>
           <span className="tenue chico">{total ? `Total ${enEsto}` : `${vacio} ${enEsto}`}</span>
           {total > 0 && <span className="mediano num">{num(total)} <span className="chico tenue">USD</span></span>}
@@ -264,15 +271,17 @@ function TarjetaComoVenis({ periodo }: { periodo: string }) {
   const x = useInsights(periodo);
   if (!x) return null;
   const partes = [
-    x.tarjeta.total > 0 && `Tarjeta ${x.tarjeta.pct}% del mes`,
-    x.comprometido.total > 0 && `${nombreMes(x.comprometido.periodo, false)} ya comprometido ~${num(x.comprometido.total, 0)} USD`,
-    x.suscripciones.total > 0 && `Suscripciones ${num(x.suscripciones.total, 0)} USD`,
+    x.tarjeta.total > 0 && `tarjeta ${x.tarjeta.pct}%`,
+    x.comprometido.total > 0 && `${nombreMes(x.comprometido.periodo, false)} ~${num(x.comprometido.total, 0)}`,
+    x.suscripciones.total > 0 && `suscripciones ${num(x.suscripciones.total, 0)}`,
   ].filter(Boolean);
   if (!partes.length) return null;
   return (
-    <button className="caja" style={{ width: "100%", textAlign: "left", borderColor: "#3A2F5C" }} onClick={() => nav.abrir({ p: "como-venis", periodo })}>
-      <div className="fila" style={{ padding: 0 }}><span className="viol">✦ Cómo venís en {nombreMes(periodo, false)}</span><T.IconChevronRight size={16} className="tenue" /></div>
-      <div className="mini tenue" style={{ marginTop: 4, lineHeight: 1.5 }}>{partes.join(" · ")}</div>
+    // Una sola línea arriba (regla de Resumen); se toca para ver el detalle.
+    <button style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 6, padding: "4px 2px" }} onClick={() => nav.abrir({ p: "como-venis", periodo })}>
+      <span className="viol chico" style={{ flex: "none" }}>✦ Cómo venís:</span>
+      <span className="mini tenue" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{partes.join(" · ")}</span>
+      <T.IconChevronRight size={16} className="tenue" style={{ flex: "none" }} />
     </button>
   );
 }

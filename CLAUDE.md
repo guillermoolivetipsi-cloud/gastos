@@ -37,6 +37,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Guardar:** un botón grande fijo abajo, como estaba.
   - **"Repetir con un toque":** debajo de las categorías.
   - **Piezas compartidas** en `src/ui/formulario.tsx`: `MontoConMoneda`, `GrillaCategorias` y `FechaEnTitulo`. Las usan "Nuevo gasto", el recurrente ("· desde hoy ▾") y la proyección ("· oct ▾"); cualquier formulario nuevo las usa también.
+- **Resumen y pantallas de números** (decididas en octubre 2026; valen también para Cómo venís, Proyecciones y la tarjeta):
+  - **Período:** como estaba, tres filas: pestañas (GASTOS · INGRESOS · PROYECCIONES), vistas (Día · Semana · Mes · Año · Período) y «‹ Octubre 2026 ›».
+  - **Números de arriba:** como estaban, las cajas Fijos y Variables con su barra y «te quedan X para N días».
+  - **Gráfico del mes:** la torta chica (120 px) con el total grande al lado (30 px), y debajo del total lo previsto y lo proyectado. Nunca una torta grande centrada.
+  - **Lista por categoría:** como estaba, con el porcentaje.
+  - **«Cómo venís»:** una sola línea arriba ("✦ Cómo venís: tarjeta 22% · noviembre ~1.982 · suscripciones 57 ›"), con textos cortos; se toca para el detalle.
+  - **Botones de arriba:** la nube (Mandar a Finanzas) y la bandeja (Para revisar), como estaban.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
