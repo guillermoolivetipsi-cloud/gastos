@@ -59,10 +59,11 @@ export function ComoVenis({ periodo }: { periodo: string }) {
         <div className="fila" style={{ paddingBottom: 0 }}><span className="mediano"><Num n={s.total} /> <span className="chico tenue">USD/mes</span></span><span className="tenue chico">≈ <Num n={s.anual} /> por año</span></div>
         {s.items.map(i => (
           <div key={i.nombre} className="fila chico" style={{ padding: "3px 0" }}>
-            <span>{i.nombre}{i.nueva && <span className="etiq e-pend" style={{ marginLeft: 6 }}>nueva</span>}</span><span className="num">{num(i.usd, 0)}</span>
+            <span>{i.nombre}{i.nueva && <span className="etiq e-pend" style={{ marginLeft: 6 }}>nueva</span>}{i.previsto && <span className="tenue mini"> · previsto</span>}</span><span className={`num${i.previsto ? " tenue" : ""}`}>{i.previsto ? "~" : ""}{num(i.usd, 0)}</span>
           </div>
         ))}
-        {!s.items.length && <div className="tenue chico">No hubo suscripciones este mes.</div>}
+        {!s.items.length && <div className="tenue chico">No hay suscripciones este mes.</div>}
+        {s.items.some(i => i.previsto) && <div className="mini tenue" style={{ marginTop: 4 }}>"Previsto": todavía no se cobró; va con su monto estimado.</div>}
       </div>
 
       <div className="caja">

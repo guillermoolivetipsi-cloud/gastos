@@ -33,7 +33,7 @@ export interface Insights {
     costoCambio: { usd: number; pct: number } | null;
   };
   comprometido: { periodo: string; tarjetas: number; recurrentes: number; entra: number; total: number };
-  suscripciones: { total: number; promedio: number | null; anual: number; items: { nombre: string; usd: number; nueva: boolean }[] };
+  suscripciones: { total: number; promedio: number | null; anual: number; items: { nombre: string; usd: number; nueva: boolean; previsto: boolean }[] };
   cambios: { cat: Categoria; ahora: number; promedio: number; dif: number }[];
 }
 
@@ -78,7 +78,13 @@ export function calcularInsights(p: string, movs: Movimiento[], cats: Categoria[
   const agrup = new Map<string, number>();
   for (const m of susAhora) agrup.set(nombre(m), (agrup.get(nombre(m)) ?? 0) + (m.usd ?? 0));
   const mesesPrev = [1, 2, 3].map(k => suma(gastosDe(movs, sumarMeses(p, -k)).filter(esSus))).filter(x => x > 0);
-  const totalSus = suma(susAhora);
+  // Las que vienen este mes y todavía no se cobraron (casi todas van a la tarjeta y
+  // se cargan con el resumen): cuentan con su monto estimado, marcadas "previsto".
+  const previstas = recurrentesDelMes(recs, movs, p, tasa)
+    .filter(i => i.rec.tipo === "gasto" && catPorId.get(i.rec.categoriaId)?.nombre === "Suscripciones" && i.estado !== "cargado")
+    .map(i => { const t = tasa(i.rec); return { nombre: i.rec.nombre, usd: t ? (i.esperado - i.pagado) / t : 0 }; })
+    .filter(x => x.usd > 0);
+  const totalSus = redondear(suma(susAhora) + previstas.reduce((s, x) => s + x.usd, 0));
 
   // 4 · Qué cambió contra el promedio de los 3 meses anteriores (con datos)
   const cambios: Insights["cambios"] = [];
@@ -105,7 +111,10 @@ export function calcularInsights(p: string, movs: Movimiento[], cats: Categoria[
     suscripciones: {
       total: totalSus, anual: redondear(totalSus * 12),
       promedio: mesesPrev.length ? redondear(mesesPrev.reduce((a, b) => a + b, 0) / mesesPrev.length) : null,
-      items: [...agrup.entries()].sort((a, b) => b[1] - a[1]).map(([n, usd]) => ({ nombre: n, usd: redondear(usd), nueva: !antes.includes(n.toLowerCase()) && antes.length > 0 })),
+      items: [
+        ...[...agrup.entries()].map(([n, usd]) => ({ nombre: n, usd: redondear(usd), nueva: !antes.includes(n.toLowerCase()) && antes.length > 0, previsto: false })),
+        ...previstas.map(x => ({ nombre: x.nombre, usd: redondear(x.usd), nueva: false, previsto: true })),
+      ].sort((a, b) => b.usd - a.usd),
     },
     cambios: cambios.slice(0, 6),
   };
