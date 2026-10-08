@@ -280,11 +280,11 @@ export function Editor(props: Props) {
       <div className="cats">
         {visibles.map(c => (
           <button key={c.id} className={`cat${c.id === categoriaId ? " on" : ""}`} onClick={() => setCategoriaId(c.id)}>
-            <Punto cat={c} /><span>{c.nombre}</span>
+            <Punto cat={c} grande /><span>{c.nombre}</span>
           </button>
         ))}
         {!todas && cats.length > 7 && (
-          <button className="cat" onClick={() => setTodas(true)}><Punto icono="question-mark" color="#2A2A36" /><span>Todas</span></button>
+          <button className="cat" onClick={() => setTodas(true)}><Punto icono="question-mark" color="#2A2A36" grande /><span>Todas</span></button>
         )}
       </div>
 

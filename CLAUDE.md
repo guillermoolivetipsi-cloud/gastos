@@ -11,6 +11,19 @@ Es una **app de Android**, empaquetada con Capacitor (proyecto en `android/`), i
 - Una compra con tarjeta cuenta en el mes de la compra; se paga con el resumen del mes siguiente.
 - El Excel a Finanzas va siempre por meses enteros y en el mismo orden (Finanzas numera los duplicados).
 
+## Reglas visuales (definidas por Guillermo; respetarlas en todo lo nuevo)
+
+Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual mostrar la maqueta.
+
+- **Tamaños de texto** (`src/estilos.css`): texto general 15 px y título de pantalla 20 px (no se cambian). Textos grises de aclaración: `.mini` 13 px, `.chico` 14 px; títulos de sección 14 px. Etiquetas de color (`.etiq`: fijo, variable, seguro…) 12 px. **Nada de contenido nuevo por debajo de 13 px**, salvo los números de los gráficos.
+- **Categorías:** en la grilla para elegir (al cargar un gasto y en Categorías) el círculo es de 54 px con ícono de 24 px (`<Punto grande />`) y el nombre de 13 px. En las listas el círculo sigue de 28 px (`chico`). El selector de íconos queda en 48 px para que entren 6 por fila.
+- **Se probaron y no se cambian** (octubre 2026): el texto general, los íconos de las listas, los botones dentro de las filas, los montos, la barra de abajo y los números de los gráficos.
+- **Barras con objetivo:** la marca blanca va fija al 80% del objetivo; la barra es del color de la categoría, amarilla desde el 80% y roja al pasarse. Lo previsto (recurrentes sin cargar) va como tramo rayado y cuenta para el color.
+- **Números que todavía no pasaron:** con "~" y en gris, con la palabra "previsto" o "estimado". Nunca mezclar lo real con lo previsto sin marcarlo.
+- **Comparaciones de un mes en curso:** siempre contra los meses anteriores hasta el mismo día, y el texto lo dice ("a esta altura").
+- **Proyecciones:** "seguro" y "opcional" (nunca "capricho"); en la torta, lo seguro en tono claro y lo opcional rayado.
+- **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
+
 ## Estructura
 
 - `src/tipos.ts`: modelo. `src/db.ts`: base (Dexie) y carga inicial de cuentas y categorías. `src/datos.ts`: los datos leídos una vez y compartidos.

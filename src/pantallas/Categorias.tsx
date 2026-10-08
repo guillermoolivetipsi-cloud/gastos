@@ -26,11 +26,11 @@ export function ListaCategorias() {
       <div className="cats">
         {cats.filter(c => !c.archivada).map(c => (
           <button key={c.id} className="cat" onClick={() => nav.abrir({ p: "categoria", id: c.id })}>
-            <Punto cat={c} /><span>{c.nombre}</span>
+            <Punto cat={c} grande /><span>{c.nombre}</span>
             {tipo === "gasto" && <EtiquetaClase clase={claseDe(c)} sugerida={!c.claseConfirmada} />}
           </button>
         ))}
-        <button className="cat" onClick={() => nav.abrir({ p: "categoria", tipo })}><Punto icono="question-mark" color="var(--viol)" /><span>Crear</span></button>
+        <button className="cat" onClick={() => nav.abrir({ p: "categoria", tipo })}><Punto icono="question-mark" color="var(--viol)" grande /><span>Crear</span></button>
       </div>
       {cats.some(c => c.archivada) && (
         <>
@@ -106,7 +106,7 @@ export function EditorCategoria({ id, tipo }: { id?: string; tipo?: Tipo }) {
       )}
 
       <div className="titulo-sec"><span>Ícono</span></div>
-      <div className="cats" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+      <div className="cats iconos" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
         {(todosIconos ? iconos : iconos.slice(0, 23)).map(n => (
           <button key={n} className={`cat${c.icono === n ? " on" : ""}`} onClick={() => set("icono", n)} aria-label={n}>
             <Punto icono={n} color={c.icono === n ? c.color : "#2A2A36"} chico />

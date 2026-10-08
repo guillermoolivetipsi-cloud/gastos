@@ -80,8 +80,8 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 .fila .izq { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
 .fila .izq > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tenue { color: var(--tenue); }
-.chico { font-size: 13px; }
-.mini { font-size: 12px; }
+.chico { font-size: 14px; }
+.mini { font-size: 13px; }
 .viol { color: var(--viol-claro); }
 .ok { color: var(--ok); }
 .mal { color: var(--mal); }
@@ -91,7 +91,7 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 .mediano { font-size: 20px; }
 .derecha { text-align: right; }
 .centro { text-align: center; }
-.titulo-sec { color: var(--tenue); font-size: 13px; margin: 18px 2px 8px; display: flex; justify-content: space-between; }
+.titulo-sec { color: var(--tenue); font-size: 14px; margin: 18px 2px 8px; display: flex; justify-content: space-between; }
 .espacio { height: 12px; }
 .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .vacio { text-align: center; color: var(--tenue); padding: 40px 20px; }
@@ -105,7 +105,7 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 .pills.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
 .pills.scroll::-webkit-scrollbar { display: none; }
 
-.etiq { font-size: 11px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+.etiq { font-size: 12px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
 .e-fijo { background: var(--azul-fondo); color: var(--azul); }
 .e-variable { background: var(--ambar-fondo); color: var(--ambar); }
 .e-ok { background: var(--ok-fondo); color: var(--ok); }
@@ -156,8 +156,10 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 .conversion { text-align: center; color: var(--tenue); font-size: 14px; min-height: 20px; }
 
 .cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 6px; margin: 10px 0; }
-.cat { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; text-align: center; color: var(--tinta); }
-.cat .punto { width: 48px; height: 48px; }
+.cat { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 13px; text-align: center; color: var(--tinta); }
+.cat .punto { width: 54px; height: 54px; }
+/* El selector de íconos (6 por fila) queda como estaba, para que entre en el ancho. */
+.cats.iconos .punto { width: 48px; height: 48px; }
 .cat.on .punto { outline: 2px solid var(--tinta); outline-offset: 2px; }
 .cat span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

@@ -2,10 +2,12 @@ import { createContext, useCallback, useContext, useRef, useState, type ReactNod
 import type { Categoria, Clase } from "../tipos";
 import { Icono, T } from "./Icono";
 
-export function Punto({ cat, chico, icono, color }: { cat?: Pick<Categoria, "icono" | "color">; chico?: boolean; icono?: string; color?: string }) {
+/** El circulito de color con el ícono de la categoría. `grande`: el de la grilla de
+ *  categorías (al cargar un gasto y en Categorías), con el ícono de 24 px. */
+export function Punto({ cat, chico, grande, icono, color }: { cat?: Pick<Categoria, "icono" | "color">; chico?: boolean; grande?: boolean; icono?: string; color?: string }) {
   return (
     <span className={`punto${chico ? " chico" : ""}`} style={{ background: color ?? cat?.color ?? "#2A2A36" }}>
-      <Icono nombre={icono ?? cat?.icono ?? "question-mark"} size={chico ? 15 : 18} />
+      <Icono nombre={icono ?? cat?.icono ?? "question-mark"} size={chico ? 15 : grande ? 24 : 18} />
     </span>
   );
 }
