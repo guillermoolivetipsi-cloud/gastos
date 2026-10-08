@@ -47,6 +47,7 @@ export function Editor(props: Props) {
   const [otrasCuotas, setOtrasCuotas] = useState(false);
   const [otrasCuentas, setOtrasCuentas] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [elegirFecha, setElegirFecha] = useState(false);
 
   const cuentas = d.cuentas.filter(c => !c.archivada || c.id === cuentaId);
   const cuenta = d.cuentas.find(c => c.id === cuentaId);
@@ -112,9 +113,9 @@ export function Editor(props: Props) {
   // Categorías: primero las que más usás para este tipo en los últimos 90 días.
   const cats = useMemo(() => categoriasPorUso(d.movimientos, d.categorias, tipo, categoriaId), [d.categorias, d.movimientos, tipo, categoriaId]);
   const visibles = todas ? cats : (() => {
-    const top = cats.slice(0, 7);
+    const top = cats.slice(0, 9);
     const sel = cats.find(c => c.id === categoriaId);
-    return sel && !top.includes(sel) ? [...top.slice(0, 6), sel] : top;
+    return sel && !top.includes(sel) ? [...top.slice(0, 8), sel] : top;
   })();
 
   // Lo que más repetís: se carga con un toque (no al editar ni al pagar un recurrente).
@@ -199,14 +200,43 @@ export function Editor(props: Props) {
     <div className="pantalla sin-tabs">
       <div className="enc">
         <button className="accion" aria-label="Cerrar" onClick={nav.volver}><T.IconX size={22} /></button>
-        <h1>{existente ? "Editar" : tipo === "gasto" ? "Nuevo gasto" : "Nuevo ingreso"}</h1>
+        <h1>{existente ? "Editar" : tipo === "gasto" ? "Nuevo gasto" : "Nuevo ingreso"}
+          {/* La fecha va en el título: casi siempre es hoy. Un toque y se elige otra. */}
+          <button type="button" className="fecha-titulo" onClick={() => setElegirFecha(true)} aria-label="Cambiar la fecha">
+            · {fecha === hoy() ? "hoy" : fecha === sumarDias(hoy(), -1) ? "ayer" : fechaCorta(fecha, false)} ▾
+          </button>
+        </h1>
         {existente && <button className="accion peligro" aria-label="Eliminar" onClick={borrar}><T.IconTrash size={21} /></button>}
       </div>
 
       <Seg opciones={[["gasto", "Gasto"], ["ingreso", "Ingreso"]]} valor={tipo} cambiar={cambiarTipo} />
 
+      {/* La moneda al lado del número: un toque y pasa a la siguiente. */}
+      <div className="monto-grande" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <input inputMode="decimal" placeholder="0" value={montoTxt} autoFocus={!existente && !props.monto}
+          onChange={e => setMontoTxt(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto"
+          style={{ width: `${Math.max(1.2, montoTxt.length * 0.62 + 0.4)}em`, maxWidth: "70%", textAlign: "right" }} />
+        <button type="button" className="chip-moneda" aria-label={`Moneda: ${moneda}. Tocá para cambiar`}
+          onClick={() => setMoneda(MONEDAS[(MONEDAS.indexOf(moneda) + 1) % MONEDAS.length])}>{moneda} ▾</button>
+      </div>
+      <div className="conversion num">
+        {moneda === "USD" ? "" : monto > 0 ? (enUsd != null ? `≈ ${num(enUsd)} USD${moneda === "ARS" ? ` · dólar ${cuenta?.dolar ?? "blue"}` : ""}` : "se convierte al tener conexión") : ""}
+      </div>
+
+      <div className="titulo-sec"><span>Categoría</span></div>
+      <div className="cats cinco">
+        {visibles.map(c => (
+          <button key={c.id} className={`cat${c.id === categoriaId ? " on" : ""}`} onClick={() => setCategoriaId(c.id)}>
+            <Punto cat={c} grande /><span>{c.nombre}</span>
+          </button>
+        ))}
+        {!todas && cats.length > 9 && (
+          <button className="cat" onClick={() => setTodas(true)}><Punto icono="question-mark" color="#2A2A36" grande /><span>Todas</span></button>
+        )}
+      </div>
+
       {tipo === "gasto" && frecuentes.length > 0 && !montoTxt && (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 4 }}>
           <div className="etq">Repetir con un toque{fecha !== hoy() ? ` (${fechaCorta(fecha, false)})` : ""}</div>
           <div className="pills scroll">
             {frecuentes.map(m => {
@@ -221,17 +251,6 @@ export function Editor(props: Props) {
           </div>
         </div>
       )}
-
-      <div className="monto-grande">
-        <input inputMode="decimal" placeholder="0" value={montoTxt} autoFocus={!existente && !props.monto}
-          onChange={e => setMontoTxt(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto" />
-      </div>
-      <div style={{ maxWidth: 240, margin: "0 auto 6px" }}>
-        <Seg opciones={MONEDAS.map(m => [m, m] as [Moneda, string])} valor={moneda} cambiar={setMoneda} />
-      </div>
-      <div className="conversion num">
-        {moneda === "USD" ? "" : monto > 0 ? (enUsd != null ? `≈ ${num(enUsd)} USD${moneda === "ARS" ? ` · dólar ${cuenta?.dolar ?? "blue"}` : ""}` : "se convierte al tener conexión") : ""}
-      </div>
 
       {/* Lo único que importa elegir es si fue con tarjeta: cambia cuándo lo pagás.
           Las demás cuentas quedan en "otra cuenta". */}
@@ -275,18 +294,6 @@ export function Editor(props: Props) {
           })()}
         </div>
       )}
-
-      <div className="titulo-sec"><span>Categoría</span></div>
-      <div className="cats">
-        {visibles.map(c => (
-          <button key={c.id} className={`cat${c.id === categoriaId ? " on" : ""}`} onClick={() => setCategoriaId(c.id)}>
-            <Punto cat={c} grande /><span>{c.nombre}</span>
-          </button>
-        ))}
-        {!todas && cats.length > 7 && (
-          <button className="cat" onClick={() => setTodas(true)}><Punto icono="question-mark" color="#2A2A36" grande /><span>Todas</span></button>
-        )}
-      </div>
 
       {/* Etiquetas de la categoría elegida; "+ otras" muestra el resto. Una nueva queda en esta categoría. */}
       <div className="titulo-sec"><span>Etiquetas</span></div>
@@ -335,16 +342,6 @@ export function Editor(props: Props) {
         </div>
       )}
 
-      <div className="titulo-sec"><span>Fecha</span></div>
-      <div className="pills">
-        {fechas.map((f, i) => <button key={f} className={`pill${fecha === f ? " on" : ""}`} onClick={() => setFecha(f)}>{["hoy", "ayer", "anteayer"][i]}</button>)}
-        <label className={`pill${!fechas.includes(fecha) ? " on" : ""}`} style={{ position: "relative" }}>
-          <T.IconCalendar size={15} />{!fechas.includes(fecha) ? fechaCorta(fecha, false) : "otro día"}
-          <input type="date" value={fecha} onChange={e => e.target.value && setFecha(e.target.value)}
-            style={{ position: "absolute", inset: 0, opacity: 0 }} aria-label="Elegir fecha" />
-        </label>
-      </div>
-
       <button className="titulo-sec" style={{ width: "100%" }} onClick={() => setDetalles(!detalles)}>
         <span>Más detalles</span>{detalles ? <T.IconChevronDown size={16} /> : <T.IconChevronRight size={16} />}
       </button>
@@ -371,6 +368,18 @@ export function Editor(props: Props) {
 
       <div className="pie-fijo"><button className="btn" disabled={!puedeGuardar} onClick={guardar}>{existente ? "Guardar cambios" : "Guardar"}</button></div>
 
+
+      <Hoja abierta={elegirFecha} cerrar={() => setElegirFecha(false)}>
+        <h2>¿Qué día fue?</h2>
+        <div className="pills" style={{ marginTop: 8 }}>
+          {fechas.map((f, i) => <button key={f} className={`pill${fecha === f ? " on" : ""}`} onClick={() => { setFecha(f); setElegirFecha(false); }}>{["hoy", "ayer", "anteayer"][i]}</button>)}
+          <label className={`pill${!fechas.includes(fecha) ? " on" : ""}`} style={{ position: "relative" }}>
+            <T.IconCalendar size={15} />{!fechas.includes(fecha) ? fechaCorta(fecha, false) : "otro día"}
+            <input type="date" value={fecha} onChange={e => { if (e.target.value) { setFecha(e.target.value); setElegirFecha(false); } }}
+              style={{ position: "absolute", inset: 0, opacity: 0 }} aria-label="Elegir fecha" />
+          </label>
+        </div>
+      </Hoja>
       <Hoja abierta={otrasCuentas} cerrar={() => setOtrasCuentas(false)}>
         <h2>¿De qué cuenta?</h2>
         {cuentas.filter(c => !c.esTarjeta).map(c => (

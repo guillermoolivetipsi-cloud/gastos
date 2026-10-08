@@ -197,3 +197,9 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
 .dia-col { width: 30px; flex: none; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .dia-col > span:first-child { font-size: 18px; }
 .dia-col > span:last-child { font-size: 12px; color: var(--tenue); }
+/* Cargar un gasto: la fecha en el título, la moneda al lado del monto, categorías de a 5. */
+.fecha-titulo { font-size: 15px; font-weight: 400; color: var(--viol-claro); margin-left: 6px; vertical-align: middle; }
+.chip-moneda { font-size: 16px; color: var(--viol-claro); border: 1px solid var(--viol-fondo); border-radius: 99px; padding: 4px 10px; flex: none; }
+.cats.cinco { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 4px; }
+.cats.cinco > .cat { min-width: 0; }
+.cats.cinco .punto { width: 46px; height: 46px; }

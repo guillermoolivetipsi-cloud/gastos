@@ -23,7 +23,7 @@ export function ListaCategorias() {
         <button className={tipo === "gasto" ? "on" : ""} onClick={() => setTipo("gasto")}>GASTOS</button>
         <button className={tipo === "ingreso" ? "on" : ""} onClick={() => setTipo("ingreso")}>INGRESOS</button>
       </div>
-      <div className="cats">
+      <div className="cats cinco">
         {cats.filter(c => !c.archivada).map(c => (
           <button key={c.id} className="cat" onClick={() => nav.abrir({ p: "categoria", id: c.id })}>
             <Punto cat={c} grande /><span>{c.nombre}</span>
