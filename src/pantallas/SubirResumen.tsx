@@ -81,7 +81,7 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
     }
   }
 
-  const etiqueta: Record<Fila["tipo"], string> = { coincide: "Ya cargados", "otra-cuenta": "Cargados en otra cuenta", moneda: "Cargados con la moneda equivocada", falta: "No están en la app" };
+  const etiqueta: Record<Fila["tipo"], string> = { coincide: "Ya cargados", "otra-cuenta": "Cargados en otra cuenta", moneda: "Cargados con la moneda equivocada", falta: "No están en la app", credito: "Devoluciones y bonificaciones" };
 
   return (
     <div className="pantalla sin-tabs">
@@ -116,7 +116,7 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
             </div>
           </div>
 
-          {(["falta", "moneda", "otra-cuenta", "coincide"] as const).map(tipo => {
+          {(["falta", "credito", "moneda", "otra-cuenta", "coincide"] as const).map(tipo => {
             const grupo = filas.map((f, i) => [f, i] as [Fila, number]).filter(([f]) => f.tipo === tipo);
             if (!grupo.length) return null;
             return (
@@ -137,6 +137,7 @@ export function SubirResumen({ cuentaId }: { cuentaId?: string }) {
                           {cat && tipo !== "falta" && <Punto cat={cat} chico />}
                         </div>
                         {tipo === "moneda" && f.mov && <div className="mini ambar">En la app: {num(f.mov.monto)} {f.mov.moneda} → pasa a {num(c.importe)} {c.moneda}</div>}
+                        {tipo === "credito" && <div className="mini tenue">Se suma como ingreso de {tarjeta?.nombre}, en "Otros ingresos".</div>}
                         {tipo === "otra-cuenta" && f.mov && <div className="mini ambar">En la app está en {d.cuentas.find(x => x.id === f.mov!.cuentaId)?.nombre} → pasa a {tarjeta?.nombre}</div>}
                         {tipo === "falta" && aplicar[i] && (
                           <select value={cats[i] ?? ""} onChange={e => setCats(x => ({ ...x, [i]: e.target.value }))}

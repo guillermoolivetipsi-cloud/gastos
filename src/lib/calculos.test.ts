@@ -87,3 +87,14 @@ it("variables: descuenta lo que falta de los recurrentes variables y no mezcla c
   const b = bloques("2026-10", gastos, cats, [luz], pend, uno);
   expect([b.variables.objetivo, b.variables.gastado, b.variables.queda]).toEqual([1500, 400, 1020]);
 });
+
+it("resumen: las devoluciones entran como ingreso de la tarjeta y no se duplican", async () => {
+  const { conciliar } = await import("./conciliar");
+  const consumos = [
+    { fecha: "2026-09-12", comercio: "TIENDA ONLINE", moneda: "EUR", importe: -20, usd: -23, columna: "USD" as const },
+    { fecha: "2026-09-15", comercio: "BONIFICACION", moneda: "ARS", importe: -1500, usd: null, columna: "ARS" as const },
+  ];
+  const yaCargada = mov({ tipo: "ingreso", cuentaId: "visa", moneda: "ARS", monto: 1500, usd: 1, fecha: "2026-09-15" });
+  const c = conciliar(consumos, visa, [yaCargada], {}, "2026-09-01", "2026-09-30");
+  expect(c.filas.map(f => f.tipo)).toEqual(["credito", "coincide"]);
+});

@@ -156,3 +156,25 @@ describe("fechas al cargar", () => {
       .toEqual(["2026-09-26", "2026-08-31", "2026-10-01"]);
   });
 });
+
+describe("guardar un resumen con euros ya cargados y una devolución", () => {
+  it("el euro toma los dólares del banco sin marcarse como modificado; la devolución entra como ingreso", async () => {
+    const { conciliar } = await import("./conciliar");
+    const { aplicarResumen } = await import("./aplicarResumen");
+    await db.categorias.add({ id: "otros-ing", nombre: "Otros ingresos", tipo: "ingreso", icono: "", color: "", orden: 9 });
+    const cafe = mov({ id: "cafe", cuentaId: "visa", monto: 20, moneda: "EUR", usd: 22.5, fecha: "2026-09-05", modificado: "2026-09-05T10:00:00Z" });
+    await db.movimientos.add(cafe);
+    const consumos = [
+      { fecha: "2026-09-05", comercio: "BAR", moneda: "EUR", importe: 20, usd: 23.4, columna: "USD" as const },
+      { fecha: "2026-09-12", comercio: "TIENDA DEVOLUCION", moneda: "EUR", importe: -10, usd: -11.7, columna: "USD" as const },
+    ];
+    const { filas } = conciliar(consumos, visa, [cafe], {}, "2026-09-01", "2026-09-30");
+    const datos = { movimientos: [cafe], recurrentes: [], categorias: [...cats, { id: "otros-ing", nombre: "Otros ingresos", tipo: "ingreso", icono: "", color: "", orden: 9 } as Categoria], tasaRec: () => 1 };
+    await aplicarResumen({ filas, aplicar: { 1: true }, cats: {}, tarjeta: visa, cierre: "2026-09-30", vence: "2026-10-10", datos });
+    const todo = await db.movimientos.toArray();
+    const c = todo.find(m => m.id === "cafe")!;
+    expect([c.usd, c.cotizacion?.fuente, c.modificado, c.monto, c.moneda]).toEqual([23.4, "resumen", "2026-09-05T10:00:00Z", 20, "EUR"]);
+    const dev = todo.find(m => m.comentario === "TIENDA DEVOLUCION")!;
+    expect([dev.tipo, dev.monto, dev.moneda, dev.usd, dev.cuentaId, dev.categoriaId]).toEqual(["ingreso", 10, "EUR", 11.7, "visa", "otros-ing"]);
+  });
+});

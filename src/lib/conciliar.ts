@@ -9,7 +9,9 @@ import { diasEntre } from "./fecha";
    - Si en la app está en USD pero el número es el de los euros, es un error de carga
      (pasó siete veces en septiembre): se propone corregir la moneda. */
 
-export type Tipo = "coincide" | "otra-cuenta" | "moneda" | "falta";
+/** "credito": una devolución o bonificación (monto negativo en el resumen); se suma
+ *  como ingreso de la tarjeta, salvo que ya esté cargada. */
+export type Tipo = "coincide" | "otra-cuenta" | "moneda" | "falta" | "credito";
 
 export interface Fila {
   consumo: Consumo;
@@ -49,7 +51,8 @@ function error(consumo: Consumo, m: Movimiento): { err: number; moneda: boolean 
   return null;
 }
 
-export function conciliar(consumos: Consumo[], tarjeta: Cuenta, gastos: Movimiento[], reglas: Record<string, string>, desde: string, hasta: string): Conciliacion {
+export function conciliar(consumos: Consumo[], tarjeta: Cuenta, gastosEIngresos: Movimiento[], reglas: Record<string, string>, desde: string, hasta: string): Conciliacion {
+  const gastos = gastosEIngresos;
   const candidatos = gastos.filter(m => m.tipo === "gasto" && m.fecha >= desde && m.fecha <= hasta);
   const pares: { i: number; m: Movimiento; score: number; moneda: boolean }[] = [];
   consumos.forEach((c, i) => {
@@ -69,8 +72,17 @@ export function conciliar(consumos: Consumo[], tarjeta: Cuenta, gastos: Movimien
     if (asignado.has(p.i) || usados.has(p.m.id)) continue;
     asignado.set(p.i, p); usados.add(p.m.id);
   }
-  const filas: Fila[] = consumos.filter(c => c.importe > 0).map(c => {
+  // Devoluciones: ¿ya hay un ingreso de esta tarjeta por ese monto, cerca de esa fecha?
+  const ingresos = gastosEIngresos.filter(m => m.tipo === "ingreso" && m.cuentaId === tarjeta.id && m.fecha >= desde && m.fecha <= hasta);
+  const filas: Fila[] = consumos.filter(c => c.importe !== 0).map(c => {
     const i = consumos.indexOf(c);
+    if (c.importe < 0) {
+      const ya = ingresos.find(m => !usados.has(m.id) && Math.abs(diasEntre(m.fecha, c.fecha)) <= 3
+        && (c.columna === "ARS" ? m.moneda === "ARS" && Math.abs(m.monto + c.importe) <= Math.abs(c.importe) * 0.01
+          : m.usd != null && c.usd != null && Math.abs(m.usd + c.usd) <= Math.abs(c.usd) * 0.06));
+      if (ya) { usados.add(ya.id); return { consumo: c, mov: ya, tipo: "coincide" }; }
+      return { consumo: c, tipo: "credito" };
+    }
     const p = asignado.get(i);
     if (!p) return { consumo: c, tipo: "falta", categoriaId: reglas[claveComercio(c.comercio)] };
     return { consumo: c, mov: p.m, tipo: p.moneda ? "moneda" : p.m.cuentaId === tarjeta.id ? "coincide" : "otra-cuenta" };
@@ -85,7 +97,8 @@ export function aprender(reglas: Record<string, string>, filas: { consumo: Consu
   const nuevas = { ...reglas };
   for (const f of filas) {
     const k = claveComercio(f.consumo.comercio);
-    if (k && f.categoriaId && validas.has(f.categoriaId)) nuevas[k] = f.categoriaId;
+    // Solo de los consumos: una devolución no enseña la categoría de un comercio.
+    if (k && f.consumo.importe > 0 && f.categoriaId && validas.has(f.categoriaId)) nuevas[k] = f.categoriaId;
   }
   return nuevas;
 }
