@@ -51,6 +51,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Cuotas y recurrentes:** íconos chicos junto al monto: "3×" en azul para cuotas y ↻ en violeta para el pago de un recurrente.
   - **Borrar:** deslizando a la izquierda, con "Deshacer".
   - **Totales:** siempre una línea arriba; sin filtros, el mes en curso ("Octubre: −1.761 gastos · +3.000 ingresos USD"); con filtros, lo filtrado.
+- **Para revisar** (decididas en octubre 2026; valen para cualquier pregunta que haga la app):
+  - **Agrupadas por tipo:** un encabezado por tipo con la cantidad, que se abre y se cierra; arranca abierto el primero.
+  - **Orden:** lo urgente primero (lo que tiene fecha: tareas del mes, pagos de recurrentes, cierres de tarjeta), después las sugerencias (cambios de precio, recurrentes encontrados, fijas o variables).
+  - **Cada pregunta:** corta, con un solo dato abajo en gris ("¿Es el pago de Expensas?" · "5 oct · 179.100 ARS").
+  - **Botones:** "Sí" (o la acción principal), "No" (o "Fue una vez", "Ya lo hice") y "⋯", que abre "Otra cosa…" y "Ahora no".
+  - **"Ahora no":** la esconde 30 días, como estaba.
+  - **Acceso:** la bandeja con número en Resumen, como estaba.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
