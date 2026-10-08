@@ -119,7 +119,8 @@ export function Deslizable({ children, borrar, tocar }: { children: ReactNode; b
   const ini = useRef<{ x: number; y: number; base: number; mueve: boolean } | null>(null);
   return (
     <div className="deslizable">
-      <button className="borrar" aria-label="Eliminar" onClick={borrar}><T.IconTrash size={20} /></button>
+      {/* El fondo de borrar solo existe mientras la fila está corrida: si no, se asoma un borde. */}
+      <button className="borrar" aria-label="Eliminar" onClick={borrar} style={{ visibility: x < 0 || ini.current?.mueve ? "visible" : "hidden" }}><T.IconTrash size={20} /></button>
       <div
         className="frente"
         style={{ transform: `translateX(${x}px)`, transition: ini.current ? "none" : undefined }}

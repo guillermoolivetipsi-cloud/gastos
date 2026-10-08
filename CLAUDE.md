@@ -44,6 +44,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Lista por categoría:** como estaba, con el porcentaje.
   - **«Cómo venís»:** una sola línea arriba ("✦ Cómo venís: tarjeta 22% · noviembre ~1.982 · suscripciones 57 ›"), con textos cortos; se toca para el detalle.
   - **Botones de arriba:** la nube (Mandar a Finanzas) y la bandeja (Para revisar), como estaban.
+- **Movimientos** (decididas en octubre 2026; valen para cualquier lista de movimientos, como el detalle de una categoría):
+  - **Buscar y filtrar:** como estaba, tres filas (buscador · Todos/Gastos/Ingresos · medio de pago y categoría).
+  - **Encabezado de cada día:** fecha corta y el total del día ("8 oct · jue … −86,60").
+  - **Cada fila:** arriba lo que fue (el comentario o las etiquetas; si no hay, la categoría); abajo la categoría y la cuenta.
+  - **Cuotas y recurrentes:** íconos chicos junto al monto: "3×" en azul para cuotas y ↻ en violeta para el pago de un recurrente.
+  - **Borrar:** deslizando a la izquierda, con "Deshacer".
+  - **Totales:** siempre una línea arriba; sin filtros, el mes en curso ("Octubre: −1.761 gastos · +3.000 ingresos USD"); con filtros, lo filtrado.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura

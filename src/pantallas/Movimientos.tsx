@@ -3,7 +3,7 @@ import { useDatos } from "../datos";
 import { useNav } from "../nav";
 import { eliminarMovimiento } from "../lib/acciones";
 import { usdDe } from "../lib/analisis";
-import { fechaCorta, fechaLarga } from "../lib/fecha";
+import { DIAS_CORTOS, aFecha, mesCorto, nombreMes, periodoHoy } from "../lib/fecha";
 import { num, sinAcentos } from "../lib/formato";
 import { BotonAgregar, Deslizable, Punto, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
@@ -37,9 +37,6 @@ export function Movimientos() {
       .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
   }, [d.movimientos, qDiferida, textos, tipo, cta, medio, catFiltro]);
   const filtrando = medio !== "todos" || !!catFiltro || !!q.trim();
-  // Gastos e ingresos por separado: restarlos esconde los dos.
-  const gastosF = lista.reduce((s, m) => s + (m.tipo === "gasto" ? usdDe(m) : 0), 0);
-  const ingresosF = lista.reduce((s, m) => s + (m.tipo === "ingreso" ? usdDe(m) : 0), 0);
 
   // El total de cada día sale de la lista entera: no cambia al tocar "Ver más".
   const totalDia = useMemo(() => {
@@ -72,7 +69,19 @@ export function Movimientos() {
           {d.categorias.filter(c => !c.archivada && (tipo === "todos" || c.tipo === tipo)).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
-      {filtrando && lista.length > 0 && <div className="mini tenue" style={{ marginTop: 8 }}>{lista.length} movimientos{gastosF > 0 && <> · <span style={{ color: "var(--tinta)" }}>−{num(gastosF)} gastos</span></>}{ingresosF > 0 && <> · <span className="ok">+{num(ingresosF)} ingresos</span></>} <span>USD</span></div>}
+      {/* Siempre una línea de totales: con filtros, lo filtrado; sin filtros, el mes en curso. */}
+      {(() => {
+        const delMes = !filtrando && tipo === "todos";
+        const base = delMes ? d.movimientos.filter(m => m.fecha.slice(0, 7) === periodoHoy()) : lista;
+        const g = base.reduce((s, m) => s + (m.tipo === "gasto" ? usdDe(m) : 0), 0), i = base.reduce((s, m) => s + (m.tipo === "ingreso" ? usdDe(m) : 0), 0);
+        if (!base.length) return null;
+        return (
+          <div className="mini tenue" style={{ marginTop: 8 }}>
+            {delMes ? `${nombreMes(periodoHoy(), false)[0].toUpperCase()}${nombreMes(periodoHoy(), false).slice(1)}:` : `${lista.length} movimientos:`}
+            {g > 0 && <> <span style={{ color: "var(--tinta)" }}>−{num(g, 0)} gastos</span></>}{g > 0 && i > 0 && " ·"}{i > 0 && <> <span className="ok">+{num(i, 0)} ingresos</span></>} USD
+          </div>
+        );
+      })()}
       {sinCotizar > 0 && <div className="mini ambar" style={{ marginTop: 10 }}><T.IconCloudOff size={13} /> {sinCotizar} sin convertir a USD: se completan al tener conexión.</div>}
 
       {!lista.length && <div className="vacio">{q ? "Nada coincide con la búsqueda." : filtrando || tipo !== "todos" ? "Nada con estos filtros." : "Todavía no cargaste nada. Tocá + para empezar."}</div>}
@@ -81,12 +90,15 @@ export function Movimientos() {
         const total = totalDia.get(fecha) ?? 0;
         return (
           <div key={fecha}>
-            <div className="dia-titulo"><span>{fechaCorta(fecha) === "hoy" || fechaCorta(fecha) === "ayer" ? `${fechaCorta(fecha)} · ` : ""}{fechaLarga(fecha)}</span><span className="num">{num(total)}</span></div>
+            {/* Fecha corta y el total del día (regla de Movimientos). */}
+            <div className="dia-titulo"><span>{Number(fecha.slice(8))} {mesCorto(fecha.slice(0, 7))} · {DIAS_CORTOS[aFecha(fecha).getDay()]}</span><span className="num">{total > 0 ? "+" : ""}{num(total)}</span></div>
             {ms.map(m => {
               const c = cat.get(m.categoriaId);
               const cuenta = cta.get(m.cuentaId);
               const r = m.recurrenteId ? rec.get(m.recurrenteId) : undefined;
-              const detalle = [m.comentario, m.etiquetas.join(", ")].filter(Boolean).join(" · ");
+              // Arriba, lo que fue (el comentario o las etiquetas); si no hay, la categoría.
+              const nombreCat = c?.nombre ?? "Sin categoría";
+              const queFue = m.comentario || m.etiquetas.join(", ");
               return (
                 <Deslizable key={m.id} tocar={() => nav.abrir({ p: "editor", id: m.id })} borrar={async () => {
                   const deshacer = await eliminarMovimiento(m.id);
@@ -96,15 +108,19 @@ export function Movimientos() {
                     <span className="izq">
                       <Punto cat={c} chico />
                       <span style={{ minWidth: 0 }}>
-                        <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c?.nombre ?? "Sin categoría"}{detalle && <span className="tenue"> · {detalle}</span>}</div>
-                        <div className="mini tenue">
-                          {cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}
-                          {m.cuotas && m.cuotas > 1 ? ` · ${m.cuotas} cuotas` : ""}{r ? ` · ${r.nombre}` : ""}
+                        <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || nombreCat}</div>
+                        <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {queFue ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}
                         </div>
                       </span>
                     </span>
                     <span className="derecha num">
-                      <div className={m.tipo === "ingreso" ? "ok" : ""}>{m.tipo === "ingreso" ? "+" : ""}{m.usd != null ? num(m.usd) : "…"} USD</div>
+                      {/* Cuotas y recurrentes, con íconos chicos junto al monto. */}
+                      <div className={m.tipo === "ingreso" ? "ok" : ""} style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
+                        {r && <T.IconRepeat size={13} className="viol" aria-label={`Pago de ${r.nombre}`} />}
+                        {m.cuotas && m.cuotas > 1 ? <span className="mini" style={{ color: "var(--azul)" }} aria-label={`${m.cuotas} cuotas`}>{m.cuotas}×</span> : null}
+                        <span>{m.tipo === "ingreso" ? "+" : ""}{m.usd != null ? num(m.usd) : "…"} USD</span>
+                      </div>
                       {m.moneda !== "USD" && <div className="mini tenue">{num(m.monto)} {m.moneda}</div>}
                     </span>
                   </div>
