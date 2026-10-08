@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Clipboard } from "@capacitor/clipboard";
 import { useNav } from "../nav";
+import { useDatos } from "../datos";
 import { diaLocal, fechaCorta, nombreMes } from "../lib/fecha";
 import { leerEnvios, leerToken, mandar, marcarVisto, mesesAMandar, probarToken, REPO, type EnvioHecho, type Resultado, type Subida } from "../lib/finanzas";
 import { useToast } from "../ui/piezas";
@@ -22,6 +23,43 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 export const resumenDe = (r: Resultado) => r.tipo === "listo"
   ? `${plural(r.nuevos, "nuevo", "nuevos")} · ${plural(r.corregidos, "corregido", "corregidos")} · ${r.iguales} ya estaban`
   : "no aceptó el envío";
+
+/** Cuántos movimientos de los meses que se mandan cambiaron desde el último envío. */
+export function useSinMandar() {
+  const d = useDatos();
+  const envios = useLiveQuery(leerEnvios, []);
+  if (!envios) return 0;
+  const ultimo = envios[envios.length - 1]?.enviado ?? "";
+  const meses = mesesAMandar();
+  return d.movimientos.filter(m => meses.includes(m.fecha.slice(0, 7)) && (m.modificado || m.creado || "") > ultimo).length;
+}
+
+/** El botón de Resumen: manda con un toque y avisa abajo cómo salió, sin cambiar de
+ *  pantalla. Sin token, abre "Conectar con Finanzas". */
+export function BotonMandar() {
+  const nav = useNav();
+  const toast = useToast();
+  const pendientes = useSinMandar();
+  const [mandando, setMandando] = useState(false);
+  async function tocar() {
+    if (mandando) return;
+    const token = await leerToken();
+    if (!token) { nav.abrir({ p: "finanzas-conectar" }); return; }
+    setMandando(true);
+    toast({ texto: "Mandando a Finanzas…" });
+    const r = await mandar(token);
+    setMandando(false);
+    if (r.tipo === "dejado") toast({ texto: `Quedó en el buzón · ${plural(r.envio.cantidad, "movimiento", "movimientos")}. Finanzas lo levanta a las 9:30 y 21:30.` });
+    else if (r.tipo === "token") { toast({ texto: "El token del buzón no sirve: cambialo" }); nav.abrir({ p: "finanzas-conectar" }); }
+    else toast({ texto: "No pude dejarlo en el buzón: ¿tenés conexión? No se mandó nada." });
+  }
+  return (
+    <button className="accion" aria-label="Mandar a Finanzas" onClick={tocar} disabled={mandando} style={{ position: "relative", opacity: mandando ? 0.5 : 1 }}>
+      <T.IconCloudUpload size={22} className="viol" />
+      {pendientes > 0 && !mandando && <span style={{ position: "absolute", top: 2, right: 2, width: 8, height: 8, borderRadius: "50%", background: "var(--ambar)" }} aria-label={`${pendientes} sin mandar`} />}
+    </button>
+  );
+}
 
 /** La tarjeta, arriba de "Exportar a Excel". */
 export function TarjetaMandar() {

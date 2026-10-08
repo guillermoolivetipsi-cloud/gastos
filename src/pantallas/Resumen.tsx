@@ -8,6 +8,7 @@ import { bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDel
 import { enUsdDe } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
+import { BotonMandar } from "./Finanzas";
 import { fechaCorta, hoy, moverAncla, nombreMes, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
 import { num, usd } from "../lib/formato";
 import { Barra, BotonAgregar, Dona, Hoja, Punto } from "../ui/piezas";
@@ -82,6 +83,7 @@ export function Resumen() {
     <div className="pantalla">
       <div className="enc">
         <h1>Resumen</h1>
+        <span style={{ marginLeft: "auto" }}><BotonMandar /></span>
         <button className="accion" aria-label="Para revisar" onClick={() => nav.abrir({ p: "revisar" })} style={{ position: "relative" }}>
           <T.IconInbox size={22} />
           {revisar > 0 && <span className="badge" style={{ position: "absolute", top: -2, right: -6 }}>{revisar}</span>}
