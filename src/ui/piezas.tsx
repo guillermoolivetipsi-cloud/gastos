@@ -10,11 +10,16 @@ export function Punto({ cat, chico, icono, color }: { cat?: Pick<Categoria, "ico
   );
 }
 
-/** Barra de avance. `marca`: dónde deberías ir hoy (0..1). */
-export function Barra({ valor, color = "var(--viol)", marca }: { valor: number; color?: string; marca?: number }) {
+/** Barra de avance. `marca`: una línea de referencia (0..1). `previsto`: un tramo rayado
+ *  después de lo real, con lo que todavía no se cargó. */
+export function Barra({ valor, color = "var(--viol)", marca, previsto = 0, colorPrevisto }: { valor: number; color?: string; marca?: number; previsto?: number; colorPrevisto?: string }) {
+  const real = Math.min(100, Math.max(0, valor * 100));
+  const prev = Math.min(100 - real, Math.max(0, previsto * 100));
+  const cp = colorPrevisto ?? color;
   return (
     <div className="barra">
-      <i style={{ width: `${Math.min(100, Math.max(0, valor * 100))}%`, background: color }} />
+      <i style={{ width: `${real}%`, background: color }} />
+      {prev > 0 && <i style={{ position: "absolute", top: 0, left: `${real}%`, width: `${prev}%`, background: `repeating-linear-gradient(45deg, ${cp} 0 3px, transparent 3px 6px)`, opacity: 0.8 }} />}
       {marca != null && marca > 0 && marca < 1 && <b style={{ left: `${marca * 100}%` }} />}
     </div>
   );

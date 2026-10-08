@@ -56,10 +56,24 @@ export function Resumen() {
   const hayProy = proyPorCat.size > 0;
   const verProy = conProy && hayProy;
   const proyTotal = verProy ? [...proyPorCat.values()].reduce((a, b) => a + b.seguro + b.opcional, 0) : 0;
-  // Con proyecciones, las categorías que solo tienen lo proyectado también aparecen.
-  const catsVer = verProy
-    ? [...cats, ...[...proyPorCat.keys()].filter(id => !cats.some(c => c.cat.id === id)).map(id => d.catPorId.get(id)).filter(Boolean).map(cat => ({ cat: cat!, total: 0, pct: 0, n: 0 }))]
-    : cats;
+  // Previsto: lo que falta de los recurrentes de gasto de este mes que todavía no se
+  // cargaron (casi siempre los que van a la tarjeta y llegan con el resumen).
+  const previstoPorCat = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!esMes || tipo !== "gasto" || periodo < periodoHoy()) return out;
+    for (const i of instancias) {
+      if (i.rec.tipo !== "gasto" || i.estado === "cargado") continue;
+      const t = tasa(i.rec);
+      if (t && i.falta > 0) out.set(i.rec.categoriaId, (out.get(i.rec.categoriaId) ?? 0) + i.falta / t);
+    }
+    return out;
+  }, [esMes, tipo, periodo, instancias, tasa]);
+  const previstoTotal = [...previstoPorCat.values()].reduce((a, b) => a + b, 0);
+  // Las categorías que solo tienen algo proyectado o previsto también aparecen.
+  const extra = new Set([...(verProy ? proyPorCat.keys() : []), ...previstoPorCat.keys()]);
+  const catsVer = [...cats, ...[...extra].filter(id => !cats.some(c => c.cat.id === id)).map(id => d.catPorId.get(id)).filter(Boolean).map(cat => ({ cat: cat!, total: 0, pct: 0, n: 0 }))];
+  // Los que todavía no tienen cotización cuentan como 0 hasta que haya conexión.
+  const sinCotizar = movs.filter(m => m.usd == null).length;
 
   const vacio = tipo === "gasto" ? "Sin gastos" : "Sin ingresos";
   const enEsto = { dia: "este día", semana: "esta semana", mes: "este mes", anio: "este año", periodo: "este período" }[vista];
@@ -151,12 +165,14 @@ export function Resumen() {
           centro={total + proyTotal ? `${num(total + proyTotal)} USD` : vacio}
           sub={verProy ? `${num(proyTotal, 0)} proyectado` : total ? undefined : enEsto} />
           {verProy && <div className="mini tenue centro" style={{ marginTop: -4 }}><span className="ambar">+ claro</span>: seguro · <span className="viol" style={{ textDecoration: "underline dotted" }}>+ rayado</span>: opcional</div>}
+          {previstoTotal >= 1 && <div className="mini tenue centro" style={{ marginTop: 2 }}>+ ~{num(previstoTotal, 0)} previsto</div>}
       </>) : (
         <div className="fila" style={{ padding: "4px 2px 10px" }}>
           <span className="tenue chico">{total ? `Total ${enEsto}` : `${vacio} ${enEsto}`}</span>
           {total > 0 && <span className="mediano num">{num(total)} <span className="chico tenue">USD</span></span>}
         </div>
       )}
+      {sinCotizar > 0 && <div className="mini ambar centro" style={{ marginBottom: 6 }}>{sinCotizar} sin cotizar: se suman al tener conexión</div>}
       {grafico === "dia" && vista !== "dia" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
 
       {catsVer.length > 0 && (
@@ -164,9 +180,11 @@ export function Resumen() {
           {catsVer.map(c => {
             const proy = verProy ? proyPorCat.get(c.cat.id) : undefined;
             const obj = esMes && c.cat.objetivo ? c.cat.objetivo : null;
-            const pasado = obj != null && c.total > obj;
+            const prev = previstoPorCat.get(c.cat.id) ?? 0;
+            // Con lo previsto: si lo que viene te pasa del objetivo, ya se ve ahora.
+            const pasado = obj != null && c.total + prev > obj;
             // Cerca del objetivo: pasó la marca del 80%.
-            const ritmo = obj != null && c.total >= obj * ALERTA && !pasado;
+            const ritmo = obj != null && c.total + prev >= obj * ALERTA && !pasado;
             const ranking = obj == null && grafico === "dia";
             return (
               <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
@@ -178,10 +196,11 @@ export function Resumen() {
                     <span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>
                     {proy != null && proy.seguro > 0 && <span className="ambar chico"> +{num(proy.seguro, 0)}</span>}
                     {proy != null && proy.opcional > 0 && <span className="viol chico" style={{ textDecoration: "underline dotted" }}> +{num(proy.opcional, 0)}</span>}
+                    {prev >= 1 && <span className="tenue chico" style={{ textDecoration: "underline dotted" }}> +{num(prev, 0)} previsto</span>}
                     {obj != null && <span className="tenue chico"> / {num(obj)}</span>}
                   </span>
                 </div>
-                {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} marca={ALERTA} /></div>}
+                {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} previsto={prev / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} colorPrevisto={c.cat.color} marca={ALERTA} /></div>}
                 {ranking && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / cats[0].total} color={c.cat.color} /></div>}
               </button>
             );
