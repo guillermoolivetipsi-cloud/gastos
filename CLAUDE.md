@@ -84,6 +84,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Datos:** cada uno en su fila alineada (nombre a la izquierda, número a la derecha), separadas por una línea (`.filas`).
   - **Suscripciones:** como en Recurrentes: el día, el puntito de color, con qué tarjeta y el monto; lo más caro arriba.
   - **Aclaraciones:** detrás de un «?» en el título (`.ayuda`), que las muestra al tocarlo; nunca a la vista todo el tiempo.
+- **Tarjetas** (decididas en octubre 2026, la solapa TARJETAS de Lo que viene y el detalle de una tarjeta):
+  - **Cada tarjeta en la solapa:** caja corta: el total grande y una línea («vence ~5 nov · 12 consumos ›», que abre el detalle), los recurrentes del resumen como estaban, y un solo botón, «Subir resumen».
+  - **Arriba del detalle:** un número y una línea («cierra 28 oct ▾ (estimado) · vence ~5 nov»); la fecha de cierre se toca para cambiarla. «Subir el resumen» grande y fijo abajo.
+  - **Consumos del resumen:** como en Movimientos: arriba lo que fue, abajo la categoría; «3×» en azul para las cuotas y ↻ para un recurrente.
+  - **Cuotas que siguen:** la lista al final, como estaba.
+  - **Aclaraciones** («Se junta…», «Pagar la tarjeta no es un gasto nuevo…»): detrás de un «?» (`<GrupoT ayuda>`).
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura

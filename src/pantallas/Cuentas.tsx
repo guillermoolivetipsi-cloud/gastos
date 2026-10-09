@@ -7,7 +7,7 @@ import { fechaCorta, mesCorto, nombreMes, periodoDe, periodoHoy, sumarMeses, ult
 import { num, redondear } from "../lib/formato";
 import { aPagarTarjeta } from "../lib/analisis";
 import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
-import { Dia, Interruptor, Montos, Seg, textoOriginal, useToast } from "../ui/piezas";
+import { Dia, GrupoT, Interruptor, Montos, Seg, textoOriginal, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 export function ListaCuentas() {
@@ -117,57 +117,57 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
         <span>Cierra en {nombreMes(periodo, false)}</span>
         <button aria-label="Siguiente" onClick={() => setPeriodo(sumarMeses(periodo, 1))}><T.IconChevronRight size={20} /></button>
       </div>
-      <div className="caja">
-        {/* Mientras no está confirmado, suma los recurrentes que todavía no se cobraron
-            (igual que "Lo que viene"). */}
-        {(() => {
-          const ap = aPagarTarjeta(c, d.movimientos, d.recurrentes, periodoDe(r.vence), d.tasaRec, d.resumenesCargados);
-          const real = ap.resumen.periodo === periodo && ap.real;
-          const previsto = ap.resumen.periodo === periodo && !real ? ap.previsto : 0;
-          return <>
-            <div className="mediano num">{real ? "" : "~"}{num(redondear(r.total + previsto))} USD</div>
-            {previsto > 0 && <>
-              <div className="fila chico" style={{ padding: "4px 0 0" }}><span className="tenue">consumos</span><span className="num">{num(r.total)}</span></div>
-              <div className="fila chico" style={{ padding: 0 }}><span className="tenue">recurrentes que faltan cobrar</span><span className="num ambar">+{num(previsto)}</span></div>
-            </>}
-          </>;
-        })()}
-        <div className="mini tenue">cierra {fechaCorta(r.cierre, false)}{r.confirmado ? "" : " (estimado)"} · vence ~{fechaCorta(r.vence, false)}</div>
-        {r.enCuotas > 0 && <div className="fila chico" style={{ paddingBottom: 0 }}><span className="tenue">en cuotas {num(r.enCuotas)}</span><span className="tenue">en un pago {num(r.enUnPago)}</span></div>}
-      </div>
+      {/* Un número y una línea (regla de Tarjetas). Mientras no está confirmado, suma los
+          recurrentes que todavía no se cobraron (igual que "Lo que viene"). El cierre real
+          sale del resumen al subirlo; acá se puede corregir tocando la fecha o volver al estimado. */}
+      {(() => {
+        const ap = aPagarTarjeta(c, d.movimientos, d.recurrentes, periodoDe(r.vence), d.tasaRec, d.resumenesCargados);
+        const real = ap.resumen.periodo === periodo && ap.real;
+        const previsto = ap.resumen.periodo === periodo && !real ? ap.previsto : 0;
+        return (
+          <div style={{ margin: "4px 2px 6px" }}>
+            <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{real ? "" : "~"}{num(redondear(r.total + previsto), 0)} <span className="chico tenue">USD</span></div>
+            <div className="mini tenue" style={{ marginTop: 4 }}>
+              cierra{" "}
+              <label className="viol" style={{ position: "relative", textDecoration: "underline dotted" }}>
+                {fechaCorta(r.cierre, false)} ▾
+                <input type="date" value={r.cierre} min={`${periodo}-01`} max={ultimoDia(periodo)} aria-label="Día de cierre"
+                  onChange={e => e.target.value && confirmarCierre(Number(e.target.value.slice(8)))} style={{ position: "absolute", inset: 0, opacity: 0, width: "100%" }} />
+              </label>
+              {r.confirmado ? <> (confirmado · <button className="viol mini" onClick={borrarCierre}>volver al estimado</button>)</> : " (estimado)"} · vence ~{fechaCorta(r.vence, false)}
+            </div>
+            {(previsto > 0 || r.enCuotas > 0) && (
+              <div className="mini tenue">{num(r.total, 0)} de consumos{previsto > 0 && <span className="ambar"> · +{num(previsto, 0)} de recurrentes que faltan</span>}{r.enCuotas > 0 ? ` · ${num(r.enCuotas, 0)} en cuotas` : ""}</div>
+            )}
+          </div>
+        );
+      })()}
 
-      {/* El cierre real sale del resumen al subirlo; acá se puede corregir a mano
-          (cualquier día) o volver al estimado. */}
-      <div className="caja">
-        <div className="fila" style={{ padding: 0 }}>
-          <span className="chico">{r.confirmado ? "Cierre confirmado" : "Cierre estimado"}</span>
-          <input type="date" value={r.cierre} min={`${periodo}-01`} max={ultimoDia(periodo)}
-            onChange={e => e.target.value && confirmarCierre(Number(e.target.value.slice(8)))} style={{ color: "var(--viol-claro)" }} aria-label="Día de cierre" />
-        </div>
-        {r.confirmado
-          ? <button className="mini viol" onClick={borrarCierre}>Volver al estimado (día {c.cierreHasta ?? 31})</button>
-          : <div className="mini tenue">Se confirma solo al subir el resumen, o elegilo acá.</div>}
-      </div>
-
-      <button className="btn1" style={{ width: "100%", marginBottom: 10 }} onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: c.id })}>
-        <T.IconFileImport size={16} style={{ verticalAlign: -3 }} /> Subir el PDF del resumen
-      </button>
-
-      <div className="grupo-t"><span>Qué entra en este resumen</span><span>{r.items.length}</span></div>
+      <GrupoT titulo={`Qué entra en este resumen · ${r.items.length}`} derecha={num(r.total, 0)} ayuda="Pagar la tarjeta no es un gasto nuevo: ya lo contaste el día de la compra." />
       {!r.items.length && <div className="tenue chico">Nada todavía.</div>}
       {r.items.length > 0 && (
         <div className="caja lista">
-          {r.items.map(q => (
-            <button key={q.mov.id + q.numero} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: q.mov.id })}>
-              <span className="izq"><Dia dia={Number(q.mov.fecha.slice(8))} abajo={mesCorto(q.mov.fecha.slice(0, 7))} /><span style={{ minWidth: 0 }}>
-                <div>{cat.get(q.mov.categoriaId)}{q.mov.comentario ? <span className="tenue"> · {q.mov.comentario}</span> : ""}</div>
-                <div className="mini tenue">{q.de > 1 ? `cuota ${q.numero} de ${q.de}` : `un pago${textoOriginal({ usd: q.mov.usd, monto: q.mov.monto, moneda: q.mov.moneda })}`}{q.numero === 1 && esDudosa(c, q.mov.fecha) ? <span className="ambar"> · puede ir al próximo</span> : ""}</div>
-              </span></span>
-              <span className="derecha">{q.de > 1
-                ? <div className="num">{num(q.usd)}</div>
-                : <Montos usd={q.mov.usd} monto={q.mov.monto} moneda={q.mov.moneda} />}</span>
-            </button>
-          ))}
+          {/* Como Movimientos: arriba lo que fue, abajo la categoría; "3×" para las cuotas y ↻ para un recurrente. */}
+          {r.items.map(q => {
+            const queFue = q.mov.comentario || q.mov.etiquetas.join(", ");
+            const nombreCat = cat.get(q.mov.categoriaId) ?? "Sin categoría";
+            const abajo = [queFue ? nombreCat : "", q.de > 1 ? `cuota ${q.numero} de ${q.de}` : textoOriginal({ usd: q.mov.usd, monto: q.mov.monto, moneda: q.mov.moneda }).replace(/^ · /, "")].filter(Boolean).join(" · ");
+            return (
+              <button key={q.mov.id + q.numero} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: q.mov.id })}>
+                <span className="izq"><Dia dia={Number(q.mov.fecha.slice(8))} abajo={mesCorto(q.mov.fecha.slice(0, 7))} /><span style={{ minWidth: 0 }}>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || nombreCat}</div>
+                  <div className="mini tenue">{abajo}{q.numero === 1 && esDudosa(c, q.mov.fecha) ? <span className="ambar">{abajo ? " · " : ""}puede ir al próximo</span> : ""}</div>
+                </span></span>
+                <span className="derecha">
+                  <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
+                    {q.mov.recurrenteId && <T.IconRepeat size={13} className="viol" aria-label="Pago de un recurrente" />}
+                    {q.de > 1 && <span className="mini" style={{ color: "var(--azul)" }}>{q.de}×</span>}
+                    {q.de > 1 ? <span className="num">{num(q.usd)}</span> : <Montos usd={q.mov.usd} monto={q.mov.monto} moneda={q.mov.moneda} />}
+                  </div>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -184,7 +184,8 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
           </div>
         </>
       )}
-      <div className="mini tenue centro" style={{ marginTop: 12 }}>Pagar la tarjeta no es un gasto nuevo: ya lo contaste el día de la compra.</div>
+      <div className="espacio" />
+      <div className="pie-fijo"><button className="btn" onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: c.id })}><T.IconFileImport size={17} style={{ verticalAlign: -3 }} /> Subir el resumen</button></div>
     </div>
   );
 }

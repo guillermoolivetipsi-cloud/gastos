@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos } from "../datos";
 import { leerAjuste } from "../db";
@@ -6,7 +6,7 @@ import { useNav } from "../nav";
 import { calcularInsights } from "../lib/insights";
 import { mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num } from "../lib/formato";
-import { Barra, Dia, Puntito, Punto } from "../ui/piezas";
+import { Barra, Dia, GrupoT, Puntito, Punto } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 /** Se recalcula solo si cambian los datos o el mes, no en cada dibujo. */
@@ -24,17 +24,7 @@ const veces = (a: number, b: number) => (b > 0 && a / b >= 1.5 ? `${num(a / b, a
    cada dato en su fila alineada; las suscripciones como en Recurrentes; y las
    aclaraciones detrás de un «?» en el título. */
 function Parte({ titulo, derecha, ayuda, children }: { titulo: string; derecha?: React.ReactNode; ayuda?: string; children: React.ReactNode }) {
-  const [ver, setVer] = useState(false);
-  return (
-    <>
-      <div className="grupo-t">
-        <span>{titulo}{ayuda && <button className="ayuda" aria-label="Qué es" aria-expanded={ver} onClick={() => setVer(!ver)}>?</button>}</span>
-        {derecha != null && <span className="num">{derecha}</span>}
-      </div>
-      {ver && ayuda && <div className="mini tenue" style={{ margin: "-2px 2px 8px" }}>{ayuda}</div>}
-      <div className="caja">{children}</div>
-    </>
-  );
+  return <><GrupoT titulo={titulo} derecha={derecha} ayuda={ayuda} /><div className="caja">{children}</div></>;
 }
 /** Filas alineadas dentro de una caja, separadas por una línea. */
 const Filas = ({ children }: { children: React.ReactNode }) => <div className="filas">{children}</div>;

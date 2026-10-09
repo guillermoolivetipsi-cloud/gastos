@@ -6,7 +6,7 @@ import { cuotasFuturas } from "../lib/tarjeta";
 import { fechaCorta, hoy, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import type { EstadoInstancia } from "../lib/recurrentes";
-import { Dia, Montos, Puntito, textoOriginal, useToast } from "../ui/piezas";
+import { Dia, GrupoT, Montos, Puntito, textoOriginal, useToast } from "../ui/piezas";
 import { descartar, vincular } from "../lib/acciones";
 import { fechaDePago, sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
@@ -226,9 +226,9 @@ function Tarjetas({ periodo }: { periodo: string }) {
           <div className="mini tenue">USD</div>
         </div>
       </div>
-      {hayEstimados && <div className="mini tenue" style={{ margin: "6px 2px 0" }}>Estimado con lo que cargaste. Se confirma al subir cada resumen.</div>}
+      <div style={{ height: 10 }} />
 
-      {aPagar.map(({ resumen: r, insts, previsto, real, total: totalR, desde }) => {
+      {aPagar.map(({ resumen: r, insts, previsto, real, total: totalR }) => {
         return (
           <div key={r.cuenta.id} className="caja">
             <div className="fila" style={{ padding: 0 }}>
@@ -237,11 +237,11 @@ function Tarjetas({ periodo }: { periodo: string }) {
             </div>
             {r.items.length === 0 && !insts.length ? <div className="tenue chico" style={{ marginTop: 6 }}>Nada para pagar en {nombreMes(periodo, false)}.</div> : (
               <>
-                <div className="fila" style={{ paddingBottom: 0 }}>
-                  <span className="mediano num">{real ? "" : "~"}{num(totalR)} <span className="chico tenue">USD</span></span>
-                  <span className="tenue chico">vence ~{fechaCorta(r.vence, false)}</span>
-                </div>
-                <div className="mini tenue">compras del {fechaCorta(desde, false)} al {fechaCorta(r.cierre, false)} · {r.items.length} consumos{r.enCuotas > 0 ? ` · ${num(r.enCuotas)} en cuotas` : ""}</div>
+                {/* Caja corta (regla de Tarjetas): el total grande y una línea; tocarla abre los consumos. */}
+                <button style={{ width: "100%", textAlign: "left", marginTop: 8 }} onClick={() => nav.abrir({ p: "tarjeta", id: r.cuenta.id, periodo: r.periodo })}>
+                  <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{real ? "" : "~"}{num(totalR, 0)} <span className="chico tenue">USD</span></div>
+                  <div className="mini tenue" style={{ marginTop: 4 }}>vence ~{fechaCorta(r.vence, false)} · {r.items.length} consumos ›</div>
+                </button>
                 {insts.length > 0 && (
                   <div className="sep" style={{ marginTop: 8, paddingTop: 6 }}>
                     <div className="mini tenue" style={{ marginBottom: 2 }}>Recurrentes de este resumen{previsto > 0 && !real ? ` · ${num(previsto, 0)} USD previstos incluidos` : ""}</div>
@@ -256,14 +256,13 @@ function Tarjetas({ periodo }: { periodo: string }) {
               </>
             )}
             <div className="botones">
-              <button className="btn1" onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: r.cuenta.id })}>Subir resumen</button>
-              <button className="btn2" onClick={() => nav.abrir({ p: "tarjeta", id: r.cuenta.id, periodo: r.periodo })}>Ver consumos</button>
+              <button className="btn1" onClick={() => nav.abrir({ p: "subir-resumen", cuentaId: r.cuenta.id })}><T.IconFileImport size={15} style={{ verticalAlign: -3 }} /> Subir resumen</button>
             </div>
           </div>
         );
       })}
 
-      <div className="mini tenue centro">"Se junta": lo que compraste después del cierre, más cuotas. "Cuotas después": las que siguen en los resúmenes siguientes.</div>
+      <GrupoT titulo={<span className="tenue" style={{ fontWeight: 400 }}>Qué es cada número</span>} ayuda={`"A pagar": ${hayEstimados ? "estimado con lo que cargaste; se confirma al subir cada resumen. " : ""}"Se junta": lo que compraste después del cierre, más cuotas. "Cuotas después": las que siguen en los resúmenes siguientes.`} />
     </>
   );
 }

@@ -184,3 +184,18 @@ export function textoOriginal({ usd, monto, moneda, estimado, signo = "" }: { us
 export function Puntito({ cat }: { cat?: { color: string } }) {
   return <span className="puntito" style={{ background: cat?.color ?? "var(--tenue)" }} aria-hidden="true" />;
 }
+
+/** Título de un grupo (`.grupo-t`) con su número a la derecha y, si hace falta, la
+ *  aclaración detrás de un «?» que se muestra al tocarlo (regla de Cómo venís). */
+export function GrupoT({ titulo, derecha, ayuda }: { titulo: ReactNode; derecha?: ReactNode; ayuda?: string }) {
+  const [ver, setVer] = useState(false);
+  return (
+    <>
+      <div className="grupo-t">
+        <span>{titulo}{ayuda && <button className="ayuda" aria-label="Qué es" aria-expanded={ver} onClick={() => setVer(!ver)}>?</button>}</span>
+        {derecha != null && <span className="num">{derecha}</span>}
+      </div>
+      {ver && ayuda && <div className="mini tenue" style={{ margin: "-2px 2px 8px" }}>{ayuda}</div>}
+    </>
+  );
+}
