@@ -103,6 +103,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Editor:** arriba el círculo y el nombre, después el objetivo como monto grande, después fijo o variable; el ícono y el color al final.
   - **Sugerencias:** como estaban, el texto violeta («Sugerido: 405 · tu promedio es 450, 10% menos») y «No te frena…» a la vista.
   - **Archivar o eliminar:** en «⋯» arriba, no un botón abajo.
+- **Más y Ajustes** (decididas en octubre 2026):
+  - **Más, grupos:** Para revisar arriba en su caja (como estaba), después grupos con título: «Ordenar» (Categorías y objetivos, Etiquetas, Recurrentes, Cuentas y tarjetas), «Archivos y Finanzas» (Subir resumen, Exportar a Finanzas, Copia de seguridad) y «La app» (Ajustes, Actualizar).
+  - **Más, estado:** cada ítem con una línea gris de cómo está («última copia: hace 12 días», en amarillo si pasaron más de 30 o nunca; «último envío: 8 oct»; «13 activos»; «9 cuentas · 2 tarjetas»; el resumen que falta subir, en amarillo).
+  - **Más, pie:** solo la versión («Gastos 1.0.31 · app de Android»).
+  - **Ajustes, avisos:** una fila con el interruptor y el estado en gris («activados · probar un aviso», «bloqueados…» en rojo, «apagados»).
+  - **Ajustes, recordatorios:** una lista de tres filas; el cuándo («desde las 21:00 ▾», «desde el día 5 ▾») se toca para cambiarlo. Las explicaciones, detrás del «?».
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
