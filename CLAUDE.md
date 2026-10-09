@@ -16,7 +16,7 @@ Es una **app de Android**, empaquetada con Capacitor (proyecto en `android/`), i
 Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual mostrar la maqueta.
 
 - **Tamaños de texto** (`src/estilos.css`): texto general 15 px y título de pantalla 20 px (no se cambian). Textos grises de aclaración: `.mini` 13 px, `.chico` 14 px; títulos de sección 14 px. Etiquetas de color (`.etiq`: fijo, variable, seguro…) 12 px. **Nada de contenido nuevo por debajo de 13 px**, salvo los números de los gráficos.
-- **Categorías:** las grillas para elegir (al cargar un gasto y en Categorías) van de a **5 por fila** (`.cats.cinco`): círculo de 46 px, ícono de 24 px (`<Punto grande />`), nombre de 13 px cortado con "…"; se ven 9 y "Todas". En las listas el círculo sigue de 28 px (`chico`). El selector de íconos queda en 6 por fila, de 48 px.
+- **Categorías:** las grillas para elegir (al cargar un gasto, un recurrente o una proyección) van de a **5 por fila** (`.cats.cinco`): círculo de 46 px, ícono de 24 px (`<Punto grande />`), nombre de 13 px cortado con "…"; se ven 9 y "Todas". En las listas el círculo sigue de 28 px (`chico`). El selector de íconos queda en 6 por fila, de 48 px.
 - **Se probaron y no se cambian** (octubre 2026): el texto general, los íconos de las listas, los botones dentro de las filas, los montos, la barra de abajo y los números de los gráficos.
 - **Barras con objetivo:** la marca blanca va fija al 80% del objetivo; la barra es del color de la categoría, amarilla desde el 80% y roja al pasarse. Lo previsto (recurrentes sin cargar) va como tramo rayado y cuenta para el color.
 - **Números que todavía no pasaron:** con "~" y en gris, con la palabra "previsto" o "estimado". Nunca mezclar lo real con lo previsto sin marcarlo.
