@@ -223,3 +223,7 @@ select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); b
 .caja > .filas { margin: 8px -14px -12px; padding: 0 14px; border-top: 1px solid #1A1A24; }
 .filas > .fila + .fila { border-top: 1px solid #1A1A24; }
 .ayuda { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--linea-2); color: var(--tenue); font-size: 11px; align-items: center; justify-content: center; margin-left: 6px; vertical-align: 1px; }
+/* Subir el resumen: qué va a pasar con cada fila; se toca para sacarla. */
+.toggle { font-size: 13px; padding: 4px 10px; border-radius: 99px; flex: none; }
+.toggle.si { background: var(--ok-fondo); color: var(--ok); }
+.toggle.no { background: var(--panel-2); color: var(--tenue); }

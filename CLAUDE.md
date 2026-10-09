@@ -90,6 +90,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Consumos del resumen:** como en Movimientos: arriba lo que fue, abajo la categoría; «3×» en azul para las cuotas y ↻ para un recurrente.
   - **Cuotas que siguen:** la lista al final, como estaba.
   - **Aclaraciones** («Se junta…», «Pagar la tarjeta no es un gasto nuevo…»): detrás de un «?» (`<GrupoT ayuda>`).
+- **Subir el resumen** (decididas en octubre 2026, la pantalla que compara el PDF con lo cargado):
+  - **Arriba:** la tarjeta en el título («Resumen · Visa ▾», se cambia ahí), el total grande, «N consumos · ✓ cuadra con el banco» y «cierra 28 oct ▾ · vence 5 nov ▾» (se tocan para corregir).
+  - **Orden:** primero lo que hay que decidir (lo nuevo, devoluciones, moneda equivocada, otra cuenta), después lo cargado que el resumen no trae, y «✓ N ya cargados, coinciden» plegado al final.
+  - **Categoría de lo nuevo:** la lista desplegable «¿Qué categoría es?», como estaba.
+  - **Qué se aplica:** sin casillas: cada fila dice a la derecha qué va a pasar («se agrega», «se corrige») y se toca para pasarla a «no».
+  - **Cambios de moneda o de cuenta:** «55 USD → 55 EUR» (o «Revolut → Visa») a la derecha, alineado con los montos; abajo en gris qué cambia.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
