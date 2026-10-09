@@ -213,3 +213,9 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
 select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); border: 0; font-family: inherit; }
 .navega .flechas { display: flex; align-items: center; gap: 4px; }
 .torta-fila .dona { margin: 0; flex: none; }
+/* Los últimos meses de un recurrente: barritas con el monto cuando cambia. */
+.hist { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; align-items: end; height: 76px; }
+.hist > div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; height: 100%; }
+.hist i { width: 100%; max-width: 26px; background: #3a3156; border-radius: 4px 4px 0 0; display: block; }
+.hist i.ahora { background: var(--viol); }
+.hist small { font-size: 12px; color: var(--tenue); }

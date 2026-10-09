@@ -3,7 +3,7 @@ import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
 import type { Clase, Frecuencia, Recurrente, Tipo } from "../tipos";
-import { eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincular, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
+import { descartar, eliminarRecurrente, marcarEnCero, reactivarRecurrente, terminarRecurrente, vincular, vincularPagosDeSugerencia, type Alcance } from "../lib/acciones";
 import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, mesCorto, nombreDia, nombreMes, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
@@ -287,52 +287,93 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
     nav.volver();
   }
 
+  // Reglas del recurrente del mes: el monto grande con una línea, lo parecido preguntado
+  // arriba, una sola acción abajo y lo demás en «⋯».
+  const tasaR = d.tasaRec(r);
+  const descartados = descartesSet(d.descartes);
+  const parecido = e.estado !== "cargado" ? candidatos(e, d.movimientos, tasaR).find(m => !descartados.has(`vinc|${m.id}|${r.id}`)) : undefined;
+  const vence = fechaDePago(e);
+  const estadoTxt = e.cero ? <span>en 0 este mes</span>
+    : e.estado === "cargado" ? <span className="ok">{ing ? "cobrado" : "pagado"}</span>
+    : e.pagado > 0 ? <span className="ambar">faltan {num(e.falta)} {r.moneda}</span>
+    : e.estimado ? <span>estimado: cargá el real</span> : <span>falta todo</span>;
+  // Los últimos 6 meses (solo lo mensual): lo que se pagó cada mes, en su moneda.
+  const historia = r.frecuencia === "mensual" && clave.length === 7
+    ? Array.from({ length: 6 }, (_, k) => sumarMeses(clave, k - 5)).filter(p => p >= r.inicio.slice(0, 7))
+      .map(p => ({ p, v: p === clave ? (e.pagado || e.esperado) : estadoDe({ rec: r, clave: p, fecha: fechaEnMes(p, r.dia) }, d.movimientos, tasaR).pagado }))
+    : [];
+  const maxH = Math.max(1, ...historia.map(h => h.v));
+  const textoCargar = e.estado === "cargado" ? `+ Agregar otro ${pagoTxt}` : e.pagado > 0 ? `Cargar lo que falta · ${num(e.falta)} ${r.moneda}` : e.estimado ? "Cargar el monto real" : `Cargar el ${pagoTxt}`;
+
   return (
     <div className="pantalla sin-tabs">
       <div className="enc">
         <button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button>
-        <h1>{r.nombre} · {titulo}</h1>
-        <button className="accion peligro" aria-label="Eliminar" onClick={() => setBorrar(true)}><T.IconTrash size={21} /></button>
+        <h1>{r.nombre} · {titulo}<span className="mini tenue" style={{ display: "block", fontWeight: 400, marginTop: 2 }}>{cadaCuanto(r)} · {cta.get(r.cuentaId)}</span></h1>
+        <button className="accion" aria-label="Más opciones" onClick={() => setBorrar(true)}><T.IconDots size={22} /></button>
       </div>
-      <div className="caja">
-        <div className="etq">{e.estimado ? "Estimado del mes" : r.tipo === "gasto" ? "Total a pagar" : "Total a cobrar"}</div>
-        <div className="mediano num">{totalUsd != null ? `~${num(totalUsd, 0)} USD` : `${e.estimado ? "~" : ""}${num(e.esperado)} ${r.moneda}`}</div>
-        {totalUsd != null && <div className="mini tenue num">{e.estimado ? "~" : ""}{num(e.esperado)} {r.moneda}</div>}
-        <Barra valor={e.esperado ? e.pagado / e.esperado : 0} color="#60A5FA" />
-        <div className="fila chico" style={{ padding: 0 }}>
-          <span className="tenue">{ing ? "cobrado" : "pagado"} {num(e.pagado)}</span>
-          {e.falta > 0 && !e.estimado && <span className="ambar">faltan {num(e.falta)}</span>}
-        </div>
-      </div>
-      <div className="titulo-sec"><span>{ing ? "Cobros" : "Pagos"}</span></div>
-      {!e.pagos.length && <div className="tenue chico" style={{ marginBottom: 8 }}>Todavía no hay {pagoTxt}s. {e.estimado ? "El monto es un estimado: cargá el real." : ""}</div>}
-      {e.pagos.length > 0 && (
-        <div className="caja lista">
-          {e.pagos.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(p => (
-            <button key={p.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: p.id })}>
-              <span className="izq"><Dia dia={Number(p.fecha.slice(8))} abajo={mesCorto(p.fecha.slice(0, 7))} /><span className="chico">{cta.get(p.cuentaId)}<span className="tenue">{textoOriginal({ usd: p.usd, monto: p.monto, moneda: p.moneda })}</span></span></span>
-              <span className="derecha"><Montos usd={p.usd} monto={p.monto} moneda={p.moneda} /></span>
-            </button>
-          ))}
+
+      {parecido && (
+        <div className="caja sug">
+          <div>¿Es este el {pagoTxt}?</div>
+          <div className="mini tenue">{fechaCorta(parecido.fecha, false)} · {d.categorias.find(c => c.id === parecido.categoriaId)?.nombre}{parecido.comentario ? ` · ${parecido.comentario}` : ""} · {cta.get(parecido.cuentaId)} · {num(parecido.monto)} {parecido.moneda}</div>
+          <div className="botones">
+            <button className="btn1" onClick={async () => { const deshacer = await vincular(parecido.id, r.id, clave); toast({ texto: `Vinculado como ${pagoTxt} de ${r.nombre}`, deshacer }); }}>Sí</button>
+            <button className="btn2" onClick={() => descartar(`vinc|${parecido.id}|${r.id}`)}>No</button>
+          </div>
         </div>
       )}
-      <button className="btn1" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "editor", recurrenteId: r.id, periodo: clave, monto: e.estimado ? undefined : e.falta || undefined, fecha: fechaDePago(e) })}>
-        + {e.pagos.length ? `Agregar un ${pagoTxt}` : e.estimado ? "Cargar el monto real" : `Cargar el ${pagoTxt}`}
-      </button>
-      {e.estado !== "cargado" && (
+
+      <div style={{ margin: "4px 2px 10px" }}>
+        <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>
+          {totalUsd != null ? <>{e.estimado ? "~" : ""}{num(totalUsd, 0)} <span className="chico tenue">USD</span></> : <>{e.estimado ? "~" : ""}{num(e.esperado)} <span className="chico tenue">{r.moneda}</span></>}
+        </div>
+        <div className="mini tenue" style={{ marginTop: 4 }}>
+          {totalUsd != null && r.moneda !== "USD" ? `${e.estimado ? "~" : ""}${num(e.esperado)} ${r.moneda} · ` : ""}{ing ? "se cobra" : "vence"} el {fechaCorta(vence, false)} · {estadoTxt}
+        </div>
+        {e.pagado > 0 && e.falta > 0 && <Barra valor={e.pagado / e.esperado} color="#60A5FA" />}
+      </div>
+
+      {e.pagos.length > 0 && (
         <>
-          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setElegir(true)}>Ya lo cargué como {ing ? "ingreso" : "gasto"}: elegirlo</button>
-          <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => marcarEnCero(r, clave, true)}>Este mes no se {ing ? "cobró" : "pagó"} (queda en 0)</button>
+          <div className="grupo-t"><span>{ing ? "Cobros" : "Pagos"}</span></div>
+          <div className="caja lista">
+            {e.pagos.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(p => (
+              <button key={p.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: p.id })}>
+                <span className="izq"><Dia dia={Number(p.fecha.slice(8))} abajo={mesCorto(p.fecha.slice(0, 7))} /><span className="chico">{cta.get(p.cuentaId)}<span className="tenue">{textoOriginal({ usd: p.usd, monto: p.monto, moneda: p.moneda })}</span></span></span>
+                <span className="derecha"><Montos usd={p.usd} monto={p.monto} moneda={p.moneda} /></span>
+              </button>
+            ))}
+          </div>
         </>
       )}
+
+      {historia.length > 1 && (
+        <>
+          <div className="grupo-t"><span>Los últimos {historia.length} meses</span><span className="tenue">{r.moneda}</span></div>
+          <div className="caja">
+            <div className="hist">
+              {historia.map((h, k) => (
+                <div key={h.p}>
+                  <small className="num">{h.v > 0 && (k === 0 || Math.round(historia[k - 1].v) !== Math.round(h.v)) ? num(h.v, 0) : ""}</small>
+                  <i className={h.p === clave ? "ahora" : ""} style={{ height: Math.max(2, Math.round(h.v / maxH * 44)) }} />
+                  <small>{mesCorto(h.p)}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {e.cero && (
         <div className="caja" style={{ marginTop: 8 }}>
           <div className="fila" style={{ padding: 0 }}><span className="chico">Marcado en 0 este mes</span><button className="viol chico" onClick={() => marcarEnCero(r, clave, false)}>Deshacer</button></div>
         </div>
       )}
+
       <div className="espacio" />
-      <button className="btn2" style={{ width: "100%" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>Editar el recurrente</button>
-      <button className="btn2" style={{ width: "100%", marginTop: 8 }} onClick={() => setBorrar(true)}>Ya no aplica: dejar de pedirlo</button>
+      {e.estado !== "cargado" && <button className="viol chico" style={{ width: "100%", padding: "8px 0" }} onClick={() => setElegir(true)}>¿Ya lo cargaste? Elegilo</button>}
+      {!e.cero && <div className="pie-fijo" style={{ marginTop: 8 }}><button className="btn" onClick={() => nav.abrir({ p: "editor", recurrenteId: r.id, periodo: clave, monto: e.estimado ? undefined : e.falta || undefined, fecha: fechaDePago(e) })}>{textoCargar}</button></div>}
 
       <Hoja abierta={elegir} cerrar={() => setElegir(false)}>
         <h2>¿Cuál es el {pagoTxt} de {r.nombre}?</h2>
@@ -357,15 +398,23 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
           ));
         })()}
       </Hoja>
-      <div className="mini tenue centro" style={{ marginTop: 10 }}>{cadaCuanto(r)}</div>
 
       <Hoja abierta={borrar} cerrar={() => setBorrar(false)}>
-        <h2>Eliminar {r.nombre}</h2>
-        <div className="tenue chico">Lo que ya {ing ? "cobraste" : "pagaste"} queda cargado.</div>
+        <h2>{r.nombre} · {titulo}</h2>
+        <button className="opcion" onClick={() => { setBorrar(false); nav.abrir({ p: "recurrente", id: r.id }); }}>
+          <div>Editar el recurrente</div>
+          <div className="mini tenue">Monto, día, cuenta y categoría.</div>
+        </button>
+        {e.estado !== "cargado" && (
+          <button className="opcion" onClick={() => { setBorrar(false); marcarEnCero(r, clave, true); }}>
+            <div>Fue 0 este mes</div>
+            <div className="mini tenue">{titulo} queda resuelto sin {pagoTxt}.</div>
+          </button>
+        )}
         {r.frecuencia !== "una-vez" && (
           <button className="opcion" onClick={async () => { const deshacer = await terminarRecurrente(r); setBorrar(false); toast({ texto: `${r.nombre}: no se pide más`, deshacer }); nav.volver(); }}>
-            <div>Dejar de pedirlo desde ahora</div>
-            <div className="mini tenue">Pasa a "Terminados" con su historial.</div>
+            <div>Dejar de pedirlo</div>
+            <div className="mini tenue">Pasa a "Terminados" con su historial. Lo que ya {ing ? "cobraste" : "pagaste"} queda cargado.</div>
           </button>
         )}
         <button className="opcion" onClick={() => eliminar("este")}>

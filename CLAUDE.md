@@ -71,6 +71,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Fijo o variable:** sin etiqueta; los variables llevan «~» en el monto.
   - **Lo semanal y lo anual:** pasado a dólares por mes («97/mes»), como estaba.
   - **En partes y terminados:** «Lo que debés en partes» arriba de la lista; «Terminados» plegado al final.
+- **Recurrente del mes** (decididas en octubre 2026, la pantalla que se abre al tocar una fila de Lo que viene):
+  - **Título:** «Alquiler · octubre» y debajo, en gris, cada cuánto y con qué cuenta («todos los meses, el 25 · Wise»).
+  - **El monto:** un número grande y una línea («1.100 EUR · vence el 25 oct · falta todo»); la barra solo si está pagado en parte.
+  - **Si ya cargaste algo parecido:** se pregunta arriba («¿Es este el pago?» con Sí y No), como en Para revisar.
+  - **Los meses anteriores:** barritas de los últimos 6 meses, con el monto cuando cambia.
+  - **Acciones:** una sola grande abajo («Cargar el pago», «Cargar lo que falta», «+ Agregar otro pago»), con «¿Ya lo cargaste? Elegilo» como enlace arriba.
+  - **«⋯» arriba:** Editar el recurrente · Fue 0 este mes · Dejar de pedirlo · Saltear solo este mes · Eliminarlo del todo. Sin tacho ni botones sueltos abajo.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
