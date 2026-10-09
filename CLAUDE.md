@@ -109,6 +109,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Más, pie:** solo la versión («Gastos 1.0.31 · app de Android»).
   - **Ajustes, avisos:** una fila con el interruptor y el estado en gris («activados · probar un aviso», «bloqueados…» en rojo, «apagados»).
   - **Ajustes, recordatorios:** una lista de tres filas; el cuándo («desde las 21:00 ▾», «desde el día 5 ▾») se toca para cambiarlo. Las explicaciones, detrás del «?».
+- **Ingresos** (decididas en octubre 2026, la solapa INGRESOS de Resumen en la vista Mes):
+  - **Arriba:** tres números: Entró · Falta cobrar · Tu promedio (de los 3 meses anteriores con datos).
+  - **Gráfico:** en lugar de la torta, barras de los últimos 6 meses; en el mes, lo que falta cobrar rayado arriba de lo que entró, y el promedio como línea punteada.
+  - **Contra el mes anterior:** una línea debajo («a esta altura de septiembre: 930 · +131»; si el mes terminó, «en septiembre: …»).
+  - **Falta cobrar:** un grupo arriba de la lista, con el día, el puntito, el nombre, el monto estimado y «Cobrar» (como en Lo que viene).
+  - **Lista por categoría:** en las que tienen un recurrente, «lo que entró / lo esperado», abajo «~X falta» o «cobrado», y una barra con lo que falta rayado.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura

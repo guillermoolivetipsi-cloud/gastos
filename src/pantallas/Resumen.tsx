@@ -5,13 +5,13 @@ import { db } from "../db";
 import { useNav } from "../nav";
 import type { Categoria, Movimiento, Tipo } from "../tipos";
 import { bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
-import { enUsdDe } from "../lib/recurrentes";
+import { enUsdDe, fechaDePago } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
 import { BotonMandar } from "./Finanzas";
-import { fechaCorta, hoy, moverAncla, nombreMes, periodoDe, periodoHoy, rango, tituloRango, type Vista } from "../lib/fecha";
+import { fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
 import { num, usd } from "../lib/formato";
-import { Barra, BotonAgregar, Dona, Hoja, Punto } from "../ui/piezas";
+import { Barra, BotonAgregar, Dia, Dona, Hoja, Puntito, Punto } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
 import { useInsights } from "./ComoVenis";
 import { T } from "../ui/Icono";
@@ -71,7 +71,23 @@ export function Resumen() {
   }, [esMes, tipo, periodo, instancias, tasa]);
   const previstoTotal = [...previstoPorCat.values()].reduce((a, b) => a + b, 0);
   // Las categorías que solo tienen algo proyectado o previsto también aparecen.
-  const extra = new Set([...(verProy ? proyPorCat.keys() : []), ...previstoPorCat.keys()]);
+  // Ingresos del mes (reglas de Ingresos): lo que falta cobrar de los recurrentes, lo
+  // esperado por categoría, los últimos 6 meses y la comparación con el mes anterior.
+  const esIng = esMes && tipo === "ingreso";
+  const instIng = esIng ? instancias.filter(i => i.rec.tipo === "ingreso" && !i.cero) : [];
+  const enUsdI = (i: (typeof instancias)[number], x: number) => { const t = tasa(i.rec); return t ? x / t : 0; };
+  const faltaCobrar = instIng.filter(i => i.estado !== "cargado");
+  const faltaUsd = faltaCobrar.reduce((s, i) => s + enUsdI(i, i.esperado - i.pagado), 0);
+  const esperadoPorCat = new Map<string, number>();
+  for (const i of instIng) esperadoPorCat.set(i.rec.categoriaId, (esperadoPorCat.get(i.rec.categoriaId) ?? 0) + enUsdI(i, Math.max(i.esperado, i.pagado)));
+  const ingresoDe = (p: string, hastaDia?: string) => d.movimientos.filter(m => m.tipo === "ingreso" && m.fecha.slice(0, 7) === p && (!hastaDia || m.fecha.slice(8) <= hastaDia)).reduce((s, m) => s + usdDe(m), 0);
+  const seisMeses = esIng ? Array.from({ length: 6 }, (_, k) => sumarMeses(periodo, k - 5)).map(p => ({ p, v: p === periodo ? total : ingresoDe(p) })) : [];
+  const previos = esIng ? [1, 2, 3].map(k => ingresoDe(sumarMeses(periodo, -k))).filter(x => x > 0) : [];
+  const promedio = previos.length ? previos.reduce((a, b) => a + b, 0) / previos.length : null;
+  const mesEnCurso = periodo === periodoHoy();
+  const anterior = sumarMeses(periodo, -1);
+  const antVal = esIng ? ingresoDe(anterior, mesEnCurso ? hoy().slice(8) : undefined) : 0;
+  const extra = new Set([...(verProy ? proyPorCat.keys() : []), ...previstoPorCat.keys(), ...esperadoPorCat.keys()]);
   const catsVer = [...cats, ...[...extra].filter(id => !cats.some(c => c.cat.id === id)).map(id => d.catPorId.get(id)).filter(Boolean).map(cat => ({ cat: cat!, total: 0, pct: 0, n: 0 }))];
   // Los que todavía no tienen cotización cuentan como 0 hasta que haya conexión.
   const sinCotizar = movs.filter(m => m.usd == null).length;
@@ -135,6 +151,13 @@ export function Resumen() {
 
       {/* "Cómo venís" arriba de todo en el mes, antes de los números. */}
       {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
+      {esIng && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 6 }}>
+          <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Entró</div><div className="num ok" style={{ fontSize: 20 }}>+{num(total, 0)}</div><div className="mini tenue">USD</div></div>
+          <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Falta cobrar</div><div className="num" style={{ fontSize: 20 }}>{faltaUsd >= 1 ? `~${num(faltaUsd, 0)}` : "0"}</div><div className="mini tenue">{faltaCobrar.length ? `${faltaCobrar.length} · ` : ""}USD</div></div>
+          <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Tu promedio</div><div className="num" style={{ fontSize: 20 }}>{promedio != null ? num(promedio, 0) : "—"}</div><div className="mini tenue">USD/mes</div></div>
+        </div>
+      )}
 
       {b && (
         <div className="dos">
@@ -160,7 +183,59 @@ export function Resumen() {
         </div>
       )}
 
-      {grafico === "torta" ? (
+      {esIng ? (
+        // Barras de los últimos 6 meses, con lo que falta cobrar rayado y tu promedio punteado.
+        (() => {
+          const max = Math.max(1, ...seisMeses.map(x => x.v + (x.p === periodo ? faltaUsd : 0)), promedio ?? 0);
+          const H = 80;
+          return (
+            <>
+              <div className="grupo-t"><span>Los últimos 6 meses</span>{promedio != null && <span className="num">promedio {num(promedio, 0)}</span>}</div>
+              <div className="caja">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
+                  {seisMeses.map(({ p, v }) => {
+                    const ahora = p === periodo;
+                    return (
+                      <div key={p} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                        <small className="num mini tenue" style={{ fontSize: 12 }}>{v > 0 ? num(v, 0) : ""}</small>
+                        <div style={{ position: "relative", height: H, width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
+                          {promedio != null && <div style={{ position: "absolute", left: 0, right: 0, bottom: Math.round(promedio / max * H), borderTop: "1px dashed #8E8BA3", zIndex: 1 }} />}
+                          {ahora && faltaUsd >= 1 && <i style={{ width: "62%", height: Math.round(faltaUsd / max * H), background: "repeating-linear-gradient(-45deg, var(--ok) 0 3px, transparent 3px 6px)", borderRadius: "4px 4px 0 0", display: "block", opacity: .7 }} />}
+                          <i style={{ width: "62%", height: Math.max(v > 0 ? 2 : 0, Math.round(v / max * H)), background: ahora ? "var(--ok)" : "#1E5A48", borderRadius: ahora && faltaUsd >= 1 ? 0 : "4px 4px 0 0", display: "block", position: "relative" }} />
+                        </div>
+                        <small className="mini tenue" style={{ fontSize: 12 }}>{mesCorto(p)}</small>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {antVal > 0 && (
+                <div className="mini tenue" style={{ margin: "-4px 2px 4px" }}>
+                  {mesEnCurso ? `a esta altura de ${nombreMes(anterior, false)}` : `en ${nombreMes(anterior, false)}`}: {num(antVal, 0)} · <span className={total >= antVal ? "ok" : "ambar"}>{total >= antVal ? "+" : "−"}{num(Math.abs(total - antVal), 0)}</span>
+                </div>
+              )}
+              {faltaCobrar.length > 0 && <>
+                <div className="grupo-t"><span>Falta cobrar · {faltaCobrar.length}</span><span className="num">~{num(faltaUsd, 0)}</span></div>
+                <div className="caja lista">
+                  {faltaCobrar.map(i => (
+                    <div key={i.rec.id + i.clave} className="fila">
+                      <button className="izq" style={{ textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
+                        <Dia dia={Number(i.fecha.slice(8))} abajo={mesCorto(i.fecha.slice(0, 7))} />
+                        <Puntito cat={d.catPorId.get(i.rec.categoriaId)} />
+                        <span style={{ minWidth: 0 }}><div>{i.rec.nombre}</div><div className="mini tenue">{d.cuentaPorId.get(i.rec.cuentaId)?.nombre}</div></span>
+                      </button>
+                      <span className="derecha">
+                        <div className="num tenue">~{num(enUsdI(i, i.esperado - i.pagado), 0)}</div>
+                        <button className="btn1" style={{ padding: "3px 10px", fontSize: 13, marginTop: 3 }} onClick={() => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: fechaDePago(i) })}>Cobrar</button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>}
+            </>
+          );
+        })()
+      ) : grafico === "torta" ? (
         // La torta chica con el total pegado a la izquierda, y "Con proyecciones" debajo (reglas de Resumen y de orden).
         <div className="torta-fila" style={{ display: "flex", alignItems: "center", gap: 20, margin: "16px 0 4px" }}>
           <Dona tam={120} centro=""
@@ -199,6 +274,8 @@ export function Resumen() {
             const ritmo = obj != null && c.total + prev >= obj * ALERTA && !pasado;
             const ranking = obj == null && grafico === "dia";
             const hayDebajo = prev >= 1 || (proy != null && proy.seguro + proy.opcional > 0);
+            // Ingresos con un recurrente: lo que entró contra lo esperado (regla de Ingresos).
+            const esp = esIng ? esperadoPorCat.get(c.cat.id) : undefined;
             // Columnas alineadas: el % debajo del nombre; el monto con su objetivo arriba y lo previsto debajo.
             return (
               <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
@@ -209,7 +286,8 @@ export function Resumen() {
                     {c.total > 0 && <div className="mini tenue">{Math.round(c.pct * 100)}% {enEsto === "este mes" ? "del mes" : ""}</div>}
                   </span>
                   <span className="num derecha">
-                    <div><span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>{obj != null && <span className="tenue chico"> / {num(obj)}</span>}</div>
+                    <div><span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>{obj != null && <span className="tenue chico"> / {num(obj)}</span>}{esp != null && <span className="tenue chico"> / {num(esp, 0)}</span>}</div>
+                    {esp != null && (esp - c.total >= 1 ? <div className="mini tenue">~{num(esp - c.total, 0)} falta</div> : <div className="mini ok">cobrado</div>)}
                     {hayDebajo && <div className="mini tenue">
                       {prev >= 1 && <span>~+{num(prev, 0)} previsto</span>}
                       {proy != null && proy.seguro > 0 && <span className="ambar"> +{num(proy.seguro, 0)}</span>}
@@ -217,6 +295,7 @@ export function Resumen() {
                     </div>}
                   </span>
                 </div>
+                {esp != null && <div style={{ paddingLeft: 38 }}><Barra valor={Math.min(1, c.total / esp)} previsto={Math.max(0, (esp - c.total) / esp)} color={c.cat.color} colorPrevisto={c.cat.color} /></div>}
                 {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} previsto={prev / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} colorPrevisto={c.cat.color} marca={ALERTA} /></div>}
                 {ranking && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / cats[0].total} color={c.cat.color} /></div>}
               </button>
