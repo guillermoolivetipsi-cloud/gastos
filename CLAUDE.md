@@ -78,6 +78,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Los meses anteriores:** barritas de los últimos 6 meses, con el monto cuando cambia.
   - **Acciones:** una sola grande abajo («Cargar el pago», «Cargar lo que falta», «+ Agregar otro pago»), con «¿Ya lo cargaste? Elegilo» como enlace arriba.
   - **«⋯» arriba:** Editar el recurrente · Fue 0 este mes · Dejar de pedirlo · Saltear solo este mes · Eliminarlo del todo. Sin tacho ni botones sueltos abajo.
+- **Cómo venís** (decididas en octubre 2026, el detalle que se abre desde Resumen):
+  - **Orden:** como estaba, igual que la línea de Resumen: Tarjeta, el mes que viene, Suscripciones y Qué cambió. Sin resumen arriba (la línea de Resumen ya lo muestra).
+  - **Títulos:** afuera de la caja (`.grupo-t`), sin número de orden, con el número principal a la derecha («Tarjeta … 565 USD»).
+  - **Datos:** cada uno en su fila alineada (nombre a la izquierda, número a la derecha), separadas por una línea (`.filas`).
+  - **Suscripciones:** como en Recurrentes: el día, el puntito de color, con qué tarjeta y el monto; lo más caro arriba.
+  - **Aclaraciones:** detrás de un «?» en el título (`.ayuda`), que las muestra al tocarlo; nunca a la vista todo el tiempo.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura

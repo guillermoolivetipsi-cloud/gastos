@@ -33,7 +33,7 @@ export interface Insights {
     costoCambio: { usd: number; pct: number } | null;
   };
   comprometido: { periodo: string; tarjetas: number; recurrentes: number; entra: number; total: number };
-  suscripciones: { total: number; promedio: number | null; anual: number; items: { nombre: string; usd: number; nueva: boolean; previsto: boolean }[] };
+  suscripciones: { total: number; promedio: number | null; anual: number; items: { nombre: string; usd: number; nueva: boolean; previsto: boolean; fecha: string; cuentaId: string }[] };
   cambios: { cat: Categoria; ahora: number; promedio: number; dif: number }[];
 }
 
@@ -81,14 +81,18 @@ export function calcularInsights(p: string, movs: Movimiento[], cats: Categoria[
   // "Nueva" solo contra meses con recurrentes cargados en esta app: en la anterior los
   // nombres eran a mano ("Antriphic") y todo parecería nuevo.
   const antes = [1, 2].flatMap(k => gastosDe(movs, sumarMeses(p, -k)).filter(m => esSus(m) && m.recurrenteId)).map(nombre).map(n => n.toLowerCase());
-  const agrup = new Map<string, number>();
-  for (const m of susAhora) agrup.set(nombre(m), (agrup.get(nombre(m)) ?? 0) + (m.usd ?? 0));
+  // Por nombre: lo cobrado, y la fecha y la cuenta del último cobro (para la lista).
+  const agrup = new Map<string, { usd: number; fecha: string; cuentaId: string }>();
+  for (const m of susAhora) {
+    const a = agrup.get(nombre(m));
+    agrup.set(nombre(m), { usd: (a?.usd ?? 0) + (m.usd ?? 0), fecha: a && a.fecha > m.fecha ? a.fecha : m.fecha, cuentaId: a && a.fecha > m.fecha ? a.cuentaId : m.cuentaId });
+  }
   const mesesPrev = [1, 2, 3].map(k => suma(gastosDe(movs, sumarMeses(p, -k)).filter(esSus))).filter(x => x > 0);
   // Las que vienen este mes y todavía no se cobraron (casi todas van a la tarjeta y
   // se cargan con el resumen): cuentan con su monto estimado, marcadas "previsto".
   const previstas = recurrentesDelMes(recs, movs, p, tasa)
     .filter(i => i.rec.tipo === "gasto" && catPorId.get(i.rec.categoriaId)?.nombre === "Suscripciones" && i.estado !== "cargado")
-    .map(i => { const t = tasa(i.rec); return { nombre: i.rec.nombre, usd: t ? (i.esperado - i.pagado) / t : 0 }; })
+    .map(i => { const t = tasa(i.rec); return { nombre: i.rec.nombre, usd: t ? (i.esperado - i.pagado) / t : 0, fecha: i.fecha, cuentaId: i.rec.cuentaId }; })
     .filter(x => x.usd > 0);
   const totalSus = redondear(suma(susAhora) + previstas.reduce((s, x) => s + x.usd, 0));
   // Por año: cada recurrente según su frecuencia (una anual cuenta una vez, no × 12),
@@ -127,8 +131,8 @@ export function calcularInsights(p: string, movs: Movimiento[], cats: Categoria[
       total: totalSus, anual: anualSus,
       promedio: mesesPrev.length ? redondear(mesesPrev.reduce((a, b) => a + b, 0) / mesesPrev.length) : null,
       items: [
-        ...[...agrup.entries()].map(([n, usd]) => ({ nombre: n, usd: redondear(usd), nueva: !antes.includes(n.toLowerCase()) && antes.length > 0, previsto: false })),
-        ...previstas.map(x => ({ nombre: x.nombre, usd: redondear(x.usd), nueva: false, previsto: true })),
+        ...[...agrup.entries()].map(([n, a]) => ({ nombre: n, usd: redondear(a.usd), nueva: !antes.includes(n.toLowerCase()) && antes.length > 0, previsto: false, fecha: a.fecha, cuentaId: a.cuentaId })),
+        ...previstas.map(x => ({ nombre: x.nombre, usd: redondear(x.usd), nueva: false, previsto: true, fecha: x.fecha, cuentaId: x.cuentaId })),
       ].sort((a, b) => b.usd - a.usd),
     },
     cambios: cambios.slice(0, 6),

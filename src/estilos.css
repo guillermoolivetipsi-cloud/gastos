@@ -219,3 +219,7 @@ select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); b
 .hist i { width: 100%; max-width: 26px; background: #3a3156; border-radius: 4px 4px 0 0; display: block; }
 .hist i.ahora { background: var(--viol); }
 .hist small { font-size: 12px; color: var(--tenue); }
+/* Cómo venís: filas alineadas dentro de una caja y el «?» de las aclaraciones. */
+.caja > .filas { margin: 8px -14px -12px; padding: 0 14px; border-top: 1px solid #1A1A24; }
+.filas > .fila + .fila { border-top: 1px solid #1A1A24; }
+.ayuda { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--linea-2); color: var(--tenue); font-size: 11px; align-items: center; justify-content: center; margin-left: 6px; vertical-align: 1px; }
