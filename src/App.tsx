@@ -14,7 +14,7 @@ import { Movimientos } from "./pantallas/Movimientos";
 import { LoQueViene } from "./pantallas/LoQueViene";
 import { Mas } from "./pantallas/Mas";
 import { Editor } from "./pantallas/Editor";
-import { EditorCategoria, ListaCategorias, Objetivos } from "./pantallas/Categorias";
+import { EditorCategoria, ListaCategorias } from "./pantallas/Categorias";
 import { EditorCuenta, ListaCuentas, Tarjeta } from "./pantallas/Cuentas";
 import { EditorRecurrente, Instancia, ListaRecurrentes } from "./pantallas/Recurrentes";
 import { Clases, Revisar } from "./pantallas/Revisar";
@@ -39,7 +39,6 @@ function Encima({ p }: { p: Pantalla }) {
     case "recurrentes": return <ListaRecurrentes />;
     case "recurrente": return <EditorRecurrente {...p} />;
     case "instancia": return <Instancia id={p.id} clave={p.clave} />;
-    case "objetivos": return <Objetivos />;
     case "revisar": return <Revisar />;
     case "exportar": return <Exportar />;
     case "respaldo": return <Respaldo />;

@@ -96,6 +96,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Categoría de lo nuevo:** la lista desplegable «¿Qué categoría es?», como estaba.
   - **Qué se aplica:** sin casillas: cada fila dice a la derecha qué va a pasar («se agrega», «se corrige») y se toca para pasarla a «no».
   - **Cambios de moneda o de cuenta:** «55 USD → 55 EUR» (o «Revolut → Visa») a la derecha, alineado con los montos; abajo en gris qué cambia.
+- **Categorías** (decididas en octubre 2026, Más → Categorías y objetivos):
+  - **Lista:** filas como en el resto de la app (círculo, nombre y lo gastado este mes a la derecha), no una grilla. La grilla de 5 queda solo para elegir al cargar.
+  - **Objetivos:** se ponen acá, no en una pantalla aparte. Variables y Fijos por separado; cada fila con objetivo muestra «gastado / objetivo» y la barra con la marca del 80% (como en Resumen). Sin objetivo, el botón «usar X de objetivo (promedio Y)».
+  - **Archivadas:** plegadas al final, «Archivadas (N) ›».
+  - **Editor:** arriba el círculo y el nombre, después el objetivo como monto grande, después fijo o variable; el ícono y el color al final.
+  - **Sugerencias:** como estaban, el texto violeta («Sugerido: 405 · tu promedio es 450, 10% menos») y «No te frena…» a la vista.
+  - **Archivar o eliminar:** en «⋯» arriba, no un botón abajo.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura

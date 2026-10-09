@@ -33,9 +33,8 @@ function Menu({ arriba, abajo, pie = "Gastos · prueba en el navegador" }: { arr
         {item({ p: "revisar" }, <T.IconInbox size={20} />, "Para revisar", revisar ? <span className="badge">{revisar}</span> : undefined)}
       </div>
       <div className="caja lista">
-        {item({ p: "categorias" }, <T.IconCategory size={20} />, "Categorías")}
+        {item({ p: "categorias" }, <T.IconCategory size={20} />, "Categorías y objetivos")}
         {item({ p: "etiquetas" }, <T.IconTag size={20} />, "Etiquetas")}
-        {item({ p: "objetivos" }, <T.IconTarget size={20} />, "Objetivos por categoría")}
         {item({ p: "recurrentes" }, <T.IconRepeat size={20} />, "Recurrentes")}
         {item({ p: "cuentas" }, <T.IconBuildingBank size={20} />, "Cuentas y tarjetas")}
       </div>

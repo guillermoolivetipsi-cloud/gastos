@@ -17,7 +17,6 @@ export type Pantalla =
   | { p: "recurrentes" }
   | { p: "recurrente"; id?: string; desdeSugerencia?: string; tipo?: Tipo }
   | { p: "instancia"; id: string; clave: string }
-  | { p: "objetivos" }
   | { p: "revisar" }
   | { p: "exportar" }
   | { p: "respaldo" }
