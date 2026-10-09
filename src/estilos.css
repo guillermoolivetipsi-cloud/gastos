@@ -203,3 +203,13 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
 .cats.cinco { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 4px; }
 .cats.cinco > .cat { min-width: 0; }
 .cats.cinco .punto { width: 46px; height: 46px; }
+/* Reglas de orden (octubre 2026): grupos con su título y su caja, una fila de controles
+   arriba y el puntito de color en las listas que ya llevan el día a la izquierda. */
+.grupo-t { font-size: 14px; font-weight: 500; margin: 22px 2px 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.grupo-t .num, .grupo-t .tenue { font-weight: 400; color: var(--tenue); }
+.lista > .deslizable + .deslizable { border-top: 1px solid #1A1A24; }
+.caja .deslizable .frente { background: var(--panel); }
+.puntito { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); border: 0; font-family: inherit; }
+.navega .flechas { display: flex; align-items: center; gap: 4px; }
+.torta-fila .dona { margin: 0; flex: none; }

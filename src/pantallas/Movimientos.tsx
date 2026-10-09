@@ -5,7 +5,7 @@ import { eliminarMovimiento } from "../lib/acciones";
 import { usdDe } from "../lib/analisis";
 import { DIAS_CORTOS, aFecha, mesCorto, nombreMes, periodoHoy } from "../lib/fecha";
 import { num, sinAcentos } from "../lib/formato";
-import { BotonAgregar, Deslizable, Punto, Seg, useToast } from "../ui/piezas";
+import { BotonAgregar, Deslizable, Punto, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 
@@ -19,6 +19,8 @@ export function Movimientos() {
   const [medio, setMedio] = useState<string>("todos");
   const [catFiltro, setCatFiltro] = useState("");
   const [cuantos, setCuantos] = useState(150);
+  // La búsqueda se abre con la lupa de arriba (regla de orden: una sola fila de controles).
+  const [buscando, setBuscando] = useState(false);
 
   const cat = useMemo(() => new Map(d.categorias.map(c => [c.id, c])), [d.categorias]);
   const cta = useMemo(() => new Map(d.cuentas.map(c => [c.id, c])), [d.cuentas]);
@@ -53,20 +55,27 @@ export function Movimientos() {
 
   return (
     <div className="pantalla">
-      <div className="enc"><h1>Movimientos</h1></div>
-      <div className="buscar"><T.IconSearch size={18} className="tenue" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por categoría, cuenta, comentario…" />{q && <button onClick={() => setQ("")} aria-label="Borrar búsqueda"><T.IconX size={16} /></button>}</div>
-      <Seg opciones={[["todos", "Todos"], ["gasto", "Gastos"], ["ingreso", "Ingresos"]]} valor={tipo} cambiar={t => {
-        setTipo(t);
-        // Una categoría de gastos no tiene sentido mirando ingresos (y al revés).
-        if (t !== "todos" && catFiltro && cat.get(catFiltro)?.tipo !== t) setCatFiltro("");
-      }} />
-      <div className="pills scroll" style={{ marginTop: 10 }}>
-        {[["todos", "Todas"], ["sin", "Sin tarjeta"], ...d.cuentas.filter(c => c.esTarjeta && !c.archivada).map(c => [c.id, c.nombre])].map(([v, t]) => (
-          <button key={v} className={`pill${medio === v ? " on" : ""}`} onClick={() => setMedio(v)}>{t}</button>
-        ))}
-        <select className={`pill${catFiltro ? " on" : ""}`} value={catFiltro} onChange={e => setCatFiltro(e.target.value)} aria-label="Categoría" style={{ appearance: "none" }}>
+      <div className="enc"><h1>Movimientos</h1>
+        <button className="accion" aria-label="Buscar" onClick={() => { if (buscando) setQ(""); setBuscando(!buscando); }}>{buscando ? <T.IconX size={22} /> : <T.IconSearch size={22} />}</button>
+      </div>
+      {buscando && <div className="buscar"><T.IconSearch size={18} className="tenue" /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por categoría, cuenta, comentario…" />{q && <button onClick={() => setQ("")} aria-label="Borrar búsqueda"><T.IconX size={16} /></button>}</div>}
+      {/* Los filtros, en una sola fila de desplegables. */}
+      <div className="pills scroll">
+        <select className={`pill${tipo !== "todos" ? " on" : ""}`} value={tipo} aria-label="Tipo" onChange={e => {
+          const t = e.target.value as typeof tipo;
+          setTipo(t);
+          // Una categoría de gastos no tiene sentido mirando ingresos (y al revés).
+          if (t !== "todos" && catFiltro && cat.get(catFiltro)?.tipo !== t) setCatFiltro("");
+        }}>
+          <option value="todos">Gastos e ingresos ▾</option><option value="gasto">Gastos ▾</option><option value="ingreso">Ingresos ▾</option>
+        </select>
+        <select className={`pill${medio !== "todos" ? " on" : ""}`} value={medio} aria-label="Cuenta" onChange={e => setMedio(e.target.value)}>
+          <option value="todos">Todas las cuentas ▾</option><option value="sin">Sin tarjeta ▾</option>
+          {d.cuentas.filter(c => c.esTarjeta && !c.archivada).map(c => <option key={c.id} value={c.id}>{c.nombre} ▾</option>)}
+        </select>
+        <select className={`pill${catFiltro ? " on" : ""}`} value={catFiltro} onChange={e => setCatFiltro(e.target.value)} aria-label="Categoría">
           <option value="">Categoría ▾</option>
-          {d.categorias.filter(c => !c.archivada && (tipo === "todos" || c.tipo === tipo)).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          {d.categorias.filter(c => !c.archivada && (tipo === "todos" || c.tipo === tipo)).map(c => <option key={c.id} value={c.id}>{c.nombre} ▾</option>)}
         </select>
       </div>
       {/* Siempre una línea de totales: con filtros, lo filtrado; sin filtros, el mes en curso. */}
@@ -76,7 +85,7 @@ export function Movimientos() {
         const g = base.reduce((s, m) => s + (m.tipo === "gasto" ? usdDe(m) : 0), 0), i = base.reduce((s, m) => s + (m.tipo === "ingreso" ? usdDe(m) : 0), 0);
         if (!base.length) return null;
         return (
-          <div className="mini tenue" style={{ marginTop: 8 }}>
+          <div className="mini tenue" style={{ marginTop: 10 }}>
             {delMes ? `${nombreMes(periodoHoy(), false)[0].toUpperCase()}${nombreMes(periodoHoy(), false).slice(1)}:` : `${lista.length} movimientos:`}
             {g > 0 && <> <span style={{ color: "var(--tinta)" }}>−{num(g, 0)} gastos</span></>}{g > 0 && i > 0 && " ·"}{i > 0 && <> <span className="ok">+{num(i, 0)} ingresos</span></>} USD
           </div>
@@ -90,8 +99,9 @@ export function Movimientos() {
         const total = totalDia.get(fecha) ?? 0;
         return (
           <div key={fecha}>
-            {/* Fecha corta y el total del día (regla de Movimientos). */}
-            <div className="dia-titulo"><span>{Number(fecha.slice(8))} {mesCorto(fecha.slice(0, 7))} · {DIAS_CORTOS[aFecha(fecha).getDay()]}</span><span className="num">{total > 0 ? "+" : ""}{num(total)}</span></div>
+            {/* Cada día es un grupo: su título con el total y su caja (reglas de Movimientos y de orden). */}
+            <div className="grupo-t"><span>{Number(fecha.slice(8))} {mesCorto(fecha.slice(0, 7))} · {DIAS_CORTOS[aFecha(fecha).getDay()]}</span><span className="num">{total > 0 ? "+" : ""}{num(total)}</span></div>
+            <div className="caja lista">
             {ms.map(m => {
               const c = cat.get(m.categoriaId);
               const cuenta = cta.get(m.cuentaId);
@@ -110,7 +120,7 @@ export function Movimientos() {
                       <span style={{ minWidth: 0 }}>
                         <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || nombreCat}</div>
                         <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {queFue ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}
+                          {queFue ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}
                         </div>
                       </span>
                     </span>
@@ -119,14 +129,14 @@ export function Movimientos() {
                       <div className={m.tipo === "ingreso" ? "ok" : ""} style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
                         {r && <T.IconRepeat size={13} className="viol" aria-label={`Pago de ${r.nombre}`} />}
                         {m.cuotas && m.cuotas > 1 ? <span className="mini" style={{ color: "var(--azul)" }} aria-label={`${m.cuotas} cuotas`}>{m.cuotas}×</span> : null}
-                        <span>{m.tipo === "ingreso" ? "+" : ""}{m.usd != null ? num(m.usd) : "…"} USD</span>
+                        <span>{m.tipo === "ingreso" ? "+" : ""}{m.usd != null ? num(m.usd) : "…"}</span>
                       </div>
-                      {m.moneda !== "USD" && <div className="mini tenue">{num(m.monto)} {m.moneda}</div>}
                     </span>
                   </div>
                 </Deslizable>
               );
             })}
+            </div>
           </div>
         );
       })}

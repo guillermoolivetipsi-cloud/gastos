@@ -164,17 +164,23 @@ export function Dia({ dia, abajo, vencido }: { dia: string | number; abajo: stri
   );
 }
 
-/** Regla de los montos: los dólares arriba (como los totales) y la moneda original
- *  abajo, en gris, solo si no es USD. `estimado`: con "~" (lo que todavía no pasó o va
- *  con la cotización de hoy). `signo`: "+" en ingresos. */
+/** Regla de los montos: a la derecha, un solo número en dólares (como los totales);
+ *  la moneda original va en la línea gris de la fila (`textoOriginal`). Si no hay
+ *  cotización, el monto en su moneda. `estimado`: con "~". `signo`: "+" en ingresos. */
 export function Montos({ usd, monto, moneda, estimado, signo = "", clase = "" }: { usd: number | null; monto: number | string; moneda: string; estimado?: boolean; signo?: string; clase?: string }) {
   const t = estimado ? "~" : "";
-  const original = `${t}${signo}${typeof monto === "number" ? num(monto) : monto} ${moneda}`;
-  const enUsd = moneda !== "USD" && usd != null;
-  return (
-    <>
-      <div className={`num chico ${clase}`}>{enUsd ? `${t}${signo}${num(usd!, usd! >= 100 ? 0 : 2)} USD` : original}</div>
-      {enUsd && <div className="mini tenue num">{original}</div>}
-    </>
-  );
+  const enUsd = moneda === "USD" || usd != null;
+  const valor = moneda === "USD" ? (typeof monto === "number" ? monto : null) : usd;
+  return <div className={`num ${clase}`}>{enUsd && valor != null ? `${t}${signo}${num(valor, valor >= 100 ? 0 : 2)}` : `${t}${signo}${typeof monto === "number" ? num(monto) : monto} ${moneda}`}</div>;
+}
+
+/** La moneda original para la línea gris (" · 55 EUR"); vacío si es USD o no hay cotización. */
+export function textoOriginal({ usd, monto, moneda, estimado, signo = "" }: { usd: number | null; monto: number | string; moneda: string; estimado?: boolean; signo?: string }) {
+  if (moneda === "USD" || usd == null) return "";
+  return ` · ${estimado ? "~" : ""}${signo}${typeof monto === "number" ? num(monto) : monto} ${moneda}`;
+}
+
+/** En las listas que ya llevan el día a la izquierda, la categoría va como un puntito de color. */
+export function Puntito({ cat }: { cat?: { color: string } }) {
+  return <span className="puntito" style={{ background: cat?.color ?? "var(--tenue)" }} aria-hidden="true" />;
 }

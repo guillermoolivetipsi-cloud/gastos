@@ -6,7 +6,7 @@ import { cuotasFuturas } from "../lib/tarjeta";
 import { fechaCorta, hoy, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import type { EstadoInstancia } from "../lib/recurrentes";
-import { Dia, Montos, Punto, useToast } from "../ui/piezas";
+import { Dia, Montos, Puntito, textoOriginal, useToast } from "../ui/piezas";
 import { descartar, vincular } from "../lib/acciones";
 import { fechaDePago, sugerirVinculos } from "../lib/recurrentes";
 import { T } from "../ui/Icono";
@@ -25,13 +25,14 @@ export function LoQueViene() {
   const nav = useNav();
   const [periodo, setPeriodo] = useState(nav.periodoViene ?? periodoHoy());
   const [pestana, setPestana] = useState<Pestana>("recurrentes");
-  const meses = Array.from({ length: 4 }, (_, i) => sumarMeses(periodoHoy(), i - 1));
-  if (!meses.includes(periodo)) meses.unshift(periodo);
   return (
     <div className="pantalla">
       <div className="enc"><h1>Lo que viene</h1></div>
-      <div className="pills scroll" style={{ marginBottom: 10 }}>
-        {meses.map(p => <button key={p} className={`pill${p === periodo ? " on" : ""}`} onClick={() => setPeriodo(p)}>{nombreMes(p, false)}</button>)}
+      {/* El mes con flechas, como en Resumen (regla de orden). */}
+      <div className="navega" style={{ marginBottom: 6 }}>
+        <button aria-label="Mes anterior" onClick={() => setPeriodo(sumarMeses(periodo, -1))}><T.IconChevronLeft size={20} /></button>
+        <button onClick={() => setPeriodo(periodoHoy())}><span style={{ color: "var(--tinta)" }}>{nombreMes(periodo)}</span></button>
+        <button aria-label="Mes siguiente" onClick={() => setPeriodo(sumarMeses(periodo, 1))}><T.IconChevronRight size={20} /></button>
       </div>
       <div className="solapas">
         <button className={pestana === "recurrentes" ? "on" : ""} onClick={() => setPestana("recurrentes")}>RECURRENTES</button>
@@ -92,11 +93,11 @@ function Recurrentes({ periodo }: { periodo: string }) {
       <div className="fila">
         <button className="izq" style={{ textAlign: "left", flex: 1, minWidth: 0 }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
           <Dia dia={Number(i.fecha.slice(8))} abajo={mesCorto(i.fecha.slice(0, 7))} vencido={vencido} />
-          <Punto cat={cat.get(i.rec.categoriaId)} chico />
+          <Puntito cat={cat.get(i.rec.categoriaId)} />
           <span style={{ minWidth: 0 }}>
-            <div>{i.rec.nombre}</div>
-            <div className="mini tenue">
-              {c?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {c?.nombre}
+            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.rec.nombre}</div>
+            <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {c?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {c?.nombre}{!i.cero && textoOriginal({ usd: t ? valor / t : null, monto: valor, moneda: i.rec.moneda, estimado: i.estimado, signo: ing ? "+" : "" })}
               {i.estado === "parcial" && <span className="ambar"> · parcial</span>}
               {vencido && i.estado !== "parcial" && <span className="mal"> · vencido</span>}
               {i.cero && <span> · fue 0</span>}
@@ -135,7 +136,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
         </div>
       </div>
 
-      {porPagar.length > 0 && <div className="titulo-sec"><span>Por pagar de tus cuentas</span><span>{porPagar.length}</span></div>}
+      {porPagar.length > 0 && <div className="grupo-t"><span>Por pagar de tus cuentas · {porPagar.length}</span><span className="num">{num(porPagarUsd, 0)}</span></div>}
       {porPagar.length > 0 && (
         <div className="caja lista">
           {porPagar.map(i => {
@@ -159,15 +160,15 @@ function Recurrentes({ periodo }: { periodo: string }) {
 
       {aTarjeta.length > 0 && (
         <>
-          <div className="titulo-sec"><span>Van a la tarjeta · {aTarjeta.length}{tarjetaPendientes ? ` (${tarjetaPendientes} por cobrar)` : ""}</span><span className="num">~{num(totalTarjeta, 0)} USD</span></div>
-          <div className="mini tenue" style={{ margin: "-4px 2px 8px" }}>Se pagan con el resumen de {nombreMes(sumarMeses(periodo, 1), false)}: no se suman acá.</div>
+          <div className="grupo-t"><span>Van a la tarjeta · {aTarjeta.length}</span><span className="num">~{num(totalTarjeta, 0)}</span></div>
+          <div className="mini tenue" style={{ margin: "-4px 2px 8px" }}>Se pagan con el resumen de {nombreMes(sumarMeses(periodo, 1), false)}: no se suman acá.{tarjetaPendientes ? ` ${tarjetaPendientes} todavía sin cargar.` : ""}</div>
           <div className="caja lista">{aTarjeta.map(i => <div key={i.rec.id + i.clave}>{fila(i)}</div>)}</div>
         </>
       )}
 
       {ingresos.length > 0 && (
         <>
-          <div className="titulo-sec"><span>A cobrar</span><span className="ok num">+{num(totalCobrar, 0)} USD</span></div>
+          <div className="grupo-t"><span>A cobrar</span><span className="ok num">+{num(totalCobrar, 0)}</span></div>
           <div className="caja lista">{ingresos.map(i => <div key={i.rec.id + i.clave}>{fila(i, "Cobrar")}</div>)}</div>
           <button className="mini viol" style={{ margin: "-4px 2px 0" }} onClick={() => nav.abrir({ p: "recurrente", tipo: "ingreso" })}>+ Agregar ingreso</button>
         </>
@@ -175,7 +176,7 @@ function Recurrentes({ periodo }: { periodo: string }) {
 
       {pagados.length > 0 && (
         <>
-          <button className="titulo-sec" style={{ width: "100%" }} onClick={() => setVerPagados(!verPagados)}>
+          <button className="grupo-t" style={{ width: "100%" }} onClick={() => setVerPagados(!verPagados)}>
             <span>Ya pagados ({pagados.length})</span>{verPagados ? <T.IconChevronDown size={16} /> : <T.IconChevronRight size={16} />}
           </button>
           {verPagados && <div className="caja lista">{pagados.map(i => <div key={i.rec.id + i.clave}>{fila(i)}</div>)}</div>}

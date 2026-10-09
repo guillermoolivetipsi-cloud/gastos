@@ -7,7 +7,7 @@ import { fechaCorta, mesCorto, nombreMes, periodoDe, periodoHoy, sumarMeses, ult
 import { num, redondear } from "../lib/formato";
 import { aPagarTarjeta } from "../lib/analisis";
 import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
-import { Dia, Interruptor, Montos, Seg, useToast } from "../ui/piezas";
+import { Dia, Interruptor, Montos, Seg, textoOriginal, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 export function ListaCuentas() {
@@ -153,7 +153,7 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
         <T.IconFileImport size={16} style={{ verticalAlign: -3 }} /> Subir el PDF del resumen
       </button>
 
-      <div className="titulo-sec"><span>Qué entra en este resumen</span><span>{r.items.length}</span></div>
+      <div className="grupo-t"><span>Qué entra en este resumen</span><span>{r.items.length}</span></div>
       {!r.items.length && <div className="tenue chico">Nada todavía.</div>}
       {r.items.length > 0 && (
         <div className="caja lista">
@@ -161,10 +161,10 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
             <button key={q.mov.id + q.numero} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: q.mov.id })}>
               <span className="izq"><Dia dia={Number(q.mov.fecha.slice(8))} abajo={mesCorto(q.mov.fecha.slice(0, 7))} /><span style={{ minWidth: 0 }}>
                 <div>{cat.get(q.mov.categoriaId)}{q.mov.comentario ? <span className="tenue"> · {q.mov.comentario}</span> : ""}</div>
-                <div className="mini tenue">{q.de > 1 ? `cuota ${q.numero} de ${q.de}` : "un pago"}{q.numero === 1 && esDudosa(c, q.mov.fecha) ? <span className="ambar"> · puede ir al próximo</span> : ""}</div>
+                <div className="mini tenue">{q.de > 1 ? `cuota ${q.numero} de ${q.de}` : `un pago${textoOriginal({ usd: q.mov.usd, monto: q.mov.monto, moneda: q.mov.moneda })}`}{q.numero === 1 && esDudosa(c, q.mov.fecha) ? <span className="ambar"> · puede ir al próximo</span> : ""}</div>
               </span></span>
               <span className="derecha">{q.de > 1
-                ? <div className="num chico">{num(q.usd)} USD</div>
+                ? <div className="num">{num(q.usd)}</div>
                 : <Montos usd={q.mov.usd} monto={q.mov.monto} moneda={q.mov.moneda} />}</span>
             </button>
           ))}
@@ -173,7 +173,7 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
 
       {porCompra.size > 0 && (
         <>
-          <div className="titulo-sec"><span>Cuotas que siguen</span><span className="num">{num(futuras.reduce((s, q) => s + q.usd, 0))} USD</span></div>
+          <div className="grupo-t"><span>Cuotas que siguen</span><span className="num">{num(futuras.reduce((s, q) => s + q.usd, 0))} USD</span></div>
           <div className="caja lista">
             {[...porCompra.values()].map(qs => (
               <div key={qs[0].mov.id} className="fila">

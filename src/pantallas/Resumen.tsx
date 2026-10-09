@@ -97,19 +97,21 @@ export function Resumen() {
       </div>
       {solapa === "proy" ? <Proyecciones /> : <>
 
-      <div className="vistas">
-        {VISTAS.map(([v, t]) => (
-          <button key={v} className={vista === v ? "on" : ""} onClick={() => {
-            setVista(v);
-            if (v === "periodo") { setAncla(`${periodoHoy()}-01`); setHasta(hoy()); setElegirPeriodo(true); }
-            else setAncla(hoy());
-          }}>{t}</button>
-        ))}
-      </div>
+      {/* La vista y el período en una sola fila (regla de orden). */}
       <div className="navega">
-        <button aria-label="Anterior" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, -1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronLeft size={20} /></button>
-        <button onClick={() => vista === "periodo" ? setElegirPeriodo(true) : setAncla(hoy())}><span style={{ color: "var(--tinta)" }}>{tituloRango(vista, desde, fin)}</span></button>
-        <button aria-label="Siguiente" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, 1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronRight size={20} /></button>
+        <select className="pill" value={vista} aria-label="Vista" onChange={e => {
+          const v = e.target.value as Vista;
+          setVista(v);
+          if (v === "periodo") { setAncla(`${periodoHoy()}-01`); setHasta(hoy()); setElegirPeriodo(true); }
+          else setAncla(hoy());
+        }}>
+          {VISTAS.map(([v, t]) => <option key={v} value={v}>{t} ▾</option>)}
+        </select>
+        <span className="flechas">
+          <button aria-label="Anterior" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, -1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronLeft size={20} /></button>
+          <button onClick={() => vista === "periodo" ? setElegirPeriodo(true) : setAncla(hoy())}><span style={{ color: "var(--tinta)" }}>{tituloRango(vista, desde, fin)}</span></button>
+          <button aria-label="Siguiente" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, 1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronRight size={20} /></button>
+        </span>
       </div>
 
       {vencidos.length > 0 && (
@@ -158,26 +160,21 @@ export function Resumen() {
         </div>
       )}
 
-      {hayProy && (
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button className={`pill${verProy ? " on" : ""}`} style={{ fontSize: 12, padding: "3px 10px" }} onClick={() => setConProy(!conProy)}>Con proyecciones{verProy ? " ✓" : ""}</button>
-        </div>
-      )}
       {grafico === "torta" ? (
-        // La torta chica y el total grande al lado (regla de Resumen): entra más sin bajar.
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, margin: "4px 0 6px" }}>
+        // La torta chica con el total pegado a la izquierda, y "Con proyecciones" debajo (reglas de Resumen y de orden).
+        <div className="torta-fila" style={{ display: "flex", alignItems: "center", gap: 20, margin: "16px 0 4px" }}>
           <Dona tam={120} centro=""
             partes={catsVer.flatMap(c => {
               const p = verProy ? proyPorCat.get(c.cat.id) : undefined;
               return [{ valor: c.total, color: c.cat.color }, { valor: p?.seguro ?? 0, color: c.cat.color, tenue: true }, { valor: p?.opcional ?? 0, color: c.cat.color, rayado: true }];
             })} />
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
             {total + proyTotal
               ? <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(total + proyTotal, 0)} <span className="chico tenue">USD</span></div>
               : <div className="chico tenue">{vacio}</div>}
-            <div className="mini tenue">{enEsto}</div>
+            <div className="mini tenue">{enEsto}{previstoTotal >= 1 ? ` · + ~${num(previstoTotal, 0)} previsto` : ""}</div>
             {verProy && <div className="mini tenue">{num(proyTotal, 0)} proyectado: <span className="ambar">claro</span> seguro · <span className="viol" style={{ textDecoration: "underline dotted" }}>rayado</span> opcional</div>}
-            {previstoTotal >= 1 && <div className="mini tenue">+ ~{num(previstoTotal, 0)} previsto</div>}
+            {hayProy && <button className={`pill${verProy ? " on" : ""}`} style={{ marginTop: 8, width: "fit-content" }} onClick={() => setConProy(!conProy)}>Con proyecciones{verProy ? " ✓" : ""}</button>}
           </div>
         </div>
       ) : (
@@ -189,6 +186,7 @@ export function Resumen() {
       {sinCotizar > 0 && <div className="mini ambar centro" style={{ marginBottom: 6 }}>{sinCotizar} sin cotizar: se suman al tener conexión</div>}
       {grafico === "dia" && vista !== "dia" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
 
+      {catsVer.length > 0 && <div className="grupo-t"><span>Por categoría</span>{total > 0 && <span className="num">{num(total, 0)}</span>}</div>}
       {catsVer.length > 0 && (
         <div className="caja lista">
           {catsVer.map(c => {
@@ -200,18 +198,23 @@ export function Resumen() {
             // Cerca del objetivo: pasó la marca del 80%.
             const ritmo = obj != null && c.total + prev >= obj * ALERTA && !pasado;
             const ranking = obj == null && grafico === "dia";
+            const hayDebajo = prev >= 1 || (proy != null && proy.seguro + proy.opcional > 0);
+            // Columnas alineadas: el % debajo del nombre; el monto con su objetivo arriba y lo previsto debajo.
             return (
               <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Punto cat={c.cat} chico />
-                  <span style={{ flex: 1 }}>{c.cat.nombre}</span>
-                  <span className="tenue chico">{c.total > 0 ? `${Math.round(c.pct * 100)}%` : ""}</span>
-                  <span className="num derecha" style={{ minWidth: 82 }}>
-                    <span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>
-                    {proy != null && proy.seguro > 0 && <span className="ambar chico"> +{num(proy.seguro, 0)}</span>}
-                    {proy != null && proy.opcional > 0 && <span className="viol chico" style={{ textDecoration: "underline dotted" }}> +{num(proy.opcional, 0)}</span>}
-                    {prev >= 1 && <span className="tenue chico" style={{ textDecoration: "underline dotted" }}> +{num(prev, 0)} previsto</span>}
-                    {obj != null && <span className="tenue chico"> / {num(obj)}</span>}
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <div>{c.cat.nombre}</div>
+                    {c.total > 0 && <div className="mini tenue">{Math.round(c.pct * 100)}% {enEsto === "este mes" ? "del mes" : ""}</div>}
+                  </span>
+                  <span className="num derecha">
+                    <div><span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>{obj != null && <span className="tenue chico"> / {num(obj)}</span>}</div>
+                    {hayDebajo && <div className="mini tenue">
+                      {prev >= 1 && <span>~+{num(prev, 0)} previsto</span>}
+                      {proy != null && proy.seguro > 0 && <span className="ambar"> +{num(proy.seguro, 0)}</span>}
+                      {proy != null && proy.opcional > 0 && <span className="viol" style={{ textDecoration: "underline dotted" }}> +{num(proy.opcional, 0)}</span>}
+                    </div>}
                   </span>
                 </div>
                 {obj != null && <div style={{ paddingLeft: 38 }}><Barra valor={c.total / obj} previsto={prev / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : c.cat.color} colorPrevisto={c.cat.color} marca={ALERTA} /></div>}

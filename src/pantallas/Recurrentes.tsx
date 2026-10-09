@@ -8,7 +8,7 @@ import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, mesCorto, nombreDia, nombreMes, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { candidatos, enUsdDe, estadoDe, fechaDePago, mensualEnUsd, montoHabitual } from "../lib/recurrentes";
-import { Barra, Dia, Hoja, Montos, Punto, Seg, useToast } from "../ui/piezas";
+import { Barra, Dia, Hoja, Montos, Puntito, Punto, Seg, textoOriginal, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 import { cuentaDiaria } from "./Editor";
 import { categoriasPorUso } from "./editorLogica";
@@ -48,13 +48,13 @@ export function ListaRecurrentes() {
     const abajo = r.frecuencia === "semanal" ? "c/sem" : r.frecuencia === "anual" ? MESES[(r.mes ?? 1) - 1].slice(0, 3) : r.frecuencia === "una-vez" ? mesCorto(r.inicio.slice(0, 7)) : "c/mes";
     return (
       <button key={r.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>
-        <span className="izq"><Dia dia={dia} abajo={abajo} /><Punto cat={cat.get(r.categoriaId)} chico /><span style={{ minWidth: 0 }}>
-          <div>{r.nombre}</div>
-          <div className="mini tenue">{d.cuentaPorId.get(r.cuentaId)?.nombre} · <span className={`etiq e-${r.clase}`}>{r.clase}</span></div>
+        <span className="izq"><Dia dia={dia} abajo={abajo} /><Puntito cat={cat.get(r.categoriaId)} /><span style={{ minWidth: 0 }}>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nombre}</div>
+          <div className="mini tenue">{d.cuentaPorId.get(r.cuentaId)?.nombre}{r.moneda !== "USD" && u != null ? ` · ${aprox}${ing}${num(habitual)} ${r.moneda}` : ""} · <span className={`etiq e-${r.clase}`}>{r.clase}</span></div>
         </span></span>
         <span className="derecha">
           {r.moneda !== "USD" && u != null
-            ? <><div className={`num chico ${ing ? "ok" : ""}`}>{aprox}{ing}{num(u, 0)} USD{r.frecuencia !== "mensual" ? "/mes" : ""}</div><div className="mini tenue num">{aprox}{ing}{num(habitual)} {r.moneda}</div></>
+            ? <div className={`num ${ing ? "ok" : ""}`}>{aprox}{ing}{num(u, 0)}{r.frecuencia !== "mensual" ? "/mes" : ""}</div>
             : <div className={`num chico ${ing ? "ok" : ""}`}>{aprox}{ing}{num(habitual)} {r.moneda}</div>}
         </span>
       </button>
@@ -73,13 +73,13 @@ export function ListaRecurrentes() {
       )}
       {!activos.length && <div className="vacio">Todavía no hay recurrentes.</div>}
       {activos.length > 0 && <div className="caja lista">{activos.map(fila)}</div>}
-      {enPartes.length > 0 && <><div className="titulo-sec"><span>En partes, sin terminar</span></div><div className="caja lista">{enPartes.map(e => (
+      {enPartes.length > 0 && <><div className="grupo-t"><span>En partes, sin terminar</span></div><div className="caja lista">{enPartes.map(e => (
         <button key={e.rec.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: e.rec.id, clave: e.clave })}>
           <span className="izq"><Punto cat={cat.get(e.rec.categoriaId)} chico /><span><div>{e.rec.nombre}</div><div className="mini tenue">{cadaCuanto(e.rec)}</div></span></span>
           <span className="derecha"><div className="num ambar">faltan {num(e.falta)} {e.rec.moneda}</div></span>
         </button>
       ))}</div></>}
-      {terminados.length > 0 && <><div className="titulo-sec"><span>Terminados</span></div><div className="caja lista">{terminados.map(fila)}</div></>}
+      {terminados.length > 0 && <><div className="grupo-t"><span>Terminados</span></div><div className="caja lista">{terminados.map(fila)}</div></>}
     </div>
   );
 }
@@ -281,7 +281,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
         <div className="caja lista">
           {e.pagos.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(p => (
             <button key={p.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: p.id })}>
-              <span className="izq"><Dia dia={Number(p.fecha.slice(8))} abajo={mesCorto(p.fecha.slice(0, 7))} /><span className="chico">{cta.get(p.cuentaId)}</span></span>
+              <span className="izq"><Dia dia={Number(p.fecha.slice(8))} abajo={mesCorto(p.fecha.slice(0, 7))} /><span className="chico">{cta.get(p.cuentaId)}<span className="tenue">{textoOriginal({ usd: p.usd, monto: p.monto, moneda: p.moneda })}</span></span></span>
               <span className="derecha"><Montos usd={p.usd} monto={p.monto} moneda={p.moneda} /></span>
             </button>
           ))}

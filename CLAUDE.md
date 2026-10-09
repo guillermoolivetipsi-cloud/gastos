@@ -24,7 +24,7 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
 - **Proyecciones:** "seguro" y "opcional" (nunca "capricho"); en la torta, lo seguro en tono claro y lo opcional rayado.
 - **Listas** (decididas sobre Lo que viene, octubre 2026; valen para toda la app):
   - **Fecha:** en las listas con fecha, el día grande a la izquierda con el mes abajo (`<Dia />`); en rojo si venció. En Recurrentes, el día de cobro con "c/mes", "c/sem" o el mes. Movimientos no lo lleva porque ya agrupa por día.
-  - **Montos:** los dólares arriba y la moneda original abajo en gris (`<Montos />`), igual que los totales. Si el monto está en USD, una sola línea.
+  - **Montos:** un solo número a la derecha, en dólares y sin "USD" (`<Montos />`); la moneda original va al final de la línea gris («Revolut · 55 EUR», con `textoOriginal`). Sin cotización, el monto en su moneda.
   - **Acciones:** una sola por fila ("Cargar", o "Cobrar" en los ingresos). Lo demás ("Fue 0", saltear, elegir un gasto ya cargado) va en la pantalla que se abre tocando la fila.
   - **Estado:** como texto de color en la línea gris (· vencido en rojo, · parcial en amarillo), sin píldoras.
   - **Resumen de arriba:** tres números uno al lado del otro (en Lo que viene: Por pagar · Pagado · A cobrar; en Tarjetas: A pagar · Se junta · Cuotas después).
@@ -58,6 +58,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Botones:** "Sí" (o la acción principal), "No" (o "Fue una vez", "Ya lo hice") y "⋯", que abre "Otra cosa…" y "Ahora no".
   - **"Ahora no":** la esconde 30 días, como estaba.
   - **Acceso:** la bandeja con número en Resumen, como estaba.
+- **Orden** (decidido en octubre 2026, después de probar letra más grande y más aire, que no se cambian; vale para toda la app):
+  - **Una sola fila de controles arriba:** en Movimientos la lupa va en el título y los filtros en una fila de desplegables (Gastos e ingresos · Todas las cuentas · Categoría); en Resumen la vista («Mes ▾») y «‹ Octubre 2026 ›» comparten la fila; en Lo que viene, el mes con flechas, igual que en Resumen.
+  - **Un solo monto por fila** (ver Montos, en Listas).
+  - **Grupos que se ven:** cada día o sección tiene su título (`.grupo-t`: 14 px, en blanco, con el total a la derecha) y su propia caja; hay más espacio entre grupos que entre filas.
+  - **Columnas alineadas:** nada de columnas sueltas en el medio (el % va debajo del nombre); el objetivo al lado del monto y lo previsto debajo; la torta con su texto pegado a la izquierda y «Con proyecciones» debajo del total; en las listas con el día a la izquierda, la categoría es un puntito de color (`<Puntito />`), no el círculo.
+  - **Se probaron y no se cambian:** los colores, los bordes de las cajas, el tamaño de letra y el espacio entre filas.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
