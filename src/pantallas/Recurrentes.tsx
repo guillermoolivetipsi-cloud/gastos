@@ -8,7 +8,7 @@ import { descartesSet, detectarRecurrentes } from "../lib/analisis";
 import { DIAS_CORTOS, MESES, fechaCorta, fechaEnMes, hoy, mesCorto, nombreDia, nombreMes, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { candidatos, enUsdDe, estadoDe, fechaDePago, mensualEnUsd, montoHabitual } from "../lib/recurrentes";
-import { Barra, Dia, Hoja, Montos, Puntito, Punto, Seg, textoOriginal, useToast } from "../ui/piezas";
+import { Barra, Dia, Hoja, Montos, Puntito, Seg, textoOriginal, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 import { cuentaDiaria } from "./Editor";
 import { categoriasPorUso } from "./editorLogica";
@@ -28,6 +28,10 @@ export function ListaRecurrentes() {
   const d = useDatos();
   const nav = useNav();
   const cat = new Map(d.categorias.map(c => [c.id, c]));
+  // Reglas de Recurrentes: tres números arriba, solapas de gastos e ingresos, lo más caro
+  // arriba, lo que debés en partes primero y los terminados plegados al final.
+  const [pestana, setPestana] = useState<Tipo>("gasto");
+  const [verTerminados, setVerTerminados] = useState(false);
   const activos = d.recurrentes.filter(r => r.activo && r.frecuencia !== "una-vez" && (!r.fin || r.fin >= hoy()));
   const terminados = d.recurrentes.filter(r => !activos.includes(r) && r.frecuencia !== "una-vez");
   // Los pagos en partes que todavía deben algo (se abren en su mes).
@@ -37,6 +41,11 @@ export function ListaRecurrentes() {
   const usd = (r: Recurrente) => mensualEnUsd(r, d.movimientos, d.tasaRec(r));
   const total = (tipo: Recurrente["tipo"]) => activos.filter(r => r.tipo === tipo).reduce((s, r) => s + (usd(r) ?? 0), 0);
   const gastos = total("gasto"), ingresos = total("ingreso");
+  const aTarjeta = activos.filter(r => r.tipo === "gasto" && d.cuentaPorId.get(r.cuentaId)?.esTarjeta).reduce((s, r) => s + (usd(r) ?? 0), 0);
+  const lista = activos.filter(r => r.tipo === pestana).sort((a, b) => (usd(b) ?? 0) - (usd(a) ?? 0));
+  const term = terminados.filter(r => r.tipo === pestana);
+  const partes = enPartes.filter(e => e.rec.tipo === pestana);
+  const partesUsd = partes.reduce((s, e) => s + (enUsdDe(e.rec, e.falta, d.tasaRec(e.rec)) ?? 0), 0);
   // Reglas de las listas: el día a la izquierda (cuándo toca), los dólares arriba y la
   // moneda original abajo. Lo semanal y lo anual se muestran por mes en dólares.
   const fila = (r: Recurrente) => {
@@ -50,12 +59,12 @@ export function ListaRecurrentes() {
       <button key={r.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>
         <span className="izq"><Dia dia={dia} abajo={abajo} /><Puntito cat={cat.get(r.categoriaId)} /><span style={{ minWidth: 0 }}>
           <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nombre}</div>
-          <div className="mini tenue">{d.cuentaPorId.get(r.cuentaId)?.nombre}{r.moneda !== "USD" && u != null ? ` · ${aprox}${ing}${num(habitual)} ${r.moneda}` : ""} · <span className={`etiq e-${r.clase}`}>{r.clase}</span></div>
+          <div className="mini tenue">{d.cuentaPorId.get(r.cuentaId)?.nombre}{r.moneda !== "USD" && u != null ? ` · ${aprox}${ing}${num(habitual)} ${r.moneda}` : ""}</div>
         </span></span>
         <span className="derecha">
           {r.moneda !== "USD" && u != null
             ? <div className={`num ${ing ? "ok" : ""}`}>{aprox}{ing}{num(u, 0)}{r.frecuencia !== "mensual" ? "/mes" : ""}</div>
-            : <div className={`num chico ${ing ? "ok" : ""}`}>{aprox}{ing}{num(habitual)} {r.moneda}</div>}
+            : <div className={`num ${ing ? "ok" : ""}`}>{aprox}{ing}{num(habitual)}{r.moneda !== "USD" ? ` ${r.moneda}` : ""}</div>}
         </span>
       </button>
     );
@@ -63,23 +72,43 @@ export function ListaRecurrentes() {
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Recurrentes</h1><button className="accion" aria-label="Nuevo" onClick={() => nav.abrir({ p: "recurrente" })}><T.IconPlus size={22} /></button></div>
-      <div className="chico tenue" style={{ marginBottom: 10 }}>Lo que se repite, gastos e ingresos juntos. Si el monto cambia cada mes (expensas, luz) te aviso con un estimado para que cargues el real.</div>
       {activos.length > 0 && (
-        <div className="caja">
-          <div className="fila" style={{ padding: 0 }}><span className="tenue chico">Gastos recurrentes por mes</span><span className="mediano num">~{num(gastos, 0)} <span className="chico tenue">USD</span></span></div>
-          {ingresos > 0 && <div className="fila" style={{ paddingBottom: 0 }}><span className="tenue chico">Ingresos recurrentes por mes</span><span className="num ok">+{num(ingresos, 0)} USD</span></div>}
-          <div className="mini tenue" style={{ marginTop: 4 }}>En dólares con la cotización de hoy. Los variables, con su estimado.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+          <div className="caja" style={{ padding: "8px 10px" }}>
+            <div className="mini tenue">Gastos/mes</div>
+            <div className="num" style={{ fontSize: 20 }}>~{num(gastos, 0)}</div>
+            <div className="mini tenue">USD</div>
+          </div>
+          <div className="caja" style={{ padding: "8px 10px" }}>
+            <div className="mini tenue">Ingresos/mes</div>
+            <div className="num ok" style={{ fontSize: 20 }}>{ingresos > 0 ? `+${num(ingresos, 0)}` : "0"}</div>
+            <div className="mini tenue">USD</div>
+          </div>
+          <div className="caja" style={{ padding: "8px 10px" }}>
+            <div className="mini tenue">A la tarjeta</div>
+            <div className="num" style={{ fontSize: 20 }}>~{num(aTarjeta, 0)}</div>
+            <div className="mini tenue">USD/mes</div>
+          </div>
         </div>
       )}
-      {!activos.length && <div className="vacio">Todavía no hay recurrentes.</div>}
-      {activos.length > 0 && <div className="caja lista">{activos.map(fila)}</div>}
-      {enPartes.length > 0 && <><div className="grupo-t"><span>En partes, sin terminar</span></div><div className="caja lista">{enPartes.map(e => (
+      <div className="solapas" style={{ marginTop: 14 }}>
+        <button className={pestana === "gasto" ? "on" : ""} onClick={() => setPestana("gasto")}>GASTOS</button>
+        <button className={pestana === "ingreso" ? "on" : ""} onClick={() => setPestana("ingreso")}>INGRESOS</button>
+      </div>
+      {partes.length > 0 && <><div className="grupo-t"><span>Lo que debés en partes</span>{partesUsd > 0 && <span className="num">~{num(partesUsd, 0)}</span>}</div><div className="caja lista">{partes.map(e => (
         <button key={e.rec.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: e.rec.id, clave: e.clave })}>
-          <span className="izq"><Punto cat={cat.get(e.rec.categoriaId)} chico /><span><div>{e.rec.nombre}</div><div className="mini tenue">{cadaCuanto(e.rec)}</div></span></span>
+          <span className="izq"><Dia dia={Number(e.rec.inicio.slice(8))} abajo={mesCorto(e.rec.inicio.slice(0, 7))} /><Puntito cat={cat.get(e.rec.categoriaId)} /><span style={{ minWidth: 0 }}><div>{e.rec.nombre}</div><div className="mini tenue">{d.cuentaPorId.get(e.rec.cuentaId)?.nombre}</div></span></span>
           <span className="derecha"><div className="num ambar">faltan {num(e.falta)} {e.rec.moneda}</div></span>
         </button>
       ))}</div></>}
-      {terminados.length > 0 && <><div className="grupo-t"><span>Terminados</span></div><div className="caja lista">{terminados.map(fila)}</div></>}
+      {!lista.length && <div className="vacio">{pestana === "gasto" ? "Todavía no hay gastos recurrentes." : "Todavía no hay ingresos recurrentes."}</div>}
+      {lista.length > 0 && <div className="caja lista" style={{ marginTop: partes.length ? 0 : 4 }}>{lista.map(fila)}</div>}
+      {term.length > 0 && <>
+        <button className="grupo-t" style={{ width: "100%", color: "var(--tenue)", fontWeight: 400 }} onClick={() => setVerTerminados(!verTerminados)}>
+          <span>Terminados ({term.length})</span>{verTerminados ? <T.IconChevronDown size={16} /> : <T.IconChevronRight size={16} />}
+        </button>
+        {verTerminados && <div className="caja lista">{term.map(fila)}</div>}
+      </>}
     </div>
   );
 }

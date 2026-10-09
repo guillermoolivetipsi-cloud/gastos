@@ -64,6 +64,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Grupos que se ven:** cada día o sección tiene su título (`.grupo-t`: 14 px, en blanco, con el total a la derecha) y su propia caja; hay más espacio entre grupos que entre filas.
   - **Columnas alineadas:** nada de columnas sueltas en el medio (el % va debajo del nombre); el objetivo al lado del monto y lo previsto debajo; la torta con su texto pegado a la izquierda y «Con proyecciones» debajo del total; en las listas con el día a la izquierda, la categoría es un puntito de color (`<Puntito />`), no el círculo.
   - **Se probaron y no se cambian:** los colores, los bordes de las cajas, el tamaño de letra y el espacio entre filas.
+- **Recurrentes** (decididas en octubre 2026, sobre Más → Recurrentes):
+  - **Arriba:** tres números, sin párrafo de explicación: Gastos/mes · Ingresos/mes · A la tarjeta (USD por mes).
+  - **Gastos e ingresos:** dos solapas, GASTOS · INGRESOS, como en Resumen.
+  - **Orden:** por monto, lo más caro arriba.
+  - **Fijo o variable:** sin etiqueta; los variables llevan «~» en el monto.
+  - **Lo semanal y lo anual:** pasado a dólares por mes («97/mes»), como estaba.
+  - **En partes y terminados:** «Lo que debés en partes» arriba de la lista; «Terminados» plegado al final.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
