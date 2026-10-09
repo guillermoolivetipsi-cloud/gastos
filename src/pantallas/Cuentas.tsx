@@ -2,31 +2,78 @@ import { useEffect, useRef, useState } from "react";
 import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav } from "../nav";
-import { MONEDAS, type Cuenta, type Dolar, type Moneda } from "../tipos";
-import { fechaCorta, mesCorto, nombreMes, periodoDe, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
+import { MONEDAS, type Cuenta, type Dolar } from "../tipos";
+import { fechaCorta, hoy, mesCorto, nombreMes, periodoDe, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
-import { aPagarTarjeta } from "../lib/analisis";
+import { aPagarTarjeta, usdDe } from "../lib/analisis";
 import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
-import { Dia, GrupoT, Interruptor, Montos, Seg, textoOriginal, useToast } from "../ui/piezas";
+import { Dia, GrupoT, Hoja, Montos, Seg, textoOriginal, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
+/* Reglas de Cuentas: cada cuenta con su moneda y lo que salió este mes, cada tarjeta
+   con su próximo resumen, y las archivadas plegadas al final. */
 export function ListaCuentas() {
   const d = useDatos();
   const nav = useNav();
-  const fila = (c: Cuenta) => (
-    <button key={c.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir(c.esTarjeta ? { p: "tarjeta", id: c.id } : { p: "cuenta", id: c.id })}>
-      <span className="izq">{c.esTarjeta ? <T.IconCreditCard size={18} /> : <T.IconBuildingBank size={18} className="tenue" />}<span>{c.nombre}{c.archivada && <span className="tenue"> · archivada</span>}</span></span>
-      <span className="viol chico">{c.moneda}{c.moneda === "ARS" ? ` · ${c.dolar}` : ""}</span>
-    </button>
-  );
+  const [verArchivadas, setVerArchivadas] = useState(false);
+  const p = periodoHoy();
+  const delMes = d.movimientos.filter(m => m.fecha.slice(0, 7) === p);
+  const salio = (c: Cuenta) => delMes.filter(m => m.cuentaId === c.id && m.tipo === "gasto").reduce((s, m) => s + usdDe(m), 0);
+  const cuantos = (c: Cuenta) => delMes.filter(m => m.cuentaId === c.id).length;
+  // El resumen que se está juntando: el que cierra este mes, o el del mes que viene si ya cerró.
+  const proximo = (c: Cuenta) => {
+    let periodo = p, r = resumen(c, d.movimientos, periodo);
+    if (r.cierre < hoy()) { periodo = sumarMeses(p, 1); r = resumen(c, d.movimientos, periodo); }
+    const ap = aPagarTarjeta(c, d.movimientos, d.recurrentes, periodoDe(r.vence), d.tasaRec, d.resumenesCargados);
+    const real = ap.resumen.periodo === periodo && ap.real;
+    const previsto = ap.resumen.periodo === periodo && !real ? ap.previsto : 0;
+    return { periodo, r, real, total: redondear(r.total + previsto) };
+  };
+  const filaCuenta = (c: Cuenta) => {
+    const s = salio(c), n = cuantos(c);
+    return (
+      <button key={c.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "cuenta", id: c.id })}>
+        <span className="izq"><T.IconBuildingBank size={18} className="tenue" /><span><div>{c.nombre}</div><div className="mini tenue">{c.moneda}{c.moneda === "ARS" ? ` · dólar ${c.dolar}` : ""}{n ? ` · ${n} este mes` : ""}</div></span></span>
+        <span className={`num derecha${s ? "" : " tenue"}`}>{s ? num(s, 0) : "—"}</span>
+      </button>
+    );
+  };
+  const filaTarjeta = (c: Cuenta) => {
+    const x = proximo(c);
+    return (
+      <button key={c.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "tarjeta", id: c.id, periodo: x.periodo })}>
+        <span className="izq"><T.IconCreditCard size={18} /><span><div>{c.nombre}</div><div className="mini tenue">cierra {x.r.confirmado ? "" : "~"}{fechaCorta(x.r.cierre, false)} · vence ~{fechaCorta(x.r.vence, false)}</div></span></span>
+        <span className="num derecha">{x.real ? "" : "~"}{num(x.total, 0)}</span>
+      </button>
+    );
+  };
+  const activas = d.cuentas.filter(c => !c.archivada), archivadas = d.cuentas.filter(c => c.archivada);
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Cuentas</h1><button className="accion" aria-label="Nueva" onClick={() => nav.abrir({ p: "cuenta" })}><T.IconPlus size={22} /></button></div>
-      <div className="chico tenue" style={{ marginBottom: 10 }}>Cada cuenta tiene su moneda: al elegirla, el gasto arranca en esa moneda. Los pesos se pasan a USD con el dólar que indiques.</div>
-      <div className="caja lista">{d.cuentas.filter(c => !c.esTarjeta).map(fila)}</div>
-      <div className="titulo-sec"><span>Tarjetas de crédito</span></div>
-      <div className="caja lista">{d.cuentas.filter(c => c.esTarjeta).map(fila)}</div>
+      <GrupoT titulo="Cuentas" derecha="salió este mes" ayuda="Cada cuenta tiene su moneda: al elegirla, el gasto arranca en esa moneda. Los pesos se pasan a USD con el dólar que indiques." />
+      <div className="caja lista">{activas.filter(c => !c.esTarjeta).map(filaCuenta)}</div>
+      <GrupoT titulo="Tarjetas de crédito" derecha="próximo resumen" />
+      <div className="caja lista">{activas.filter(c => c.esTarjeta).map(filaTarjeta)}</div>
+      {archivadas.length > 0 && <>
+        <button className="grupo-t" style={{ width: "100%", color: "var(--tenue)", fontWeight: 400 }} onClick={() => setVerArchivadas(!verArchivadas)}>
+          <span>Archivadas ({archivadas.length})</span>{verArchivadas ? <T.IconChevronDown size={16} /> : <T.IconChevronRight size={16} />}
+        </button>
+        {verArchivadas && <div className="caja lista">{archivadas.map(filaCuenta)}</div>}
+      </>}
     </div>
+  );
+}
+
+/** Un número de día que se toca para cambiar (regla de los formularios: el valor en violeta, con ▾). */
+function ElegirNumero({ valor, desde, hasta, cambiar, etiqueta, sufijo = "" }: { valor: number; desde: number; hasta: number; cambiar: (n: number) => void; etiqueta: string; sufijo?: string }) {
+  return (
+    <label className="viol" style={{ position: "relative", textDecoration: "underline dotted" }}>
+      {valor}{sufijo} ▾
+      <select value={valor} aria-label={etiqueta} onChange={e => cambiar(Number(e.target.value))} style={{ position: "absolute", inset: 0, opacity: 0, width: "100%" }}>
+        {Array.from({ length: hasta - desde + 1 }, (_, k) => desde + k).map(n => <option key={n} value={n}>{n}</option>)}
+      </select>
+    </label>
   );
 }
 
@@ -36,6 +83,7 @@ export function EditorCuenta({ id }: { id?: string }) {
   const toast = useToast();
   const existente = id ? d.cuentas.find(c => c.id === id) : undefined;
   const listo = useRef(false);
+  const [menu, setMenu] = useState(false);
   const [c, setC] = useState<Omit<Cuenta, "id" | "orden">>({ nombre: "", moneda: "EUR", dolar: "blue", esTarjeta: false });
   useEffect(() => { if (!listo.current && d.listo) { listo.current = true; if (existente) setC(existente); } }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = <K extends keyof typeof c>(k: K, v: (typeof c)[K]) => setC(x => ({ ...x, [k]: v }));
@@ -58,31 +106,49 @@ export function EditorCuenta({ id }: { id?: string }) {
     }
     nav.volver();
   }
+  // La moneda al lado del nombre: un toque pasa a la siguiente (regla de los formularios).
+  const sigMoneda = () => set("moneda", MONEDAS[(MONEDAS.indexOf(c.moneda) + 1) % MONEDAS.length]);
 
   return (
     <div className="pantalla sin-tabs">
-      <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>{existente ? "Editar cuenta" : "Nueva cuenta"}</h1></div>
-      <div className="campo"><label>Nombre</label><input value={c.nombre} onChange={e => set("nombre", e.target.value)} placeholder="Revolut, Mercado Pago…" /></div>
-      <div className="campo"><label>Moneda</label><Seg opciones={MONEDAS.map(m => [m, m] as [Moneda, string])} valor={c.moneda} cambiar={v => set("moneda", v)} /></div>
-      <div className="fila campo"><span>Es tarjeta de crédito</span><Interruptor on={c.esTarjeta} cambiar={v => setC(x => ({ ...x, esTarjeta: v, dolar: v ? "oficial" : x.dolar }))} /></div>
+      <div className="enc">
+        <button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button>
+        <h1>{existente ? "Editar cuenta" : "Nueva cuenta"}</h1>
+        {existente && <button className="accion" aria-label="Más opciones" onClick={() => setMenu(true)}><T.IconDots size={22} /></button>}
+      </div>
+      <Seg opciones={[["cuenta", "Cuenta"], ["tarjeta", "Tarjeta de crédito"]] as ["cuenta" | "tarjeta", string][]} valor={c.esTarjeta ? "tarjeta" : "cuenta"}
+        cambiar={v => setC(x => ({ ...x, esTarjeta: v === "tarjeta", dolar: v === "tarjeta" ? "oficial" : x.dolar }))} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderBottom: "1px solid var(--linea)", marginTop: 6 }}>
+        <input value={c.nombre} onChange={e => set("nombre", e.target.value)} placeholder="Revolut, Mercado Pago…" aria-label="Nombre" style={{ fontSize: 22, flex: 1, minWidth: 0, textAlign: "center" }} />
+        <button className="chip-moneda" onClick={sigMoneda} aria-label="Moneda">{c.moneda} ▾</button>
+      </div>
       {c.moneda === "ARS" && (
-        <div className="campo">
-          <label>Pesos a USD con el dólar</label>
+        <>
+          <GrupoT titulo="Pesos a USD con el dólar" ayuda={c.esTarjeta ? "La tarjeta se paga en dólares desde la cuenta: el banco usa el oficial." : "El que usás cuando cambiás plata."} />
           <Seg opciones={[["blue", "Blue"], ["oficial", "Oficial"]] as [Dolar, string][]} valor={c.dolar} cambiar={v => set("dolar", v)} />
-          <div className="mini tenue" style={{ marginTop: 4 }}>{c.esTarjeta ? "La tarjeta se paga en dólares desde la cuenta: el banco usa el oficial." : "El que usás cuando cambiás plata."}</div>
-        </div>
+        </>
       )}
       {c.esTarjeta && (
         <>
-          <div className="dos">
-            <div className="campo"><label>Cierra desde el día</label><input inputMode="numeric" value={c.cierreDesde ?? 5} onChange={e => set("cierreDesde", Number(e.target.value.replace(/\D/g, "")) || 1)} /></div>
-            <div className="campo"><label>hasta el día</label><input inputMode="numeric" value={c.cierreHasta ?? 10} onChange={e => set("cierreHasta", Number(e.target.value.replace(/\D/g, "")) || 1)} /></div>
+          <GrupoT titulo="Cierre y vencimiento" ayuda="Mientras no subas el resumen de un mes (o elijas el día en la tarjeta), se toma el último día del rango." />
+          <div className="caja">
+            <div>cierra entre el <ElegirNumero valor={c.cierreDesde ?? 5} desde={1} hasta={31} etiqueta="Cierra desde el día" cambiar={n => set("cierreDesde", n)} /> y el <ElegirNumero valor={c.cierreHasta ?? 10} desde={1} hasta={31} etiqueta="Cierra hasta el día" cambiar={n => set("cierreHasta", n)} /></div>
+            <div className="mini tenue" style={{ marginTop: 4 }}>vence <ElegirNumero valor={c.venceDias ?? 10} desde={0} hasta={30} etiqueta="Días hasta el vencimiento" sufijo=" días" cambiar={n => set("venceDias", n)} /> después del cierre</div>
           </div>
-          <div className="campo"><label>Vence, días después del cierre</label><input inputMode="numeric" value={c.venceDias ?? 10} onChange={e => set("venceDias", Number(e.target.value.replace(/\D/g, "")) || 0)} /></div>
         </>
       )}
       <div className="pie-fijo"><button className="btn" disabled={!c.nombre.trim()} onClick={guardar}>Guardar</button></div>
-      {existente && <button className="btn2" style={{ width: "100%", marginTop: 12 }} onClick={eliminar}>{usada ? (existente.archivada ? "Reactivar" : "Archivar (tiene movimientos)") : "Eliminar cuenta"}</button>}
+
+      <Hoja abierta={menu} cerrar={() => setMenu(false)}>
+        <h2>{existente?.nombre}</h2>
+        {existente && (
+          <button className={`opcion${usada ? "" : " mal"}`} onClick={() => { setMenu(false); eliminar(); }}>
+            <div>{usada ? (existente.archivada ? "Reactivar" : "Archivar") : "Eliminar"}</div>
+            <div className="mini tenue">{usada ? (existente.archivada ? "Vuelve a aparecer para elegir." : "Tiene movimientos: se guardan, pero no aparece para elegir.") : "No tiene movimientos: se borra (con Deshacer)."}</div>
+          </button>
+        )}
+        <button className="opcion tenue" style={{ textAlign: "center" }} onClick={() => setMenu(false)}>Cancelar</button>
+      </Hoja>
     </div>
   );
 }

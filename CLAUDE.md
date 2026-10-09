@@ -115,6 +115,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Contra el mes anterior:** una línea debajo («a esta altura de septiembre: 930 · +131»; si el mes terminó, «en septiembre: …»).
   - **Falta cobrar:** un grupo arriba de la lista, con el día, el puntito, el nombre, el monto estimado y «Cobrar» (como en Lo que viene).
   - **Lista por categoría:** en las que tienen un recurrente, «lo que entró / lo esperado», abajo «~X falta» o «cobrado», y una barra con lo que falta rayado.
+- **Cuentas y tarjetas** (decididas en octubre 2026):
+  - **Cada cuenta:** el nombre, abajo en gris la moneda (y el dólar, si es en pesos) y cuántos movimientos tuvo este mes; a la derecha lo que salió este mes en USD.
+  - **Cada tarjeta:** abajo «cierra ~28 oct · vence ~5 nov» del resumen que se está juntando, y a la derecha lo que lleva; se toca para ver el detalle.
+  - **Archivadas:** plegadas al final.
+  - **Editor:** arriba «Cuenta · Tarjeta de crédito», el nombre grande con la moneda al lado («EUR ▾», un toque pasa a la siguiente); en las tarjetas, una caja «cierra entre el 5 ▾ y el 10 ▾ · vence 10 días ▾ después del cierre». Archivar o eliminar en «⋯».
+- **Archivar o eliminar** (en toda la app): en el «⋯» de arriba, nunca un botón abajo.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
 ## Estructura
