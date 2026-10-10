@@ -27,8 +27,8 @@ export function Resumen() {
   const tipo: Tipo = solapa === "proy" ? "gasto" : solapa;
   // En el mes: sumar lo proyectado que esté prendido (seguro en claro, opcional rayado).
   const [conProy, setConProy] = useState(false);
-  // Abre siempre en la semana: es lo que se mira todos los días.
-  const [vista, setVista] = useState<Vista>("semana");
+  // Abre en el mes (regla de las vistas de Resumen).
+  const [vista, setVista] = useState<Vista>("mes");
   const [ancla, setAncla] = useState(hoy());
   const [hasta, setHasta] = useState(hoy());
   const [elegirPeriodo, setElegirPeriodo] = useState(false);
@@ -86,6 +86,8 @@ export function Resumen() {
   const promedio = previos.length ? previos.reduce((a, b) => a + b, 0) / previos.length : null;
   const mesEnCurso = periodo === periodoHoy();
   const anterior = sumarMeses(periodo, -1);
+  const gastosMes = esIng ? d.movimientos.filter(m => m.tipo === "gasto" && m.fecha.slice(0, 7) === periodo).reduce((s, m) => s + usdDe(m), 0) : 0;
+  const previstoGastos = esIng && periodo >= periodoHoy() ? instancias.filter(i => i.rec.tipo === "gasto" && i.estado !== "cargado" && !i.cero).reduce((s, i) => s + enUsdI(i, i.falta), 0) : 0;
   const antVal = esIng ? ingresoDe(anterior, mesEnCurso ? hoy().slice(8) : undefined) : 0;
   const extra = new Set([...(verProy ? proyPorCat.keys() : []), ...previstoPorCat.keys(), ...esperadoPorCat.keys()]);
   const catsVer = [...cats, ...[...extra].filter(id => !cats.some(c => c.cat.id === id)).map(id => d.catPorId.get(id)).filter(Boolean).map(cat => ({ cat: cat!, total: 0, pct: 0, n: 0 }))];
@@ -113,21 +115,20 @@ export function Resumen() {
       </div>
       {solapa === "proy" ? <Proyecciones /> : <>
 
-      {/* La vista y el período en una sola fila (regla de orden). */}
+      {/* Las vistas a la vista, en su fila, y el período debajo (regla de las vistas de Resumen). */}
+      <div className="vistas">
+        {VISTAS.map(([v, t]) => (
+          <button key={v} className={vista === v ? "on" : ""} onClick={() => {
+            setVista(v);
+            if (v === "periodo") { setAncla(`${periodoHoy()}-01`); setHasta(hoy()); setElegirPeriodo(true); }
+            else setAncla(hoy());
+          }}>{t}</button>
+        ))}
+      </div>
       <div className="navega">
-        <select className="pill" value={vista} aria-label="Vista" onChange={e => {
-          const v = e.target.value as Vista;
-          setVista(v);
-          if (v === "periodo") { setAncla(`${periodoHoy()}-01`); setHasta(hoy()); setElegirPeriodo(true); }
-          else setAncla(hoy());
-        }}>
-          {VISTAS.map(([v, t]) => <option key={v} value={v}>{t} ▾</option>)}
-        </select>
-        <span className="flechas">
-          <button aria-label="Anterior" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, -1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronLeft size={20} /></button>
-          <button onClick={() => vista === "periodo" ? setElegirPeriodo(true) : setAncla(hoy())}><span style={{ color: "var(--tinta)" }}>{tituloRango(vista, desde, fin)}</span></button>
-          <button aria-label="Siguiente" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, 1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronRight size={20} /></button>
-        </span>
+        <button aria-label="Anterior" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, -1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronLeft size={20} /></button>
+        <button onClick={() => vista === "periodo" ? setElegirPeriodo(true) : setAncla(hoy())}><span style={{ color: "var(--tinta)" }}>{tituloRango(vista, desde, fin)}</span></button>
+        <button aria-label="Siguiente" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, 1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronRight size={20} /></button>
       </div>
 
       {vencidos.length > 0 && (
@@ -152,11 +153,17 @@ export function Resumen() {
       {/* "Cómo venís" arriba de todo en el mes, antes de los números. */}
       {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
       {esIng && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 6 }}>
-          <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Entró</div><div className="num ok" style={{ fontSize: 20 }}>+{num(total, 0)}</div><div className="mini tenue">USD</div></div>
-          <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Falta cobrar</div><div className="num" style={{ fontSize: 20 }}>{faltaUsd >= 1 ? `~${num(faltaUsd, 0)}` : "0"}</div><div className="mini tenue">{faltaCobrar.length ? `${faltaCobrar.length} · ` : ""}USD</div></div>
-          <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Tu promedio</div><div className="num" style={{ fontSize: 20 }}>{promedio != null ? num(promedio, 0) : "—"}</div><div className="mini tenue">USD/mes</div></div>
-        </div>
+        // Entró y Gastaste, y debajo cuánto te quedó (regla de Ingresos).
+        <>
+          <div className="dos" style={{ marginTop: 6 }}>
+            <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Entró</div><div className="num ok" style={{ fontSize: 20 }}>+{num(total, 0)}</div><div className="mini tenue">{faltaUsd >= 1 ? `~${num(faltaUsd, 0)} falta cobrar` : "USD"}</div></div>
+            <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Gastaste</div><div className="num" style={{ fontSize: 20 }}>{num(gastosMes, 0)}</div><div className="mini tenue">{previstoGastos >= 1 ? `+ ~${num(previstoGastos, 0)} previsto` : "USD"}</div></div>
+          </div>
+          <div className="caja" style={{ marginTop: 8 }}>
+            <div className="fila" style={{ padding: 0 }}><span>Te quedó</span><span className={`num ${total - gastosMes >= 0 ? "ok" : "mal"}`} style={{ fontSize: 20 }}>{total - gastosMes >= 0 ? "+" : "−"}{num(Math.abs(total - gastosMes), 0)}</span></div>
+            <div className="mini tenue">lo que entró menos lo que gastaste{promedio != null ? ` · tu promedio de ingresos: ${num(promedio, 0)}` : ""}</div>
+          </div>
+        </>
       )}
 
       {b && (

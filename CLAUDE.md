@@ -38,7 +38,8 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **"Repetir con un toque":** debajo de las categorías.
   - **Piezas compartidas** en `src/ui/formulario.tsx`: `MontoConMoneda`, `GrillaCategorias` y `FechaEnTitulo`. Las usan "Nuevo gasto", el recurrente ("· desde hoy ▾") y la proyección ("· oct ▾"); cualquier formulario nuevo las usa también.
 - **Resumen y pantallas de números** (decididas en octubre 2026; valen también para Cómo venís, Proyecciones y la tarjeta):
-  - **Período:** como estaba, tres filas: pestañas (GASTOS · INGRESOS · PROYECCIONES), vistas (Día · Semana · Mes · Año · Período) y «‹ Octubre 2026 ›».
+  - **Período:** tres filas: pestañas (GASTOS · INGRESOS · PROYECCIONES), vistas (Día · Semana · Mes · Año · Período, siempre a la vista, nunca en un desplegable) y «‹ Octubre 2026 ›». Se probó el desplegable «Mes ▾» y se volvió a la fila (octubre 2026): el mes tiene que estar a un toque.
+  - **Al abrir:** Resumen arranca en Mes (antes en Semana). La vista Día queda como estaba.
   - **Números de arriba:** como estaban, las cajas Fijos y Variables con su barra y «te quedan X para N días».
   - **Gráfico del mes:** la torta chica (120 px) con el total grande al lado (30 px), y debajo del total lo previsto y lo proyectado. Nunca una torta grande centrada.
   - **Lista por categoría:** como estaba, con el porcentaje.
@@ -59,7 +60,7 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **"Ahora no":** la esconde 30 días, como estaba.
   - **Acceso:** la bandeja con número en Resumen, como estaba.
 - **Orden** (decidido en octubre 2026, después de probar letra más grande y más aire, que no se cambian; vale para toda la app):
-  - **Una sola fila de controles arriba:** en Movimientos la lupa va en el título y los filtros en una fila de desplegables (Gastos e ingresos · Todas las cuentas · Categoría); en Resumen la vista («Mes ▾») y «‹ Octubre 2026 ›» comparten la fila; en Lo que viene, el mes con flechas, igual que en Resumen.
+  - **Una sola fila de controles arriba:** en Movimientos la lupa va en el título y los filtros en una fila de desplegables (Gastos e ingresos · Todas las cuentas · Categoría); en Resumen no (las vistas van en su fila, ver Período); en Lo que viene, el mes con flechas, igual que en Resumen.
   - **Un solo monto por fila** (ver Montos, en Listas).
   - **Grupos que se ven:** cada día o sección tiene su título (`.grupo-t`: 14 px, en blanco, con el total a la derecha) y su propia caja; hay más espacio entre grupos que entre filas.
   - **Columnas alineadas:** nada de columnas sueltas en el medio (el % va debajo del nombre); el objetivo al lado del monto y lo previsto debajo; la torta con su texto pegado a la izquierda y «Con proyecciones» debajo del total; en las listas con el día a la izquierda, la categoría es un puntito de color (`<Puntito />`), no el círculo.
@@ -110,7 +111,7 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Ajustes, avisos:** una fila con el interruptor y el estado en gris («activados · probar un aviso», «bloqueados…» en rojo, «apagados»).
   - **Ajustes, recordatorios:** una lista de tres filas; el cuándo («desde las 21:00 ▾», «desde el día 5 ▾») se toca para cambiarlo. Las explicaciones, detrás del «?».
 - **Ingresos** (decididas en octubre 2026, la solapa INGRESOS de Resumen en la vista Mes):
-  - **Arriba:** tres números: Entró · Falta cobrar · Tu promedio (de los 3 meses anteriores con datos).
+  - **Arriba:** Entró (con «~X falta cobrar») y Gastaste (con «+ ~X previsto»), y debajo «Te quedó» (lo que entró menos lo que gastaste, verde o rojo) con tu promedio de ingresos en gris. Las mismas vistas que Gastos.
   - **Gráfico:** en lugar de la torta, barras de los últimos 6 meses; en el mes, lo que falta cobrar rayado arriba de lo que entró, y el promedio como línea punteada.
   - **Contra el mes anterior:** una línea debajo («a esta altura de septiembre: 930 · +131»; si el mes terminó, «en septiembre: …»).
   - **Falta cobrar:** un grupo arriba de la lista, con el día, el puntito, el nombre, el monto estimado y «Cobrar» (como en Lo que viene).
