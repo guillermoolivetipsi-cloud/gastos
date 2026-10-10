@@ -153,12 +153,17 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
       )}
 
       {/* "Cómo venís" arriba de todo en el mes, antes de los números. */}
-      {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
-      {tipo === "gasto" && <LineaLoQueViene />}
+      {/* Cómo venís y Lo que viene juntas en una caja, con aire arriba (regla de aire entre bloques). */}
+      {tipo === "gasto" && (
+        <div className="caja lineas-arriba" style={{ padding: "4px 12px", margin: "12px 0 0" }}>
+          {esMes && <TarjetaComoVenis periodo={periodo} />}
+          <LineaLoQueViene />
+        </div>
+      )}
       {esIng && (
         // Entró y Gastaste, y debajo cuánto te quedó (regla de Ingresos).
         <>
-          <div className="dos" style={{ marginTop: 6 }}>
+          <div className="dos" style={{ marginTop: 12 }}>
             <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Entró</div><div className="num ok" style={{ fontSize: 20 }}>+{num(total, 0)}</div><div className="mini tenue">{faltaUsd >= 1 ? `~${num(faltaUsd, 0)} falta cobrar` : "USD"}</div></div>
             <div className="caja" style={{ padding: "8px 10px", margin: 0 }}><div className="mini tenue">Gastaste</div><div className="num" style={{ fontSize: 20 }}>{num(gastosMes, 0)}</div><div className="mini tenue">{previstoGastos >= 1 ? `+ ~${num(previstoGastos, 0)} previsto` : "USD"}</div></div>
           </div>
@@ -170,7 +175,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
       )}
 
       {b && (
-        <div className="dos">
+        <div className="dos" style={{ marginTop: 16 }}>
           <div className="caja">
             <span className="etiq e-fijo">Fijos</span>
             <div className="mediano num" style={{ marginTop: 6 }}>{num(b.fijos.total)}</div>
@@ -188,7 +193,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         </div>
       )}
       {b && b.variables.porDia != null && (
-        <div className="mini tenue" style={{ margin: "-4px 2px 6px" }}>
+        <div className="mini tenue" style={{ margin: "10px 2px 0" }}>
           {b.variables.queda >= 0 ? `Te quedan ${num(b.variables.queda)} USD para ${b.variables.dias} ${b.variables.dias === 1 ? "día" : "días"}` : `Te pasaste ${num(-b.variables.queda)} USD de tus objetivos`}
         </div>
       )}
@@ -247,7 +252,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         })()
       ) : grafico === "torta" ? (
         // La torta chica con el total pegado a la izquierda, y "Con proyecciones" debajo (reglas de Resumen y de orden).
-        <div className="torta-fila" style={{ display: "flex", alignItems: "center", gap: 20, margin: "16px 0 4px" }}>
+        <div className="torta-fila" style={{ display: "flex", alignItems: "center", gap: 20, margin: "24px 0 4px" }}>
           <Dona tam={120} centro=""
             partes={catsVer.flatMap(c => {
               const p = verProy ? proyPorCat.get(c.cat.id) : undefined;
@@ -273,7 +278,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
       {sinCotizar > 0 && <div className="mini ambar centro" style={{ marginBottom: 6 }}>{sinCotizar} sin cotizar: se suman al tener conexión</div>}
       {grafico === "dia" && vista !== "dia" && vista !== "anio" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
 
-      {catsVer.length > 0 && <div className="grupo-t"><span>Por categoría</span>{total > 0 && <span className="num">{num(total, 0)}</span>}</div>}
+      {catsVer.length > 0 && <div className="grupo-t" style={{ marginTop: 28 }}><span>Por categoría</span>{total > 0 && <span className="num">{num(total, 0)}</span>}</div>}
       {catsVer.length > 0 && (
         <div className="caja lista">
           {catsVer.map(c => {

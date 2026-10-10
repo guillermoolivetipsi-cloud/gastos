@@ -43,6 +43,8 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Números de arriba:** como estaban, las cajas Fijos y Variables con su barra y «te quedan X para N días».
   - **Gráfico del mes:** la torta chica (120 px) con el total grande al lado (30 px), y debajo del total lo previsto y lo proyectado. Nunca una torta grande centrada.
   - **Lista por categoría:** como estaba, con el porcentaje.
+  - **Aire entre bloques** (octubre 2026; distinto del espacio entre filas, que no se cambia): 12 px entre el mes y la caja de líneas, 16 antes de Fijos y Variables, 10 antes de «Te quedan…», 24 antes de la torta y 28 antes de «Por categoría».
+  - **«Cómo venís» y «Lo que viene»:** juntas en una caja, separadas por una línea fina (`.lineas-arriba`).
   - **«Cómo venís»:** una sola línea arriba ("✦ Cómo venís: tarjeta 22% · noviembre ~1.982 · suscripciones 57 ›"), con textos cortos; se toca para el detalle.
   - **Botones de arriba:** la lupa (abre Movimientos buscando), la nube (Mandar a Finanzas) y la bandeja (Para revisar).
 - **Movimientos** (decididas en octubre 2026; valen para cualquier lista de movimientos, como el detalle de una categoría):

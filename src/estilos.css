@@ -227,3 +227,6 @@ select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); b
 .toggle { font-size: 13px; padding: 4px 10px; border-radius: 99px; flex: none; }
 .toggle.si { background: var(--ok-fondo); color: var(--ok); }
 .toggle.no { background: var(--panel-2); color: var(--tenue); }
+/* Cómo venís y Lo que viene en una caja, separadas por una línea fina. */
+.lineas-arriba > * + * { border-top: 1px solid #1A1A24; }
+.lineas-arriba > button { padding: 7px 2px !important; }
