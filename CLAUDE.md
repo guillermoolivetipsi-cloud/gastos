@@ -121,6 +121,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Cada tarjeta:** abajo «cierra ~28 oct · vence ~5 nov» del resumen que se está juntando, y a la derecha lo que lleva; se toca para ver el detalle.
   - **Archivadas:** plegadas al final.
   - **Editor:** arriba «Cuenta · Tarjeta de crédito», el nombre grande con la moneda al lado («EUR ▾», un toque pasa a la siguiente); en las tarjetas, una caja «cierra entre el 5 ▾ y el 10 ▾ · vence 10 días ▾ después del cierre». Archivar o eliminar en «⋯».
+- **Detalle de una categoría** (decididas en octubre 2026, lo que se abre al tocar una categoría en Resumen):
+  - **Pantalla completa** con «←» (no una hoja de abajo), con el período a la derecha del título.
+  - **Arriba:** el total grande con el objetivo («1.142 / 1.400»), la barra con lo previsto rayado y la marca del 80%, y una línea («+ ~1.230 previsto · te pasarías por 972» o «te quedan 258»; sin objetivo, tu promedio).
+  - **Falta pagar:** los recurrentes de la categoría que todavía no se cargaron este mes, con el día, el monto estimado y «Cargar».
+  - **Los últimos 6 meses:** barritas con el objetivo (o el promedio) punteado y lo previsto rayado en el mes.
+  - **La lista:** como Movimientos: agrupada por día con su total, un solo monto, ↻ y «3×».
+  - **Sin botón de cargar** abajo (ya está el «+» de Resumen).
 - **Archivar o eliminar** (en toda la app): en el «⋯» de arriba, nunca un botón abajo.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 

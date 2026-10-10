@@ -9,7 +9,7 @@ import { useDatos } from "./datos";
 import { AvisoVersion } from "./pantallas/Actualizaciones";
 import { completarPendientes } from "./lib/cotizaciones";
 import { cargarAutomaticos } from "./lib/recurrentes";
-import { Resumen } from "./pantallas/Resumen";
+import { DetalleCategoria, Resumen } from "./pantallas/Resumen";
 import { Movimientos } from "./pantallas/Movimientos";
 import { LoQueViene } from "./pantallas/LoQueViene";
 import { Mas } from "./pantallas/Mas";
@@ -46,6 +46,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "subir-resumen": return <SubirResumen cuentaId={p.cuentaId} />;
     case "etiquetas": return <Etiquetas />;
     case "como-venis": return <ComoVenis periodo={p.periodo} />;
+    case "detalle-categoria": return <DetalleCategoria {...p} />;
     case "clases": return <Clases />;
     case "proyeccion": return <EditorProyeccion {...p} />;
     case "finanzas-conectar": return <ConectarFinanzas />;

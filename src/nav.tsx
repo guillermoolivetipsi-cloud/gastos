@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Moneda, Tipo } from "./tipos";
+import type { Vista } from "./lib/fecha";
 
 /* Navegación mínima: cuatro solapas y una pila de pantallas encima. Cada pantalla
    que se abre agrega una entrada al historial, así el botón "atrás" de Android
@@ -24,6 +25,7 @@ export type Pantalla =
   | { p: "subir-resumen"; cuentaId?: string }
   | { p: "etiquetas" }
   | { p: "como-venis"; periodo: string }
+  | { p: "detalle-categoria"; id: string; desde: string; hasta: string; vista: Vista }
   | { p: "clases" }
   | { p: "proyeccion"; id?: string; periodo?: string }
   | { p: "finanzas-conectar" }

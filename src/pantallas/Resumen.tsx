@@ -1,16 +1,14 @@
 import { useMemo, useState } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos, usePendientes } from "../datos";
-import { db } from "../db";
 import { useNav } from "../nav";
-import type { Categoria, Movimiento, Tipo } from "../tipos";
+import type { Tipo } from "../tipos";
 import { bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { enUsdDe, fechaDePago } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
 import { BotonMandar } from "./Finanzas";
-import { fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
-import { num, usd } from "../lib/formato";
+import { DIAS_CORTOS, aFecha, fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
+import { num } from "../lib/formato";
 import { Barra, BotonAgregar, Dia, Dona, Hoja, Puntito, Punto } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
 import { useInsights } from "./ComoVenis";
@@ -32,7 +30,6 @@ export function Resumen() {
   const [ancla, setAncla] = useState(hoy());
   const [hasta, setHasta] = useState(hoy());
   const [elegirPeriodo, setElegirPeriodo] = useState(false);
-  const [detalle, setDetalle] = useState<Categoria | null>(null);
   // El mes se ve en torta; la semana, el año y un período, en barras por día (o por mes).
   const grafico: "torta" | "dia" = vista === "mes" || vista === "dia" ? "torta" : "dia";
 
@@ -285,7 +282,7 @@ export function Resumen() {
             const esp = esIng ? esperadoPorCat.get(c.cat.id) : undefined;
             // Columnas alineadas: el % debajo del nombre; el monto con su objetivo arriba y lo previsto debajo.
             return (
-              <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => setDetalle(c.cat)}>
+              <button key={c.cat.id} className="fila" style={{ width: "100%", textAlign: "left", flexDirection: "column", alignItems: "stretch", gap: 0 }} onClick={() => nav.abrir({ p: "detalle-categoria", id: c.cat.id, desde, hasta: fin, vista })}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Punto cat={c.cat} chico />
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -327,30 +324,133 @@ export function Resumen() {
         <button className="btn" onClick={() => setElegirPeriodo(false)}>Listo</button>
       </Hoja>
 
-      <DetalleCategoria cat={detalle} movs={movs} cerrar={() => setDetalle(null)} />
     </div>
   );
 }
 
-function DetalleCategoria({ cat, movs, cerrar }: { cat: Categoria | null; movs: Movimiento[]; cerrar: () => void }) {
+/* El detalle de una categoría (regla de Detalle de categoría): pantalla completa; arriba
+   el total con el objetivo y lo previsto; lo que falta pagar; los últimos 6 meses; y la
+   lista como en Movimientos, agrupada por día. */
+export function DetalleCategoria({ id, desde, hasta, vista }: { id: string; desde: string; hasta: string; vista: Vista }) {
+  const d = useDatos();
   const nav = useNav();
-  const cuentas = useLiveQuery(() => db.cuentas.toArray(), []);
-  if (!cat) return null;
-  const lista = movs.filter(m => m.categoriaId === cat.id).sort((a, b) => b.fecha.localeCompare(a.fecha));
-  const nombreCta = (id: string) => cuentas?.find(c => c.id === id)?.nombre ?? "";
+  const cat = d.catPorId.get(id);
+  if (!d.listo || !cat) return <div className="pantalla sin-tabs" />;
+  const esGasto = cat.tipo === "gasto";
+  const periodo = periodoDe(desde);
+  const esMes = vista === "mes";
+  const lista = d.movimientos.filter(m => m.categoriaId === id && m.fecha >= desde && m.fecha <= hasta).sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
+  const total = suma(lista);
+  const tasa = d.tasaRec;
+  const insts = esMes ? recurrentesDelMes(d.recurrentes, d.movimientos, periodo, tasa).filter(i => i.rec.categoriaId === id && !i.cero) : [];
+  const enUsdI = (i: (typeof insts)[number], x: number) => { const t = tasa(i.rec); return t ? x / t : 0; };
+  const falta = periodo >= periodoHoy() ? insts.filter(i => i.estado !== "cargado") : [];
+  const previsto = falta.reduce((s, i) => s + enUsdI(i, i.falta), 0);
+  const obj = esMes && esGasto && cat.objetivo ? cat.objetivo : null;
+  const pasado = obj != null && total + previsto > obj, ritmo = obj != null && !pasado && total + previsto >= obj * ALERTA;
+  const delMes = (p: string) => d.movimientos.filter(m => m.categoriaId === id && m.fecha.slice(0, 7) === p).reduce((s, m) => s + usdDe(m), 0);
+  const seis = esMes ? Array.from({ length: 6 }, (_, k) => sumarMeses(periodo, k - 5)).map(p => ({ p, v: p === periodo ? total : delMes(p) })) : [];
+  const previos = esMes ? [1, 2, 3].map(k => delMes(sumarMeses(periodo, -k))).filter(x => x > 0) : [];
+  const promedio = previos.length ? previos.reduce((a, b) => a + b, 0) / previos.length : null;
+  const porDia: [string, typeof lista][] = [];
+  for (const m of lista) { const u = porDia[porDia.length - 1]; if (u && u[0] === m.fecha) u[1].push(m); else porDia.push([m.fecha, [m]]); }
+  const rec = new Map(d.recurrentes.map(r => [r.id, r]));
+  const max = Math.max(1, ...seis.map(x => x.v + (x.p === periodo ? previsto : 0)), obj ?? 0), H = 70;
+
   return (
-    <Hoja abierta cerrar={cerrar}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <Punto cat={cat} chico /><h2 style={{ margin: 0, flex: 1 }}>{cat.nombre}</h2>
-        <span className="num">{usd(suma(lista))}</span>
+    <div className="pantalla sin-tabs">
+      <div className="enc">
+        <button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button>
+        <h1 style={{ display: "flex", alignItems: "center", gap: 10 }}><Punto cat={cat} chico />{cat.nombre}</h1>
+        <span className="mini tenue">{tituloRango(vista, desde, hasta)}</span>
       </div>
-      {lista.map(m => (
-        <button key={m.id} className="fila" style={{ width: "100%", textAlign: "left", borderTop: "1px solid var(--linea)" }} onClick={() => { cerrar(); nav.abrir({ p: "editor", id: m.id }); }}>
-          <span className="izq"><span className="tenue chico" style={{ minWidth: 46 }}>{fechaCorta(m.fecha)}</span><span>{m.comentario || m.etiquetas.join(", ") || nombreCta(m.cuentaId)}</span></span>
-          <span className="num derecha">{num(usdDe(m))}<div className="mini tenue">{m.moneda !== "USD" ? `${num(m.monto)} ${m.moneda}` : ""}</div></span>
-        </button>
+
+      <div style={{ margin: "2px 2px 6px" }}>
+        <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>
+          <span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(total, 0)}</span> <span className="chico tenue">{obj != null ? `/ ${num(obj)} USD` : "USD"}</span>
+        </div>
+        {obj != null && <Barra valor={total / obj} previsto={previsto / obj} color={pasado ? "var(--mal)" : ritmo ? "var(--ambar)" : cat.color} colorPrevisto={cat.color} marca={ALERTA} />}
+        <div className="mini tenue">
+          {previsto >= 1 && <>+ ~{num(previsto, 0)} previsto</>}
+          {obj != null && previsto >= 1 && " · "}
+          {obj != null && (total + previsto > obj ? <span className="mal">te pasarías por {num(total + previsto - obj, 0)}</span> : <>te quedan {num(obj - total - previsto, 0)}</>)}
+          {obj == null && promedio != null && <>tu promedio: {num(promedio, 0)}</>}
+          {obj == null && promedio == null && !(previsto >= 1) && <>{lista.length} {lista.length === 1 ? (esGasto ? "gasto" : "ingreso") : (esGasto ? "gastos" : "ingresos")}</>}
+        </div>
+      </div>
+
+      {falta.length > 0 && <>
+        <div className="grupo-t"><span>{esGasto ? "Falta pagar" : "Falta cobrar"} · {falta.length}</span><span className="num">~{num(previsto, 0)}</span></div>
+        <div className="caja lista">
+          {falta.map(i => (
+            <div key={i.rec.id + i.clave} className="fila">
+              <button className="izq" style={{ textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: i.rec.id, clave: i.clave })}>
+                <Dia dia={Number(i.fecha.slice(8))} abajo={mesCorto(i.fecha.slice(0, 7))} />
+                <Puntito cat={cat} />
+                <span style={{ minWidth: 0 }}><div>{i.rec.nombre}</div><div className="mini tenue">{d.cuentaPorId.get(i.rec.cuentaId)?.nombre}{i.rec.moneda !== "USD" ? ` · ${num(i.falta)} ${i.rec.moneda}` : ""}</div></span>
+              </button>
+              <span className="derecha">
+                <div className="num tenue">~{num(enUsdI(i, i.falta), 0)}</div>
+                <button className="btn1" style={{ padding: "3px 10px", fontSize: 13, marginTop: 3 }} onClick={() => nav.abrir({ p: "editor", recurrenteId: i.rec.id, periodo: i.clave, monto: i.estimado ? undefined : i.falta || undefined, fecha: fechaDePago(i) })}>{esGasto ? "Cargar" : "Cobrar"}</button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </>}
+
+      {seis.some(x => x.v > 0) && <>
+        <div className="grupo-t"><span>Los últimos 6 meses</span>{obj != null ? <span className="num">objetivo {num(obj)}</span> : promedio != null ? <span className="num">promedio {num(promedio, 0)}</span> : null}</div>
+        <div className="caja">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
+            {seis.map(({ p, v }) => {
+              const ahora = p === periodo, linea = obj ?? promedio;
+              return (
+                <div key={p} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                  <small className="num tenue" style={{ fontSize: 12 }}>{v > 0 ? num(v, 0) : ""}</small>
+                  <div style={{ position: "relative", height: H, width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
+                    {linea != null && <div style={{ position: "absolute", left: 0, right: 0, bottom: Math.round(linea / max * H), borderTop: "1px dashed #8E8BA3", zIndex: 1 }} />}
+                    {ahora && previsto >= 1 && <i style={{ width: "62%", height: Math.round(previsto / max * H), background: `repeating-linear-gradient(-45deg, ${cat.color} 0 3px, transparent 3px 6px)`, borderRadius: "4px 4px 0 0", display: "block" }} />}
+                    <i style={{ width: "62%", height: Math.max(v > 0 ? 2 : 0, Math.round(v / max * H)), background: ahora ? cat.color : "#3a3156", borderRadius: ahora && previsto >= 1 ? 0 : "4px 4px 0 0", display: "block" }} />
+                  </div>
+                  <small className="tenue" style={{ fontSize: 12 }}>{mesCorto(p)}</small>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>}
+
+      {!lista.length && <div className="vacio">Nada en {tituloRango(vista, desde, hasta).toLowerCase()}.</div>}
+      {porDia.map(([fecha, ms]) => (
+        <div key={fecha}>
+          <div className="grupo-t"><span>{Number(fecha.slice(8))} {mesCorto(fecha.slice(0, 7))} · {DIAS_CORTOS[aFecha(fecha).getDay()]}</span><span className="num">{esGasto ? "−" : "+"}{num(ms.reduce((s, m) => s + usdDe(m), 0))}</span></div>
+          <div className="caja lista">
+            {ms.map(m => {
+              const cuenta = d.cuentaPorId.get(m.cuentaId);
+              const queFue = m.comentario || m.etiquetas.join(", ");
+              return (
+                <button key={m.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: m.id })}>
+                  <span className="izq">
+                    <Punto cat={cat} chico />
+                    <span style={{ minWidth: 0 }}>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || cat.nombre}</div>
+                      <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}</div>
+                    </span>
+                  </span>
+                  <span className="derecha num">
+                    <div className={m.tipo === "ingreso" ? "ok" : ""} style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
+                      {m.recurrenteId && rec.get(m.recurrenteId) && <T.IconRepeat size={13} className="viol" aria-label={`Pago de ${rec.get(m.recurrenteId)!.nombre}`} />}
+                      {m.cuotas && m.cuotas > 1 ? <span className="mini" style={{ color: "var(--azul)" }}>{m.cuotas}×</span> : null}
+                      <span>{m.tipo === "ingreso" ? "+" : ""}{m.usd != null ? num(m.usd) : "…"}</span>
+                    </div>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       ))}
-    </Hoja>
+    </div>
   );
 }
 
