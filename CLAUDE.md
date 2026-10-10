@@ -135,6 +135,7 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Gráfico:** dos líneas, gastos (violeta) y lo que entró (verde), sin números encima, con dos guías de fondo. Se toca un mes y abajo aparece una línea «julio · gastaste 3.100 · entró 2.850 · −250 ›», que abre ese mes.
   - **Lista por categoría:** el total del año y, en gris, «961 por mes»; sin barras. Si tiene objetivo y algún mes te pasaste, «te pasaste 6 meses» en amarillo.
   - **Afuera, a propósito:** la comparación con el año anterior, fijo/variable y las barras contra el objetivo. Se suman de a uno solo si se piden.
+- **Vista Semana** (decidida en octubre 2026): el total en una fila y las barras por día con su número y el promedio, como estaban; la lista por categoría como en el Mes («31% de la semana» debajo del nombre, sin barras).
 - **Pestañas** (decididas en octubre 2026):
   - **Abajo:** Gastos · Ingresos · Proyecciones · Más (antes: Resumen · Movimientos · Lo que viene · Más). Lo que más se usa, a un toque.
   - **Movimientos:** ya no es pestaña. En Gastos e Ingresos, abajo de las categorías, «Últimos movimientos» (los 5 últimos del período) y «Ver todos ›», que abre la lista con «←», ya filtrada; la lupa de arriba la abre buscando.

@@ -289,7 +289,8 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
             const pasado = obj != null && c.total + prev > obj;
             // Cerca del objetivo: pasó la marca del 80%.
             const ritmo = obj != null && c.total + prev >= obj * ALERTA && !pasado;
-            const ranking = obj == null && grafico === "dia" && vista !== "anio";
+            // En la semana, como en el Mes: el % debajo del nombre y sin barras (regla de la vista Semana).
+            const ranking = obj == null && grafico === "dia" && vista !== "anio" && vista !== "semana";
             // En el año (regla de la vista Año): por mes, o en cuántos meses te pasaste del objetivo.
             const anio = vista === "anio" ? delAnio(c.cat.id) : null;
             const hayDebajo = prev >= 1 || (proy != null && proy.seguro + proy.opcional > 0);
@@ -303,7 +304,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <div>{c.cat.nombre}</div>
                     {anio ? <div className={`mini ${anio.pasados ? "ambar" : "tenue"}`}>{anio.pasados ? `te pasaste ${anio.pasados} ${anio.pasados === 1 ? "mes" : "meses"}` : `${num(c.total / anio.meses, 0)} por mes`}</div>
-                      : c.total > 0 && <div className="mini tenue">{Math.round(c.pct * 100)}% {enEsto === "este mes" ? "del mes" : ""}</div>}
+                      : c.total > 0 && <div className="mini tenue">{Math.round(c.pct * 100)}% {enEsto === "este mes" ? "del mes" : vista === "semana" ? "de la semana" : ""}</div>}
                   </span>
                   <span className="num derecha">
                     <div><span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>{obj != null && <span className="tenue chico"> / {num(obj)}</span>}{esp != null && <span className="tenue chico"> / {num(esp, 0)}</span>}</div>
