@@ -9,18 +9,20 @@ import { BotonAgregar, Deslizable, Punto, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 
-export function Movimientos() {
+/** Todos los movimientos, con buscador y filtros. Se abre desde Gastos o Ingresos
+ *  («Ver todos ›» o la lupa), ya filtrado por tipo. */
+export function Movimientos({ tipo: tipoInicial, buscar }: { tipo?: "gasto" | "ingreso"; buscar?: boolean } = {}) {
   const d = useDatos();
   const nav = useNav();
   const toast = useToast();
   const [q, setQ] = useState("");
-  const [tipo, setTipo] = useState<"todos" | "gasto" | "ingreso">("todos");
+  const [tipo, setTipo] = useState<"todos" | "gasto" | "ingreso">(tipoInicial ?? "todos");
   // Filtros: por medio de pago ("sin" = sin tarjeta) y por categoría.
   const [medio, setMedio] = useState<string>("todos");
   const [catFiltro, setCatFiltro] = useState("");
   const [cuantos, setCuantos] = useState(150);
   // La búsqueda se abre con la lupa de arriba (regla de orden: una sola fila de controles).
-  const [buscando, setBuscando] = useState(false);
+  const [buscando, setBuscando] = useState(!!buscar);
 
   const cat = useMemo(() => new Map(d.categorias.map(c => [c.id, c])), [d.categorias]);
   const cta = useMemo(() => new Map(d.cuentas.map(c => [c.id, c])), [d.cuentas]);
@@ -54,8 +56,8 @@ export function Movimientos() {
   const sinCotizar = d.movimientos.filter(m => m.usd == null).length;
 
   return (
-    <div className="pantalla">
-      <div className="enc"><h1>Movimientos</h1>
+    <div className="pantalla sin-tabs">
+      <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Movimientos</h1>
         <button className="accion" aria-label="Buscar" onClick={() => { if (buscando) setQ(""); setBuscando(!buscando); }}>{buscando ? <T.IconX size={22} /> : <T.IconSearch size={22} />}</button>
       </div>
       {buscando && <div className="buscar"><T.IconSearch size={18} className="tenue" /><input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por categoría, cuenta, comentario…" />{q && <button onClick={() => setQ("")} aria-label="Borrar búsqueda"><T.IconX size={16} /></button>}</div>}

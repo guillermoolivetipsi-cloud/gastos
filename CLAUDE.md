@@ -38,13 +38,13 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **"Repetir con un toque":** debajo de las categorías.
   - **Piezas compartidas** en `src/ui/formulario.tsx`: `MontoConMoneda`, `GrillaCategorias` y `FechaEnTitulo`. Las usan "Nuevo gasto", el recurrente ("· desde hoy ▾") y la proyección ("· oct ▾"); cualquier formulario nuevo las usa también.
 - **Resumen y pantallas de números** (decididas en octubre 2026; valen también para Cómo venís, Proyecciones y la tarjeta):
-  - **Período:** tres filas: pestañas (GASTOS · INGRESOS · PROYECCIONES), vistas (Día · Semana · Mes · Año · Período, siempre a la vista, nunca en un desplegable) y «‹ Octubre 2026 ›». Se probó el desplegable «Mes ▾» y se volvió a la fila (octubre 2026): el mes tiene que estar a un toque.
+  - **Período:** dos filas: vistas (Día · Semana · Mes · Año · Período, siempre a la vista, nunca en un desplegable) y «‹ Octubre 2026 ›». Gastos, Ingresos y Proyecciones ya no son solapas de arriba: son pestañas de abajo. Se probó el desplegable «Mes ▾» y se volvió a la fila (octubre 2026): el mes tiene que estar a un toque.
   - **Al abrir:** Resumen arranca en Mes (antes en Semana). La vista Día queda como estaba.
   - **Números de arriba:** como estaban, las cajas Fijos y Variables con su barra y «te quedan X para N días».
   - **Gráfico del mes:** la torta chica (120 px) con el total grande al lado (30 px), y debajo del total lo previsto y lo proyectado. Nunca una torta grande centrada.
   - **Lista por categoría:** como estaba, con el porcentaje.
   - **«Cómo venís»:** una sola línea arriba ("✦ Cómo venís: tarjeta 22% · noviembre ~1.982 · suscripciones 57 ›"), con textos cortos; se toca para el detalle.
-  - **Botones de arriba:** la nube (Mandar a Finanzas) y la bandeja (Para revisar), como estaban.
+  - **Botones de arriba:** la lupa (abre Movimientos buscando), la nube (Mandar a Finanzas) y la bandeja (Para revisar).
 - **Movimientos** (decididas en octubre 2026; valen para cualquier lista de movimientos, como el detalle de una categoría):
   - **Buscar y filtrar:** como estaba, tres filas (buscador · Todos/Gastos/Ingresos · medio de pago y categoría).
   - **Encabezado de cada día:** fecha corta y el total del día ("8 oct · jue … −86,60").
@@ -128,6 +128,10 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Los últimos 6 meses:** barritas con el objetivo (o el promedio) punteado y lo previsto rayado en el mes.
   - **La lista:** como Movimientos: agrupada por día con su total, un solo monto, ↻ y «3×».
   - **Sin botón de cargar** abajo (ya está el «+» de Resumen).
+- **Pestañas** (decididas en octubre 2026):
+  - **Abajo:** Gastos · Ingresos · Proyecciones · Más (antes: Resumen · Movimientos · Lo que viene · Más). Lo que más se usa, a un toque.
+  - **Movimientos:** ya no es pestaña. En Gastos e Ingresos, abajo de las categorías, «Últimos movimientos» (los 5 últimos del período) y «Ver todos ›», que abre la lista con «←», ya filtrada; la lupa de arriba la abre buscando.
+  - **Lo que viene:** ya no es pestaña ni va en Más. Una línea arriba de Gastos, debajo de «Cómo venís» («◷ Lo que viene: 1.100 por pagar · tarjetas ~980 ›»), que abre la pantalla de siempre.
 - **Archivar o eliminar** (en toda la app): en el «⋯» de arriba, nunca un botón abajo.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 
@@ -141,7 +145,7 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
 - `src/lib/recordatorios.ts`: qué está pendiente en un momento dado (puro). `src/lib/avisos.ts`: `planificar` arma los avisos de los próximos 14 días. `src/lib/notificaciones.ts`: los programa.
 - `src/lib/finanzas.ts` + `src/pantallas/Finanzas.tsx`: «Mandar a Finanzas» por el buzón, según `../Finanzas/CONTRATO-GASTOS.md`. La app sube el envío (los últimos 6 meses, completos, en su moneda, con el id de la app y el medio de pago en `cuenta`) a `envios/<fecha>.json` del repo privado `guillermoolivetipsi-cloud/gastos-buzon`, con un token de GitHub de grano fino (Contents lectura y escritura, solo ese repo) guardado en el ajuste `buzonToken`. Finanzas deja `respuestas/<mismo nombre>.json`; la app las busca al abrirse y al volver (`buscarRespuestas`), avisa arriba y marca esos meses como exportados. Los envíos quedan en el ajuste `buzonEnvios`. No viajan los cobros de Psicología (entran por PsicoTracker) ni lo de la cuenta «App anterior» (lo traído del Excel de la app vieja, que ya está en Finanzas); el punto de la nube tampoco los cuenta. Todavía no: borrados y recurrentes.
 - `src/lib/actualizacion.ts`: busca en GitHub Releases una versión más nueva y ofrece descargarla (aviso arriba al abrir, y en Más: "Actualizar la app" o "Buscar actualización", con la versión instalada al pie).
-- `src/App.tsx`: solapas, pila de pantallas, botón atrás de Android, atajos del ícono (`gastos://gasto`, `gastos://resumen`), tocar un aviso, aviso de versión nueva.
+- `src/App.tsx`: pestañas de abajo (Gastos · Ingresos · Proyecciones · Más), pila de pantallas (Movimientos y Lo que viene se abren encima), botón atrás de Android, atajos del ícono (`gastos://gasto`, `gastos://resumen`), tocar un aviso, aviso de versión nueva.
 - `src/pantallas/`: una por pantalla.
 - `android/`: proyecto de Capacitor. Ícono adaptable (fondo violeta + la dona), ícono de notificación, atajos en `res/xml/shortcuts.xml`, permisos en `AndroidManifest.xml`, firma y número de versión en `app/build.gradle`.
 

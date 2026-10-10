@@ -2,11 +2,11 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Moneda, Tipo } from "./tipos";
 import type { Vista } from "./lib/fecha";
 
-/* Navegación mínima: cuatro solapas y una pila de pantallas encima. Cada pantalla
+/* Navegación mínima: cuatro solapas (Gastos · Ingresos · Proyecciones · Más) y una pila de pantallas encima. Cada pantalla
    que se abre agrega una entrada al historial, así el botón "atrás" de Android
    cierra la pantalla en lugar de salir de la app. */
 
-export type Solapa = "resumen" | "movimientos" | "viene" | "mas";
+export type Solapa = "gastos" | "ingresos" | "proyecciones" | "mas";
 
 export type Pantalla =
   | { p: "editor"; id?: string; tipo?: Tipo; recurrenteId?: string; periodo?: string; monto?: number; fecha?: string; cuentaId?: string; categoriaId?: string; comentario?: string; proyeccionId?: string; moneda?: Moneda }
@@ -25,6 +25,8 @@ export type Pantalla =
   | { p: "subir-resumen"; cuentaId?: string }
   | { p: "etiquetas" }
   | { p: "como-venis"; periodo: string }
+  | { p: "movimientos"; tipo?: Tipo; buscar?: boolean }
+  | { p: "viene"; periodo?: string }
   | { p: "detalle-categoria"; id: string; desde: string; hasta: string; vista: Vista }
   | { p: "clases" }
   | { p: "proyeccion"; id?: string; periodo?: string }
@@ -34,9 +36,7 @@ export type Pantalla =
 
 type Nav = {
   solapa: Solapa;
-  /** `periodo`: el mes a mostrar en "Lo que viene" (si venís de otro mes). */
-  irA: (s: Solapa, periodo?: string) => void;
-  periodoViene?: string;
+  irA: (s: Solapa) => void;
   abrir: (p: Pantalla) => void;
   volver: () => void;
   pila: Pantalla[];
@@ -46,9 +46,8 @@ const Ctx = createContext<Nav>(null!);
 export const useNav = () => useContext(Ctx);
 
 export function ProveedorNav({ children }: { children: ReactNode }) {
-  const [solapa, setSolapa] = useState<Solapa>("resumen");
+  const [solapa, setSolapa] = useState<Solapa>("gastos");
   const [pila, setPila] = useState<Pantalla[]>([]);
-  const [periodoViene, setPeriodoViene] = useState<string>();
 
   useEffect(() => {
     const alVolver = () => setPila(p => p.slice(0, -1));
@@ -62,7 +61,7 @@ export function ProveedorNav({ children }: { children: ReactNode }) {
     window.scrollTo(0, 0);
   };
   const volver = () => history.back();
-  const irA = (s: Solapa, periodo?: string) => { setSolapa(s); setPeriodoViene(periodo); window.scrollTo(0, 0); };
+  const irA = (s: Solapa) => { setSolapa(s); window.scrollTo(0, 0); };
 
-  return <Ctx.Provider value={{ solapa, irA, abrir, volver, pila, periodoViene }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ solapa, irA, abrir, volver, pila }}>{children}</Ctx.Provider>;
 }

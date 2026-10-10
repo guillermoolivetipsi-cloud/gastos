@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useDatos, usePendientes } from "../datos";
 import { useNav } from "../nav";
-import type { Tipo } from "../tipos";
-import { bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
+import type { Movimiento, Tipo } from "../tipos";
+import { aPagarTarjeta, bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { enUsdDe, fechaDePago } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
@@ -18,11 +18,10 @@ import { T } from "../ui/Icono";
 const ALERTA = 0.8;
 const VISTAS: [Vista, string][] = [["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"], ["anio", "Año"], ["periodo", "Período"]];
 
-export function Resumen() {
+/** La pestaña Gastos o la pestaña Ingresos (regla de las pestañas). */
+export function Resumen({ tipo }: { tipo: Tipo }) {
   const d = useDatos();
   const nav = useNav();
-  const [solapa, setSolapa] = useState<Tipo | "proy">("gasto");
-  const tipo: Tipo = solapa === "proy" ? "gasto" : solapa;
   // En el mes: sumar lo proyectado que esté prendido (seguro en claro, opcional rayado).
   const [conProy, setConProy] = useState(false);
   // Abre en el mes (regla de las vistas de Resumen).
@@ -97,20 +96,15 @@ export function Resumen() {
   return (
     <div className="pantalla">
       <div className="enc">
-        <h1>Resumen</h1>
-        <span style={{ marginLeft: "auto" }}><BotonMandar /></span>
+        <h1>{tipo === "gasto" ? "Gastos" : "Ingresos"}</h1>
+        <button className="accion" aria-label="Buscar" style={{ marginLeft: "auto", color: "var(--tenue-2)" }} onClick={() => nav.abrir({ p: "movimientos", tipo, buscar: true })}><T.IconSearch size={22} /></button>
+        <span><BotonMandar /></span>
         <button className="accion" aria-label="Para revisar" onClick={() => nav.abrir({ p: "revisar" })} style={{ position: "relative" }}>
           <T.IconInbox size={22} />
           {revisar > 0 && <span className="badge" style={{ position: "absolute", top: -2, right: -6 }}>{revisar}</span>}
         </button>
       </div>
 
-      <div className="solapas">
-        <button className={solapa === "gasto" ? "on" : ""} onClick={() => setSolapa("gasto")}>GASTOS</button>
-        <button className={solapa === "ingreso" ? "on" : ""} onClick={() => setSolapa("ingreso")}>INGRESOS</button>
-        <button className={solapa === "proy" ? "on" : ""} onClick={() => setSolapa("proy")}>PROYECCIONES</button>
-      </div>
-      {solapa === "proy" ? <Proyecciones /> : <>
 
       {/* Las vistas a la vista, en su fila, y el período debajo (regla de las vistas de Resumen). */}
       <div className="vistas">
@@ -129,7 +123,7 @@ export function Resumen() {
       </div>
 
       {vencidos.length > 0 && (
-        <button className="caja aviso" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.irA("viene", periodo)}>
+        <button className="caja aviso" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "viene", periodo })}>
           <div className="ambar" style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
             <T.IconBell size={16} /> {porCargar.length} por cargar{vencidos.length < porCargar.length ? ` (${vencidos.length} ${vencidos.length === 1 ? "vencido" : "vencidos"})` : ""}
           </div>
@@ -149,6 +143,7 @@ export function Resumen() {
 
       {/* "Cómo venís" arriba de todo en el mes, antes de los números. */}
       {esMes && tipo === "gasto" && <TarjetaComoVenis periodo={periodo} />}
+      {tipo === "gasto" && <LineaLoQueViene />}
       {esIng && (
         // Entró y Gastaste, y debajo cuánto te quedó (regla de Ingresos).
         <>
@@ -307,14 +302,22 @@ export function Resumen() {
           })}
         </div>
       )}
+      {movs.length > 0 && <>
+        <div className="grupo-t"><span>Últimos movimientos</span><span className="num">{tituloRango(vista, desde, fin).toLowerCase()}</span></div>
+        <div className="caja lista">
+          {[...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado)).slice(0, 5).map(m => <FilaMovimiento key={m.id} m={m} />)}
+          <button className="viol chico" style={{ width: "100%", padding: "10px 0 8px", borderTop: "1px solid #1A1A24" }} onClick={() => nav.abrir({ p: "movimientos", tipo })}>
+            Ver todos los {tipo === "gasto" ? "gastos" : "ingresos"} ›
+          </button>
+        </div>
+      </>}
       {esMes && cats.some(c => c.cat.objetivo) && (
         <div className="mini tenue centro">La marca es el 80% del objetivo</div>
       )}
 
 
-      </>}
 
-      {solapa !== "proy" && <BotonAgregar tipo={tipo} abrir={t => nav.abrir({ p: "editor", tipo: t, fecha: fechaParaCargar(desde, fin) })} />}
+      {<BotonAgregar tipo={tipo} abrir={t => nav.abrir({ p: "editor", tipo: t, fecha: fechaParaCargar(desde, fin) })} />}
 
       <Hoja abierta={elegirPeriodo} cerrar={() => setElegirPeriodo(false)}>
         <h2>Elegir período</h2>
@@ -324,6 +327,80 @@ export function Resumen() {
         <button className="btn" onClick={() => setElegirPeriodo(false)}>Listo</button>
       </Hoja>
 
+    </div>
+  );
+}
+
+/** Una fila de movimiento como en Movimientos: arriba lo que fue, abajo la categoría y la
+ *  cuenta (con la moneda original), un solo monto con ↻ y «3×». Se toca para editar. */
+function FilaMovimiento({ m, sinCategoria }: { m: Movimiento; sinCategoria?: boolean }) {
+  const d = useDatos();
+  const nav = useNav();
+  const cat = d.catPorId.get(m.categoriaId);
+  const cuenta = d.cuentaPorId.get(m.cuentaId);
+  const r = m.recurrenteId ? d.recurrentes.find(x => x.id === m.recurrenteId) : undefined;
+  const queFue = m.comentario || m.etiquetas.join(", ");
+  const nombreCat = cat?.nombre ?? "Sin categoría";
+  return (
+    <button className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: m.id })}>
+      <span className="izq">
+        <Punto cat={cat} chico />
+        <span style={{ minWidth: 0 }}>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || nombreCat}</div>
+          <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {queFue && !sinCategoria ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}
+          </div>
+        </span>
+      </span>
+      <span className="derecha num">
+        <div className={m.tipo === "ingreso" ? "ok" : ""} style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
+          {r && <T.IconRepeat size={13} className="viol" aria-label={`Pago de ${r.nombre}`} />}
+          {m.cuotas && m.cuotas > 1 ? <span className="mini" style={{ color: "var(--azul)" }}>{m.cuotas}×</span> : null}
+          <span>{m.tipo === "ingreso" ? "+" : ""}{m.usd != null ? num(m.usd) : "…"}</span>
+        </div>
+      </span>
+    </button>
+  );
+}
+
+/** «◷ Lo que viene: 1.230 por pagar · tarjetas ~980 ›», arriba de Gastos (regla de las
+ *  pestañas): lo que falta pagar este mes de tus cuentas y lo que vence de las tarjetas. */
+function LineaLoQueViene() {
+  const d = useDatos();
+  const nav = useNav();
+  const p = periodoHoy();
+  const tasa = d.tasaRec;
+  const insts = useMemo(() => recurrentesDelMes(d.recurrentes, d.movimientos, p, tasa), [d.recurrentes, d.movimientos, p, tasa]);
+  const { todos } = porCargarDelMes(insts, d.cuentas);
+  const porPagar = todos.reduce((s, i) => { const t = tasa(i.rec); return s + (t ? (i.estado === "parcial" ? i.falta : i.esperado) / t : 0); }, 0);
+  const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada).map(c => aPagarTarjeta(c, d.movimientos, d.recurrentes, p, tasa, d.resumenesCargados));
+  const totalTarjetas = tarjetas.reduce((s, x) => s + x.total, 0);
+  const estimado = tarjetas.some(x => !x.real);
+  const partes = [porPagar >= 1 && `${num(porPagar, 0)} por pagar`, totalTarjetas >= 1 && `tarjetas ${estimado ? "~" : ""}${num(totalTarjetas, 0)}`].filter(Boolean);
+  return (
+    <button style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 6, padding: "4px 2px" }} onClick={() => nav.abrir({ p: "viene" })}>
+      <span className="ambar chico" style={{ flex: "none" }}>◷ Lo que viene:</span>
+      <span className="mini tenue" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{partes.length ? partes.join(" · ") : "nada pendiente este mes"}</span>
+      <T.IconChevronRight size={16} className="tenue" style={{ flex: "none" }} />
+    </button>
+  );
+}
+
+/** La pestaña Proyecciones. */
+export function PantallaProyecciones() {
+  const nav = useNav();
+  const revisar = usePendientes()?.total ?? 0;
+  return (
+    <div className="pantalla">
+      <div className="enc">
+        <h1>Proyecciones</h1>
+        <span style={{ marginLeft: "auto" }}><BotonMandar /></span>
+        <button className="accion" aria-label="Para revisar" onClick={() => nav.abrir({ p: "revisar" })} style={{ position: "relative" }}>
+          <T.IconInbox size={22} />
+          {revisar > 0 && <span className="badge" style={{ position: "absolute", top: -2, right: -6 }}>{revisar}</span>}
+        </button>
+      </div>
+      <Proyecciones />
     </div>
   );
 }

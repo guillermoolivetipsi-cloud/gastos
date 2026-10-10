@@ -20,14 +20,14 @@ import { T } from "../ui/Icono";
 
 type Pestana = "recurrentes" | "tarjetas";
 
-export function LoQueViene() {
+export function LoQueViene({ periodo: inicial }: { periodo?: string } = {}) {
   const d = useDatos();
   const nav = useNav();
-  const [periodo, setPeriodo] = useState(nav.periodoViene ?? periodoHoy());
+  const [periodo, setPeriodo] = useState(inicial ?? periodoHoy());
   const [pestana, setPestana] = useState<Pestana>("recurrentes");
   return (
-    <div className="pantalla">
-      <div className="enc"><h1>Lo que viene</h1></div>
+    <div className="pantalla sin-tabs">
+      <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Lo que viene</h1></div>
       {/* El mes con flechas, como en Resumen (regla de orden). */}
       <div className="navega" style={{ marginBottom: 6 }}>
         <button aria-label="Mes anterior" onClick={() => setPeriodo(sumarMeses(periodo, -1))}><T.IconChevronLeft size={20} /></button>

@@ -9,7 +9,7 @@ import { useDatos } from "./datos";
 import { AvisoVersion } from "./pantallas/Actualizaciones";
 import { completarPendientes } from "./lib/cotizaciones";
 import { cargarAutomaticos } from "./lib/recurrentes";
-import { DetalleCategoria, Resumen } from "./pantallas/Resumen";
+import { DetalleCategoria, PantallaProyecciones, Resumen } from "./pantallas/Resumen";
 import { Movimientos } from "./pantallas/Movimientos";
 import { LoQueViene } from "./pantallas/LoQueViene";
 import { Mas } from "./pantallas/Mas";
@@ -46,6 +46,8 @@ function Encima({ p }: { p: Pantalla }) {
     case "subir-resumen": return <SubirResumen cuentaId={p.cuentaId} />;
     case "etiquetas": return <Etiquetas />;
     case "como-venis": return <ComoVenis periodo={p.periodo} />;
+    case "movimientos": return <Movimientos tipo={p.tipo} buscar={p.buscar} />;
+    case "viene": return <LoQueViene periodo={p.periodo} />;
     case "detalle-categoria": return <DetalleCategoria {...p} />;
     case "clases": return <Clases />;
     case "proyeccion": return <EditorProyeccion {...p} />;
@@ -55,10 +57,12 @@ function Encima({ p }: { p: Pantalla }) {
   }
 }
 
+// Lo que más se usa, abajo y a un toque (regla de las pestañas). Movimientos y Lo que
+// viene se abren desde Gastos.
 const SOLAPAS: [Solapa, string, typeof T.IconHome][] = [
-  ["resumen", "Resumen", T.IconChartDonut],
-  ["movimientos", "Movimientos", T.IconList],
-  ["viene", "Lo que viene", T.IconCalendarDue],
+  ["gastos", "Gastos", T.IconArrowDownRight],
+  ["ingresos", "Ingresos", T.IconArrowUpRight],
+  ["proyecciones", "Proyecciones", T.IconTrendingUp],
   ["mas", "Más", T.IconDots],
 ];
 
@@ -87,13 +91,13 @@ export function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Botón "atrás" de Android: cierra la pantalla de arriba; si no hay, vuelve a
-  // Resumen; en Resumen, minimiza la app.
+  // Gastos; en Gastos, minimiza la app.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const l = CapApp.addListener("backButton", () => {
       const n = navRef.current;
       if (n.pila.length) n.volver();
-      else if (n.solapa !== "resumen") n.irA("resumen");
+      else if (n.solapa !== "gastos") n.irA("gastos");
       else CapApp.minimizeApp();
     });
     return () => { l.then(x => x.remove()); };
@@ -149,9 +153,9 @@ export function App() {
       )}
       {arriba && <div className="app" key={nav.pila.length}><Encima p={arriba} /></div>}
       <div className="app" style={arriba ? { display: "none" } : undefined}>
-      {nav.solapa === "resumen" && <Resumen />}
-      {nav.solapa === "movimientos" && <Movimientos />}
-      {nav.solapa === "viene" && <LoQueViene />}
+      {nav.solapa === "gastos" && <Resumen tipo="gasto" />}
+      {nav.solapa === "ingresos" && <Resumen tipo="ingreso" />}
+      {nav.solapa === "proyecciones" && <PantallaProyecciones />}
       {nav.solapa === "mas" && <Mas />}
       <nav className="tabs"><div>
         {SOLAPAS.map(([s, t, I]) => (
