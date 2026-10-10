@@ -4,7 +4,7 @@ import { Clipboard } from "@capacitor/clipboard";
 import { useNav } from "../nav";
 import { useDatos } from "../datos";
 import { diaLocal, fechaCorta, nombreMes } from "../lib/fecha";
-import { leerEnvios, leerToken, mandar, marcarVisto, mesesAMandar, probarToken, REPO, type EnvioHecho, type Resultado, type Subida } from "../lib/finanzas";
+import { leerEnvios, leerToken, mandar, marcarVisto, mesesAMandar, probarToken, REPO, seManda, type EnvioHecho, type Resultado, type Subida } from "../lib/finanzas";
 import { useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -31,7 +31,8 @@ export function useSinMandar() {
   if (!envios) return 0;
   const ultimo = envios[envios.length - 1]?.enviado ?? "";
   const meses = mesesAMandar();
-  return d.movimientos.filter(m => meses.includes(m.fecha.slice(0, 7)) && (m.modificado || m.creado || "") > ultimo).length;
+  // Solo lo que de verdad viaja (sin Psicología ni lo de «App anterior»).
+  return d.movimientos.filter(m => meses.includes(m.fecha.slice(0, 7)) && (m.modificado || m.creado || "") > ultimo && seManda(m, d.catPorId.get(m.categoriaId), d.cuentaPorId.get(m.cuentaId))).length;
 }
 
 /** El botón de Resumen: manda con un toque y avisa abajo cómo salió, sin cambiar de

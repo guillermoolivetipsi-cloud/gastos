@@ -51,3 +51,10 @@ it("cada movimiento lleva con qué se pagó; las tarjetas se llaman Visa y Maste
   expect(JSON.parse(JSON.stringify(e.movimientos[3]))).not.toHaveProperty("cuenta");
   expect(e.contrato).toBe("1.0");
 });
+
+it("lo de la cuenta «App anterior» no viaja: ya está en Finanzas", () => {
+  const ctas = [...cuentas, { id: "vieja", nombre: "App anterior", moneda: "EUR", dolar: "blue", esTarjeta: false, orden: 3 } as Cuenta];
+  const movs = [mov({ id: "a", cuentaId: "rev" }), mov({ id: "b", cuentaId: "vieja" })];
+  const e = armarEnvio(["2026-09"], movs, cats, ctas);
+  expect(e.movimientos.map(m => m.id)).toEqual(["a"]);
+});

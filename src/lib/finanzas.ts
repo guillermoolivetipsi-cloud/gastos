@@ -58,7 +58,9 @@ export const nombreDeEnvio = (d: Date) => `${d.toISOString().slice(0, 19).replac
 
 /** Lo que no viaja (contrato §5, "una fuente por hecho"): los cobros de pacientes
  *  entran a Finanzas por PsicoTracker. */
-export function seManda(m: Movimiento, cat: Categoria | undefined) {
+export function seManda(m: Movimiento, cat: Categoria | undefined, cuenta?: Cuenta) {
+  // Lo de la cuenta «App anterior» (lo que se trajo del Excel de la app vieja) ya está en Finanzas.
+  if (cuenta?.nombre.trim().toLowerCase() === "app anterior") return false;
   return !(m.tipo === "ingreso" && cat?.nombre === "Psicología");
 }
 
@@ -67,7 +69,7 @@ export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[
   const cat = new Map(cats.map(c => [c.id, c]));
   const cta = new Map(cuentas.map(c => [c.id, c]));
   const movimientos = movs
-    .filter(m => meses.includes(periodoDe(m.fecha)) && seManda(m, cat.get(m.categoriaId)))
+    .filter(m => meses.includes(periodoDe(m.fecha)) && seManda(m, cat.get(m.categoriaId), cta.get(m.cuentaId)))
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.creado.localeCompare(b.creado))
     .map((m): MovimientoEnviado => {
       const cuenta = cta.get(m.cuentaId);
