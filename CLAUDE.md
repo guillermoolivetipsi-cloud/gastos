@@ -128,6 +128,11 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Los últimos 6 meses:** barritas con el objetivo (o el promedio) punteado y lo previsto rayado en el mes.
   - **La lista:** como Movimientos: agrupada por día con su total, un solo monto, ↻ y «3×».
   - **Sin botón de cargar** abajo (ya está el «+» de Resumen).
+- **Vista Año** (decidida en octubre 2026, en Gastos e Ingresos; se probó una versión con muchos números y barras y era difícil de leer: una idea por bloque):
+  - **Arriba:** el total grande y una sola línea gris, «2.402 por mes en promedio».
+  - **Gráfico:** dos líneas, gastos (violeta) y lo que entró (verde), sin números encima, con dos guías de fondo. Se toca un mes y abajo aparece una línea «julio · gastaste 3.100 · entró 2.850 · −250 ›», que abre ese mes.
+  - **Lista por categoría:** el total del año y, en gris, «961 por mes»; sin barras. Si tiene objetivo y algún mes te pasaste, «te pasaste 6 meses» en amarillo.
+  - **Afuera, a propósito:** la comparación con el año anterior, fijo/variable y las barras contra el objetivo. Se suman de a uno solo si se piden.
 - **Pestañas** (decididas en octubre 2026):
   - **Abajo:** Gastos · Ingresos · Proyecciones · Más (antes: Resumen · Movimientos · Lo que viene · Más). Lo que más se usa, a un toque.
   - **Movimientos:** ya no es pestaña. En Gastos e Ingresos, abajo de las categorías, «Últimos movimientos» (los 5 últimos del período) y «Ver todos ›», que abre la lista con «←», ya filtrada; la lupa de arriba la abre buscando.

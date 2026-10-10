@@ -90,6 +90,17 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
   // Los que todavía no tienen cotización cuentan como 0 hasta que haya conexión.
   const sinCotizar = movs.filter(m => m.usd == null).length;
 
+  // Para la vista Año: cuántos meses van y en cuántos te pasaste del objetivo de la categoría.
+  const mesesDelAnio = (a: string) => a < periodoHoy().slice(0, 4) ? 12 : a > periodoHoy().slice(0, 4) ? 1 : Number(periodoHoy().slice(5));
+  const delAnio = (catId: string) => {
+    const a = desde.slice(0, 4), meses = mesesDelAnio(a), cat = d.catPorId.get(catId);
+    let pasados = 0;
+    if (cat?.objetivo) for (let k = 1; k <= meses; k++) {
+      const p = `${a}-${String(k).padStart(2, "0")}`;
+      if (d.movimientos.filter(m => m.categoriaId === catId && m.fecha.slice(0, 7) === p).reduce((x, m) => x + usdDe(m), 0) > cat.objetivo) pasados++;
+    }
+    return { meses, pasados };
+  };
   const vacio = tipo === "gasto" ? "Sin gastos" : "Sin ingresos";
   const enEsto = { dia: "este día", semana: "esta semana", mes: "este mes", anio: "este año", periodo: "este período" }[vista];
 
@@ -251,6 +262,8 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
             {hayProy && <button className={`pill${verProy ? " on" : ""}`} style={{ marginTop: 8, width: "fit-content" }} onClick={() => setConProy(!conProy)}>Con proyecciones{verProy ? " ✓" : ""}</button>}
           </div>
         </div>
+      ) : vista === "anio" ? (
+        <Anio tipo={tipo} anio={desde.slice(0, 4)} total={total} abrirMes={p => { setVista("mes"); setAncla(`${p}-01`); }} />
       ) : (
         <div className="fila" style={{ padding: "4px 2px 10px" }}>
           <span className="tenue chico">{total ? `Total ${enEsto}` : `${vacio} ${enEsto}`}</span>
@@ -258,7 +271,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         </div>
       )}
       {sinCotizar > 0 && <div className="mini ambar centro" style={{ marginBottom: 6 }}>{sinCotizar} sin cotizar: se suman al tener conexión</div>}
-      {grafico === "dia" && vista !== "dia" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
+      {grafico === "dia" && vista !== "dia" && vista !== "anio" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
 
       {catsVer.length > 0 && <div className="grupo-t"><span>Por categoría</span>{total > 0 && <span className="num">{num(total, 0)}</span>}</div>}
       {catsVer.length > 0 && (
@@ -271,7 +284,9 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
             const pasado = obj != null && c.total + prev > obj;
             // Cerca del objetivo: pasó la marca del 80%.
             const ritmo = obj != null && c.total + prev >= obj * ALERTA && !pasado;
-            const ranking = obj == null && grafico === "dia";
+            const ranking = obj == null && grafico === "dia" && vista !== "anio";
+            // En el año (regla de la vista Año): por mes, o en cuántos meses te pasaste del objetivo.
+            const anio = vista === "anio" ? delAnio(c.cat.id) : null;
             const hayDebajo = prev >= 1 || (proy != null && proy.seguro + proy.opcional > 0);
             // Ingresos con un recurrente: lo que entró contra lo esperado (regla de Ingresos).
             const esp = esIng ? esperadoPorCat.get(c.cat.id) : undefined;
@@ -282,7 +297,8 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
                   <Punto cat={c.cat} chico />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <div>{c.cat.nombre}</div>
-                    {c.total > 0 && <div className="mini tenue">{Math.round(c.pct * 100)}% {enEsto === "este mes" ? "del mes" : ""}</div>}
+                    {anio ? <div className={`mini ${anio.pasados ? "ambar" : "tenue"}`}>{anio.pasados ? `te pasaste ${anio.pasados} ${anio.pasados === 1 ? "mes" : "meses"}` : `${num(c.total / anio.meses, 0)} por mes`}</div>
+                      : c.total > 0 && <div className="mini tenue">{Math.round(c.pct * 100)}% {enEsto === "este mes" ? "del mes" : ""}</div>}
                   </span>
                   <span className="num derecha">
                     <div><span className={pasado ? "mal" : ritmo ? "ambar" : ""}>{num(c.total)}</span>{obj != null && <span className="tenue chico"> / {num(obj)}</span>}{esp != null && <span className="tenue chico"> / {num(esp, 0)}</span>}</div>
@@ -360,6 +376,60 @@ function FilaMovimiento({ m, sinCategoria }: { m: Movimiento; sinCategoria?: boo
         </div>
       </span>
     </button>
+  );
+}
+
+/** La vista Año (regla de la vista Año): el total grande con lo que va por mes en
+ *  promedio, y dos líneas, gastos y lo que entró, mes a mes. Se toca un mes y abajo
+ *  aparece su detalle; desde ahí se abre ese mes. */
+function Anio({ tipo, anio, total, abrirMes }: { tipo: Tipo; anio: string; total: number; abrirMes: (p: string) => void }) {
+  const d = useDatos();
+  const hoyP = periodoHoy();
+  const meses = Array.from({ length: 12 }, (_, k) => `${anio}-${String(k + 1).padStart(2, "0")}`);
+  const sumaDe = (p: string, t: Tipo) => d.movimientos.filter(m => m.tipo === t && m.fecha.slice(0, 7) === p).reduce((s, m) => s + usdDe(m), 0);
+  const gastos = meses.map(p => (p <= hoyP ? sumaDe(p, "gasto") : null));
+  const entro = meses.map(p => (p <= hoyP ? sumaDe(p, "ingreso") : null));
+  const pasados = meses.filter(p => p <= hoyP).length || 1;
+  const [sel, setSel] = useState(() => { const i = meses.indexOf(hoyP); if (i >= 0) return i; let k = 11; while (k > 0 && !gastos[k]) k--; return k; });
+  const W = 320, H = 130, pad = 10;
+  const tope = Math.max(1, ...gastos.map(v => v ?? 0), ...entro.map(v => v ?? 0)) * 1.1;
+  const x = (i: number) => pad + i * (W - 2 * pad) / 11, y = (v: number) => H - 14 - v / tope * (H - 30);
+  const camino = (arr: (number | null)[]) => arr.map((v, i) => v == null ? "" : `${i && arr[i - 1] != null ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const paso = tope > 6000 ? 2000 : tope > 3000 ? 1000 : tope > 1200 ? 500 : 200;
+  const guias = [1, 2].map(k => k * Math.ceil(tope / 3 / paso) * paso).filter(v => v < tope);
+  const VIOL = "#A78BFA", VERDE = "#5DD39E";
+  const g = gastos[sel] ?? 0, e = entro[sel] ?? 0, q = e - g;
+  return (
+    <>
+      <div style={{ margin: "8px 2px 14px" }}>
+        <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(total, 0)} <span className="chico tenue">USD</span></div>
+        <div className="mini tenue" style={{ marginTop: 4 }}>{num(total / pasados, 0)} por mes en promedio</div>
+      </div>
+      <div className="caja">
+        <div style={{ display: "flex", gap: 14, fontSize: 13, color: "var(--tenue)", marginBottom: 4 }}>
+          <span><i style={{ display: "inline-block", width: 12, height: 2, background: VIOL, verticalAlign: 3, marginRight: 5 }} />gastos</span>
+          <span><i style={{ display: "inline-block", width: 12, height: 2, background: VERDE, verticalAlign: 3, marginRight: 5 }} />entró</span>
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible" }} role="img" aria-label={`${tipo === "gasto" ? "Gastos" : "Ingresos"} e ingresos de ${anio}, mes a mes`}>
+          {guias.map(v => <g key={v}><line x1={pad} x2={W - pad} y1={y(v)} y2={y(v)} stroke="#1F1F2A" /><text x={W - pad} y={y(v) - 3} textAnchor="end" fontSize="10" fill="#8E8BA3">{num(v, 0)}</text></g>)}
+          <line x1={x(sel)} x2={x(sel)} y1={8} y2={H - 14} stroke="#2F2F3C" strokeDasharray="3 3" />
+          <path d={camino(entro)} fill="none" stroke={VERDE} strokeWidth={2} strokeLinejoin="round" />
+          <path d={camino(gastos)} fill="none" stroke={VIOL} strokeWidth={2} strokeLinejoin="round" />
+          {[[entro, VERDE], [gastos, VIOL]].map(([arr, col]) => (arr as (number | null)[]).map((v, i) => v == null ? null :
+            <circle key={`${col}${i}`} cx={x(i)} cy={y(v)} r={i === sel ? 4.5 : 2.5} fill={i === sel ? col as string : "#07070B"} stroke={col as string} strokeWidth={1.6} />))}
+          {meses.map((p, i) => (
+            <g key={p}>
+              <text x={x(i)} y={H} textAnchor="middle" fontSize="10" fill={i === sel ? "#EDEBF5" : "#8E8BA3"}>{mesCorto(p)}</text>
+              {gastos[i] != null && <rect x={x(i) - 13} y={0} width={26} height={H} fill="transparent" style={{ cursor: "pointer" }} onClick={() => setSel(i)} />}
+            </g>
+          ))}
+        </svg>
+        <button style={{ width: "100%", textAlign: "left", marginTop: 10, paddingTop: 10, borderTop: "1px solid #1A1A24", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }} onClick={() => abrirMes(meses[sel])}>
+          <span><span style={{ fontWeight: 500 }}>{nombreMes(meses[sel], false)}</span> <span className="mini tenue">· gastaste {num(g, 0)} · entró {num(e, 0)}</span></span>
+          <span className={`num mini ${q >= 0 ? "ok" : "mal"}`} style={{ whiteSpace: "nowrap" }}>{q >= 0 ? "+" : "−"}{num(Math.abs(q), 0)} ›</span>
+        </button>
+      </div>
+    </>
   );
 }
 
