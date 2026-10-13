@@ -178,16 +178,18 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         <div className="dos" style={{ marginTop: 16 }}>
           <div className="caja">
             <span className="etiq e-fijo">Fijos</span>
-            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.fijos.total)}</div>
-            <Barra valor={b.fijos.total ? b.fijos.pagado / b.fijos.total : 0} color="#60A5FA" />
+            {/* Lo pagado grande, de lo que es el mes; lo que falta, rayado (regla de Fijos y Variables:
+                los dos números grandes suman lo gastado en el mes). */}
+            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.fijos.pagado)}{b.fijos.falta > 0 && <span className="tenue chico"> / {num(b.fijos.total)}</span>}</div>
+            <Barra valor={b.fijos.total ? b.fijos.pagado / b.fijos.total : 0} previsto={b.fijos.total ? b.fijos.falta / b.fijos.total : 0} color="#60A5FA" colorPrevisto="#60A5FA" />
             <div className="mini tenue">{b.fijos.falta > 0 ? `faltan ${num(b.fijos.falta)}` : "todo pagado"}</div>
           </div>
           <div className="caja">
             <span className="etiq e-variable">Variables</span>
-            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.variables.gastado)}{b.variables.objetivo > 0 && <span className="tenue chico"> / {num(b.variables.objetivo)}</span>}</div>
+            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.variables.todo)}</div>
             {b.variables.objetivo > 0 && <Barra valor={b.variables.gastado / b.variables.objetivo} color={b.variables.queda < 0 ? "var(--mal)" : b.variables.gastado >= b.variables.objetivo * ALERTA ? "var(--ambar)" : "var(--viol)"} marca={ALERTA} />}
             <div className="mini tenue">
-              {b.variables.porDia != null ? <><span className="viol">{num(b.variables.porDia)} USD</span> por día</> : b.variables.objetivo > 0 ? (b.variables.queda >= 0 ? `sobraron ${num(b.variables.queda)}` : `te pasaste ${num(-b.variables.queda)}`) : "sin objetivos"}
+              {b.variables.objetivo > 0 ? `${num(b.variables.gastado, 0)} / ${num(b.variables.objetivo)} con objetivo` : "sin objetivos"}
             </div>
           </div>
         </div>

@@ -39,7 +39,8 @@ export function claseProvisoria(cats: Categoria[], movs: Movimiento[]) {
 
 export interface Bloques {
   fijos: { total: number; pagado: number; falta: number };
-  variables: { gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };
+  /** `todo`: todo lo variable gastado (con y sin objetivo); `gastado`: solo lo de las categorías con objetivo. */
+  variables: { todo: number; gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };
 }
 
 /** Los dos bloques del resumen del mes. Fijos: lo gastado en categorías fijas más
@@ -69,7 +70,7 @@ export function bloques(periodo: string, gastos: Movimiento[], cats: Categoria[]
   const dias = periodo === ph ? diasDelMes(periodo) - Number(hoy().slice(8)) + 1 : 0;
   return {
     fijos: { total: redondear(fijosPagado + faltaFijos), pagado: fijosPagado, falta: faltaFijos },
-    variables: { gastado: gastadoVar, objetivo, queda, dias, porDia: dias && objetivo ? redondear(Math.max(0, queda) / dias) : null },
+    variables: { todo: suma(variables), gastado: gastadoVar, objetivo, queda, dias, porDia: dias && objetivo ? redondear(Math.max(0, queda) / dias) : null },
   };
 }
 

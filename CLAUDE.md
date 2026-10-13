@@ -40,7 +40,7 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
 - **Resumen y pantallas de números** (decididas en octubre 2026; valen también para Cómo venís, Proyecciones y la tarjeta):
   - **Período:** dos filas: vistas (Día · Semana · Mes · Año · Período, siempre a la vista, nunca en un desplegable) y «‹ Octubre 2026 ›». Gastos, Ingresos y Proyecciones ya no son solapas de arriba: son pestañas de abajo. Se probó el desplegable «Mes ▾» y se volvió a la fila (octubre 2026): el mes tiene que estar a un toque.
   - **Al abrir:** Resumen arranca en Mes (antes en Semana). La vista Día queda como estaba.
-  - **Números de arriba:** como estaban, las cajas Fijos y Variables con su barra y «te quedan X para N días».
+  - **Números de arriba:** las cajas Fijos y Variables con su barra y «te quedan X para N días». Los dos números grandes suman lo gastado en el mes (el total de la torta): Fijos muestra lo pagado («1.013 / 2.348», lo que falta rayado en la barra y «faltan 1.335»); Variables, todo lo variable («1.770»), con la barra y «669 / 1.000 con objetivo» abajo. Antes no sumaban (Fijos incluía lo que falta y Variables solo lo que tiene objetivo) y confundía.
   - **Gráfico del mes:** la torta chica (120 px) con el total grande al lado (30 px), y debajo del total lo previsto y lo proyectado. Nunca una torta grande centrada.
   - **Lista por categoría:** como estaba, con el porcentaje.
   - **Aire entre bloques** (octubre 2026; distinto del espacio entre filas, que no se cambia): 12 px entre el mes y la caja de líneas, 16 antes de Fijos y Variables, 10 antes de «Te quedan…», 24 antes de la torta y 28 antes de «Por categoría».

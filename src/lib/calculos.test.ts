@@ -98,3 +98,16 @@ it("resumen: las devoluciones entran como ingreso de la tarjeta y no se duplican
   const c = conciliar(consumos, visa, [yaCargada], {}, "2026-09-01", "2026-09-30");
   expect(c.filas.map(f => f.tipo)).toEqual(["credito", "coincide"]);
 });
+
+it("Fijos pagado y todo lo variable suman lo gastado en el mes", () => {
+  const cats = [
+    { id: "casa", nombre: "Casa", tipo: "gasto", icono: "", color: "", orden: 0, clase: "fijo", claseConfirmada: true },
+    { id: "ocio", nombre: "Ocio", tipo: "gasto", icono: "", color: "", orden: 1, clase: "variable", claseConfirmada: true, objetivo: 400 },
+    { id: "culpa", nombre: "Sin culpa", tipo: "gasto", icono: "", color: "", orden: 2, clase: "variable", claseConfirmada: true },
+  ] as Categoria[];
+  const g = (id: string, categoriaId: string, usd: number) => ({ id, tipo: "gasto", fecha: "2026-10-05", monto: usd, moneda: "USD", usd, cuentaId: "c", categoriaId, etiquetas: [], creado: "", modificado: "" }) as Movimiento;
+  const gastos = [g("1", "casa", 1000), g("2", "ocio", 300), g("3", "culpa", 200)];
+  const b = bloques("2026-10", gastos, cats, [], [], () => 1);
+  expect(b.fijos.pagado + b.variables.todo).toBe(1500);
+  expect(b.variables.gastado).toBe(300);
+});
