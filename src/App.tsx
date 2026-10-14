@@ -13,7 +13,7 @@ import { DetalleCategoria, PantallaProyecciones, Resumen } from "./pantallas/Res
 import { Movimientos } from "./pantallas/Movimientos";
 import { LoQueViene } from "./pantallas/LoQueViene";
 import { Mas } from "./pantallas/Mas";
-import { PantallaPlan } from "./pantallas/Plan";
+import { EditorPlan, PantallaPlan } from "./pantallas/Plan";
 import { Editor } from "./pantallas/Editor";
 import { EditorCategoria, ListaCategorias } from "./pantallas/Categorias";
 import { EditorCuenta, ListaCuentas, Tarjeta } from "./pantallas/Cuentas";
@@ -50,6 +50,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "movimientos": return <Movimientos tipo={p.tipo} buscar={p.buscar} />;
     case "viene": return <LoQueViene periodo={p.periodo} />;
     case "plan": return <PantallaPlan periodo={p.periodo} />;
+    case "plan-config": return <EditorPlan />;
     case "detalle-categoria": return <DetalleCategoria {...p} />;
     case "clases": return <Clases />;
     case "proyeccion": return <EditorProyeccion {...p} />;

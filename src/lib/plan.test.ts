@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Categoria, Movimiento, Recurrente } from "../tipos";
-import { planDelMes } from "./plan";
+import { PLAN, planDelMes, repartoValido } from "./plan";
 import { claseDe } from "./analisis";
 
 const cat = (id: string, nombre: string, tipo: "gasto" | "ingreso", clase?: "fijo" | "variable") => ({ id, nombre, tipo, icono: "", color: "", orden: 0, clase }) as Categoria;
@@ -38,4 +38,10 @@ it("el pago de un recurrente toma la clase del recurrente", () => {
   const rec = { id: "luz", clase: "variable" } as Recurrente;
   const p = planDelMes("2026-10", [mov("gasto", "casa", 70, { recurrenteId: "luz" })], cats, [rec], undefined, claseDe);
   expect([p.vivir.fijos, p.vivir.variables]).toEqual([0, 70]);
+});
+
+it("el reparto vale solo si las partes suman 100, y las de Vivir también", () => {
+  expect(repartoValido(PLAN)).toBe(true);
+  expect(repartoValido({ ...PLAN, liquidez: 10 })).toBe(false);
+  expect(repartoValido({ ...PLAN, vivirPartes: { ...PLAN.vivirPartes, fijos: 45 } })).toBe(false);
 });

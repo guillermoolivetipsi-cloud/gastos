@@ -28,6 +28,7 @@ export type Pantalla =
   | { p: "movimientos"; tipo?: Tipo; buscar?: boolean }
   | { p: "viene"; periodo?: string }
   | { p: "plan"; periodo?: string }
+  | { p: "plan-config" }
   | { p: "detalle-categoria"; id: string; desde: string; hasta: string; vista: Vista }
   | { p: "clases" }
   | { p: "proyeccion"; id?: string; periodo?: string }

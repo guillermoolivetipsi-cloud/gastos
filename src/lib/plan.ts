@@ -1,15 +1,25 @@
 import type { Categoria, Clase, Movimiento, Recurrente } from "../tipos";
 import { usdDe } from "./analisis";
+import { leerAjuste } from "../db";
 
 /* El Plan: cómo se reparte lo que entra. Lo decidió Guillermo (octubre 2026):
    Vivir 40% (fijos 50 · variables 40 · libre de culpa 5 · eventuales 5 de Vivir),
    Liquidez 15%, Inversión 40% y Deuda 5%. Vivir sale de los gastos de la app; liquidez,
    inversión y deuda los manda Finanzas por el buzón (CONTRATO-FINANZAS-A-GASTOS.md). */
 
-export const PLAN = {
+export interface Reparto {
+  vivir: number; liquidez: number; inversion: number; deuda: number;
+  vivirPartes: { fijos: number; variables: number; sinCulpa: number; eventuales: number };
+}
+/** El reparto de arranque; se cambia en Más → Ordenar → Plan (ajuste «plan»). */
+export const PLAN: Reparto = {
   vivir: 40, liquidez: 15, inversion: 40, deuda: 5,
   vivirPartes: { fijos: 50, variables: 40, sinCulpa: 5, eventuales: 5 },
-} as const;
+};
+export const leerReparto = () => leerAjuste<Reparto>("plan", PLAN);
+/** Las cuatro partes suman 100, y las cuatro de Vivir también. */
+export const repartoValido = (r: Reparto) =>
+  r.vivir + r.liquidez + r.inversion + r.deuda === 100 && Object.values(r.vivirPartes).reduce((a, b) => a + b, 0) === 100;
 
 /** Lo que manda Finanzas por mes, en USD. `liquidez` solo cuando haya una cuenta aparte
  *  para eso; mientras tanto la liquidez es lo que quedó. */

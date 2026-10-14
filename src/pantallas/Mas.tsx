@@ -4,6 +4,7 @@ import { useDatos, usePendientes } from "../datos";
 import { leerAjuste } from "../db";
 import { diasEntre, fechaCorta, hoy, nombreMes } from "../lib/fecha";
 import type { Tarea } from "../lib/recordatorios";
+import { useReparto } from "./Plan";
 import { useNav, type Pantalla } from "../nav";
 import { T } from "../ui/Icono";
 import { esApp } from "../lib/guardar";
@@ -27,6 +28,7 @@ function useEstados() {
   const respaldo = useLiveQuery(() => leerAjuste<string | null>("ultimoRespaldo", null), []);
   const exportado = useLiveQuery(() => leerAjuste<string | null>("ultimaExportacion", null), []);
   const avisos = useLiveQuery(() => leerAjuste<boolean>("notificaciones", false), []);
+  const reparto = useReparto();
   if (!d.listo) return null;
   const etiquetas = new Set(d.movimientos.flatMap(m => m.etiquetas)).size;
   const conObjetivo = d.categorias.filter(c => c.tipo === "gasto" && !c.archivada && c.objetivo).length;
@@ -46,6 +48,7 @@ function useEstados() {
     respaldo: diasCopia == null ? <span className="ambar">todavía no hiciste ninguna</span>
       : <span className={diasCopia > 30 ? "ambar" : ""}>última copia: {diasCopia === 0 ? "hoy" : diasCopia === 1 ? "ayer" : `hace ${diasCopia} días`}</span>,
     ajustes: avisos ? "avisos activados" : "avisos apagados",
+    plan: `Vivir ${reparto.vivir} · Liquidez ${reparto.liquidez} · Inversión ${reparto.inversion} · Deuda ${reparto.deuda}`,
   };
 }
 
@@ -70,6 +73,7 @@ function Menu({ arriba, abajo, pie = "Gastos · prueba en el navegador" }: { arr
       <div className="grupo-t"><span>Ordenar</span></div>
       <div className="caja lista">
         {item({ p: "categorias" }, <T.IconCategory size={20} />, "Categorías y objetivos", e?.categorias)}
+        {item({ p: "plan-config" }, <T.IconTarget size={20} />, "Plan", e?.plan)}
         {item({ p: "etiquetas" }, <T.IconTag size={20} />, "Etiquetas", e?.etiquetas)}
         {item({ p: "recurrentes" }, <T.IconRepeat size={20} />, "Recurrentes", e?.recurrentes)}
         {item({ p: "cuentas" }, <T.IconBuildingBank size={20} />, "Cuentas y tarjetas", e?.cuentas)}
