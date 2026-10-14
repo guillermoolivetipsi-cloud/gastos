@@ -93,6 +93,9 @@ it("lo que manda Finanzas no se vuelve a mandar", () => {
 
 it("si no cumple el contrato, no se aplica nada", () => {
   expect(validarDesdeFinanzas({ ...desde, contrato: "2.0" })).toBeNull();
+  // Sin liquidez (todavía no hay cuenta aparte), con etapa y proyección: vale.
+  expect(validarDesdeFinanzas({ ...desde, destinos: [{ periodo: "2026-10", inversion: 2000, deuda: 83 }], etapa: { nombre: "Llenar liquidez", texto: "2,1 de 3 meses" }, estimados: [{ periodo: "2026-10", usd: 3300 }] })).not.toBeNull();
+  expect(validarDesdeFinanzas({ ...desde, estimados: [{ periodo: "oct", usd: 3300 }] })).toBeNull();
   expect(validarDesdeFinanzas({ ...desde, ingresos: [{ ...desde.ingresos[0], monto: -5 }] })).toBeNull();
   expect(validarDesdeFinanzas({ ...desde, ingresos: [desde.ingresos[0], desde.ingresos[0]] })).toBeNull();
   // Un ingreso de un mes que no viene en «meses» rompería el reemplazo por mes.

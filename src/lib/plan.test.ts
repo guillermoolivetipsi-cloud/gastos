@@ -21,10 +21,16 @@ it("reparte los gastos de Vivir en fijos, variables, libre de culpa y eventuales
   expect([p.liquidez, p.inversion, p.deuda, p.repartido]).toEqual([null, null, 120, null]);
 });
 
+it("sin cuenta de liquidez aparte, la liquidez es lo que quedó", () => {
+  const movs = [mov("ingreso", "alq", 1000), mov("gasto", "ocio", 400)];
+  const p = planDelMes("2026-10", movs, cats, [], { inversion: 400, deuda: 50 }, claseDe);
+  expect([p.liquidez, p.liquidezCalculada, p.quedo]).toEqual([150, true, null]);
+});
+
 it("con lo de Finanzas: liquidez, inversión y deuda de allá, y cuánto se repartió", () => {
   const movs = [mov("ingreso", "alq", 1000), mov("gasto", "ocio", 400), mov("gasto", "deuda", 30)];
   const p = planDelMes("2026-10", movs, cats, [], { liquidez: 150, inversion: 400, deuda: 50 }, claseDe);
-  expect([p.liquidez, p.inversion, p.deuda]).toEqual([150, 400, 50]);
+  expect([p.liquidez, p.inversion, p.deuda, p.liquidezCalculada, p.quedo]).toEqual([150, 400, 50, false, 0]);
   expect(p.repartido).toBeCloseTo(1);
 });
 

@@ -11,15 +11,20 @@ export const PLAN = {
   vivirPartes: { fijos: 50, variables: 40, sinCulpa: 5, eventuales: 5 },
 } as const;
 
-/** Lo que manda Finanzas por mes, en USD. */
-export interface Destinos { liquidez: number; inversion: number; deuda: number }
+/** Lo que manda Finanzas por mes, en USD. `liquidez` solo cuando haya una cuenta aparte
+ *  para eso; mientras tanto la liquidez es lo que quedó. */
+export interface Destinos { liquidez?: number; inversion: number; deuda: number }
 
 export interface PlanDelMes {
   periodo: string;
   entro: number;
   vivir: { real: number; fijos: number; variables: number; sinCulpa: number; eventuales: number };
-  /** null: Finanzas todavía no mandó ese mes. */
+  /** null: Finanzas todavía no mandó ese mes. Si Finanzas no manda liquidez, es lo que
+   *  quedó: lo que entró − Vivir − Inversión − Deuda (`liquidezCalculada`). */
   liquidez: number | null;
+  liquidezCalculada: boolean;
+  /** Con una cuenta de liquidez aparte: lo que quedó suelto en las cuentas. */
+  quedo: number | null;
   inversion: number | null;
   /** Lo que manda Finanzas; si no mandó, lo de la categoría «Deuda» de la app. */
   deuda: number;
@@ -48,6 +53,10 @@ export function planDelMes(periodo: string, movs: Movimiento[], cats: Categoria[
     else vivir.variables += u;
   }
   const deuda = destinos ? destinos.deuda : deudaApp;
-  const repartido = destinos && entro > 0 ? (vivir.real + destinos.liquidez + destinos.inversion + destinos.deuda) / entro : null;
-  return { periodo, entro, vivir, liquidez: destinos?.liquidez ?? null, inversion: destinos?.inversion ?? null, deuda, repartido };
+  const sobra = destinos ? entro - vivir.real - destinos.inversion - destinos.deuda : null;
+  const explicita = destinos?.liquidez != null;
+  const liquidez = !destinos ? null : explicita ? destinos.liquidez! : sobra;
+  const quedo = explicita ? sobra! - destinos!.liquidez! : null;
+  const repartido = explicita && entro > 0 ? (vivir.real + destinos!.liquidez! + destinos!.inversion + destinos!.deuda) / entro : null;
+  return { periodo, entro, vivir, liquidez, liquidezCalculada: !!destinos && !explicita, quedo, inversion: destinos?.inversion ?? null, deuda, repartido };
 }

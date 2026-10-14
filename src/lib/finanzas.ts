@@ -196,9 +196,15 @@ export async function marcarVisto(nombre: string) {
    vienen completos: el último manda) y borra los que leyó. */
 
 export interface IngresoDeFinanzas { id: string; fecha: string; monto: number; moneda: Moneda; usd: number; categoria: string; cuenta?: string; comentario?: string }
+export interface Etapa { nombre: string; texto: string; meses?: number; objetivo?: number }
+export interface Estimado { periodo: string; usd: number; texto?: string }
 export interface DesdeFinanzas {
   app: "finanzas"; contrato: string; generado: string; meses: string[];
   ingresos: IngresoDeFinanzas[]; destinos: (Destinos & { periodo: string })[];
+  /** La etapa de la cascada de Finanzas hoy. */
+  etapa?: Etapa;
+  /** La proyección de la clínica para el mes en curso. */
+  estimados?: Estimado[];
 }
 
 const esMes = (x: unknown) => typeof x === "string" && /^\d{4}-\d{2}$/.test(x);
@@ -211,8 +217,10 @@ export function validarDesdeFinanzas(x: unknown): DesdeFinanzas | null {
   if (!Array.isArray(d.ingresos) || !Array.isArray(d.destinos)) return null;
   const okIngreso = (i: IngresoDeFinanzas) => typeof i?.id === "string" && !!i.id && /^\d{4}-\d{2}-\d{2}$/.test(i.fecha ?? "")
     && esNum(i.monto) && i.monto > 0 && ["ARS", "USD", "EUR"].includes(i.moneda) && esNum(i.usd) && typeof i.categoria === "string" && d.meses.includes(i.fecha.slice(0, 7));
-  const okDestino = (x: Destinos & { periodo: string }) => esMes(x?.periodo) && esNum(x.liquidez) && esNum(x.inversion) && esNum(x.deuda);
+  const okDestino = (x: Destinos & { periodo: string }) => esMes(x?.periodo) && (x.liquidez == null || esNum(x.liquidez)) && esNum(x.inversion) && esNum(x.deuda);
   if (!d.ingresos.every(okIngreso) || !d.destinos.every(okDestino)) return null;
+  if (d.etapa != null && (typeof d.etapa.nombre !== "string" || typeof d.etapa.texto !== "string")) return null;
+  if (d.estimados != null && (!Array.isArray(d.estimados) || !d.estimados.every(e => esMes(e?.periodo) && esNum(e.usd)))) return null;
   if (new Set(d.ingresos.map(i => i.id)).size !== d.ingresos.length) return null;
   return d;
 }
@@ -241,7 +249,7 @@ export function armarDesdeFinanzas(d: DesdeFinanzas, cats: Categoria[], cuentas:
     exportado: d.generado, creado: d.generado, modificado: d.generado,
   }));
   const destinos: Record<string, Destinos> = {};
-  for (const x of d.destinos) destinos[x.periodo] = { liquidez: x.liquidez, inversion: x.inversion, deuda: x.deuda };
+  for (const x of d.destinos) destinos[x.periodo] = { ...(x.liquidez != null ? { liquidez: x.liquidez } : {}), inversion: x.inversion, deuda: x.deuda };
   return { movs, catsNuevas, cuentasNuevas, destinos };
 }
 
@@ -259,6 +267,8 @@ export async function aplicarDesdeFinanzas(d: DesdeFinanzas) {
     for (const p of d.meses) delete antes[p];
     await guardarAjuste("destinosFinanzas", { ...antes, ...destinos });
     await guardarAjuste("ultimoDeFinanzas", { generado: d.generado, ingresos: movs.length, meses: d.meses });
+    await guardarAjuste("etapaFinanzas", d.etapa ?? null);
+    await guardarAjuste("estimadosFinanzas", d.estimados ?? []);
   });
   return movs.length;
 }

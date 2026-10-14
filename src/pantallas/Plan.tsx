@@ -69,7 +69,7 @@ export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
   const planes = usePlanes(seis);
   if (!planes) return <div className="pantalla sin-tabs" />;
   const p = planes[planes.length - 1];
-  const faltaFinanzas = p.liquidez == null;
+  const faltaFinanzas = p.inversion == null;
   const elegida = PARTES.find(x => x.clave === parte)!;
 
   return (
@@ -84,7 +84,9 @@ export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
       <div style={{ margin: "12px 2px 6px" }}>
         <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(p.entro, 0)} <span className="chico tenue">USD entraron</span></div>
         <div className="mini tenue" style={{ marginTop: 4 }}>
-          {faltaFinanzas ? "liquidez, inversión y deuda llegan de Finanzas"
+          {faltaFinanzas ? "inversión y deuda llegan de Finanzas"
+            : p.entro <= 0 ? "sin ingresos este mes"
+            : p.liquidezCalculada ? "la liquidez es lo que te quedó"
             : p.repartido == null ? "sin ingresos este mes"
             : p.repartido > 1.005 ? <>repartiste el <span className="ambar">{Math.round(p.repartido * 100)}%</span>: salió {num(p.entro * (p.repartido - 1), 0)} más de lo que entró</>
             : <>repartiste el {Math.round(p.repartido * 100)}%{p.repartido < 0.995 ? ` · quedan ${num(p.entro * (1 - p.repartido), 0)} sin repartir` : ""}</>}
@@ -98,7 +100,7 @@ export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
           return (
             <div key={x.clave} style={{ padding: "10px 0", borderTop: x.clave === "vivir" ? undefined : "1px solid #1A1A24" }}>
               <div className="fila" style={{ padding: 0 }}>
-                <span><div>{x.nombre}</div><div className="mini tenue">plan {PLAN[x.clave]}% · {num(meta, 0)}</div></span>
+                <span><div>{x.nombre}</div><div className="mini tenue">plan {PLAN[x.clave]}% · {num(meta, 0)}{x.clave === "liquidez" && p.liquidezCalculada ? " · lo que quedó" : ""}</div></span>
                 <span className="derecha">
                   {r == null ? <div className="tenue">—</div> : <>
                     <div className={`num ${pasa ? "mal" : ""}`}>{pct(r, p.entro)}%</div>
@@ -156,7 +158,7 @@ export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
           </tbody>
         </table>
         <div className="mini tenue" style={{ marginTop: 8 }}>
-          «Debería» es el {PLAN[parte]}% de lo que entró ese mes. {elegida.gasto ? "Rojo: te pasaste." : "Amarillo: pusiste menos de lo planeado."} Verde: a menos del 10% del plan.{!elegida.gasto && " «—»: Finanzas todavía no lo mandó."}
+          «Debería» es el {PLAN[parte]}% de lo que entró ese mes. {elegida.gasto ? "Rojo: te pasaste." : "Amarillo: pusiste menos de lo planeado."} Verde: a menos del 10% del plan.{!elegida.gasto && " «—»: Finanzas todavía no lo mandó."}{parte === "liquidez" && " Mientras no haya cuenta aparte, la liquidez es lo que quedó."}
         </div>
       </div>
     </div>
