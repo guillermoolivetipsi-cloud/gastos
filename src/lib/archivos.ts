@@ -33,7 +33,8 @@ export async function editadosDespues() {
 
 export async function exportar(meses: string[]) {
   const [movs, cats, cuentas] = await Promise.all([
-    db.movimientos.filter(m => meses.includes(periodoDe(m.fecha))).toArray(),
+    // Lo que llegó de Finanzas no vuelve a Finanzas (una fuente por hecho).
+    db.movimientos.filter(m => meses.includes(periodoDe(m.fecha)) && m.origen !== "finanzas").toArray(),
     db.categorias.toArray(),
     db.cuentas.toArray(),
   ]);

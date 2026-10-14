@@ -70,6 +70,10 @@ export interface Movimiento {
   recurrenteId?: string;
   periodo?: string;
   exportado?: string;
+  /** Llegó de Finanzas por el buzón (cobros de Psicología): no se edita acá ni se vuelve a mandar. */
+  origen?: "finanzas";
+  /** Un gasto eventual: se cargó desde una proyección (cuenta como «eventuales» en el Plan). */
+  eventual?: boolean;
   creado: string;
   modificado: string;
 }

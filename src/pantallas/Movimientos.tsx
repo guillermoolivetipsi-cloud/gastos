@@ -112,7 +112,8 @@ export function Movimientos({ tipo: tipoInicial, buscar }: { tipo?: "gasto" | "i
               const nombreCat = c?.nombre ?? "Sin categoría";
               const queFue = m.comentario || m.etiquetas.join(", ");
               return (
-                <Deslizable key={m.id} tocar={() => nav.abrir({ p: "editor", id: m.id })} borrar={async () => {
+                <Deslizable key={m.id} tocar={() => m.origen === "finanzas" ? toast({ texto: "Viene de Finanzas: se corrige allá" }) : nav.abrir({ p: "editor", id: m.id })} borrar={async () => {
+                  if (m.origen === "finanzas") { toast({ texto: "Viene de Finanzas: se borra allá" }); return; }
                   const deshacer = await eliminarMovimiento(m.id);
                   toast({ texto: m.tipo === "gasto" ? "Gasto eliminado" : "Ingreso eliminado", deshacer });
                 }}>
@@ -122,7 +123,7 @@ export function Movimientos({ tipo: tipoInicial, buscar }: { tipo?: "gasto" | "i
                       <span style={{ minWidth: 0 }}>
                         <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || nombreCat}</div>
                         <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {queFue ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}
+                          {queFue ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}{m.origen === "finanzas" ? " · de Finanzas" : ""}
                         </div>
                       </span>
                     </span>

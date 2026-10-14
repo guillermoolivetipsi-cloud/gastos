@@ -166,6 +166,8 @@ export function Editor(props: Props) {
         comentario: comentario.trim() || undefined,
         cuotas: esTarjeta && cuotas > 1 ? cuotas : undefined,
         recurrenteId: v?.recurrenteId, periodo: v?.periodo,
+        // Si sale de una proyección, es un gasto eventual (cuenta así en el Plan).
+        ...(props.proyeccionId ? { eventual: true } : {}),
       }, cuenta);
       // Venía de una proyección que pasó: ya es un gasto real.
       if (props.proyeccionId) await db.proyecciones.delete(props.proyeccionId);

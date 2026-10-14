@@ -9,9 +9,10 @@ import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
 import { BotonMandar } from "./Finanzas";
 import { DIAS_CORTOS, aFecha, fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
 import { num } from "../lib/formato";
-import { Barra, BotonAgregar, Dia, Dona, Hoja, Puntito, Punto } from "../ui/piezas";
+import { Barra, BotonAgregar, Dia, Dona, Hoja, Puntito, Punto, useToast } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
 import { useInsights } from "./ComoVenis";
+import { LineaPlan } from "./Plan";
 import { T } from "../ui/Icono";
 
 /** La marca de las barras con objetivo: avisa que ya vas por el 80%. */
@@ -158,6 +159,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         <div className="caja lineas-arriba" style={{ padding: "4px 12px", margin: "12px 0 0" }}>
           {esMes && <TarjetaComoVenis periodo={periodo} />}
           <LineaLoQueViene />
+          <LineaPlan periodo={esMes ? periodo : periodoHoy()} />
         </div>
       )}
       {esIng && (
@@ -360,19 +362,20 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
 function FilaMovimiento({ m, sinCategoria }: { m: Movimiento; sinCategoria?: boolean }) {
   const d = useDatos();
   const nav = useNav();
+  const toast = useToast();
   const cat = d.catPorId.get(m.categoriaId);
   const cuenta = d.cuentaPorId.get(m.cuentaId);
   const r = m.recurrenteId ? d.recurrentes.find(x => x.id === m.recurrenteId) : undefined;
   const queFue = m.comentario || m.etiquetas.join(", ");
   const nombreCat = cat?.nombre ?? "Sin categoría";
   return (
-    <button className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: m.id })}>
+    <button className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => m.origen === "finanzas" ? toast({ texto: "Viene de Finanzas: se corrige allá" }) : nav.abrir({ p: "editor", id: m.id })}>
       <span className="izq">
         <Punto cat={cat} chico />
         <span style={{ minWidth: 0 }}>
           <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || nombreCat}</div>
           <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {queFue && !sinCategoria ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}
+            {queFue && !sinCategoria ? `${nombreCat} · ` : ""}{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}{m.origen === "finanzas" ? " · de Finanzas" : ""}
           </div>
         </span>
       </span>
@@ -509,7 +512,6 @@ export function DetalleCategoria({ id, desde, hasta, vista }: { id: string; desd
   const promedio = previos.length ? previos.reduce((a, b) => a + b, 0) / previos.length : null;
   const porDia: [string, typeof lista][] = [];
   for (const m of lista) { const u = porDia[porDia.length - 1]; if (u && u[0] === m.fecha) u[1].push(m); else porDia.push([m.fecha, [m]]); }
-  const rec = new Map(d.recurrentes.map(r => [r.id, r]));
   const max = Math.max(1, ...seis.map(x => x.v + (x.p === periodo ? previsto : 0)), obj ?? 0), H = 70;
 
   return (
@@ -580,28 +582,7 @@ export function DetalleCategoria({ id, desde, hasta, vista }: { id: string; desd
         <div key={fecha}>
           <div className="grupo-t"><span>{Number(fecha.slice(8))} {mesCorto(fecha.slice(0, 7))} · {DIAS_CORTOS[aFecha(fecha).getDay()]}</span><span className="num">{esGasto ? "−" : "+"}{num(ms.reduce((s, m) => s + usdDe(m), 0))}</span></div>
           <div className="caja lista">
-            {ms.map(m => {
-              const cuenta = d.cuentaPorId.get(m.cuentaId);
-              const queFue = m.comentario || m.etiquetas.join(", ");
-              return (
-                <button key={m.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: m.id })}>
-                  <span className="izq">
-                    <Punto cat={cat} chico />
-                    <span style={{ minWidth: 0 }}>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{queFue || cat.nombre}</div>
-                      <div className="mini tenue" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuenta?.esTarjeta && <T.IconCreditCard size={12} style={{ verticalAlign: -2 }} />} {cuenta?.nombre}{m.moneda !== "USD" ? ` · ${num(m.monto)} ${m.moneda}` : ""}</div>
-                    </span>
-                  </span>
-                  <span className="derecha num">
-                    <div className={m.tipo === "ingreso" ? "ok" : ""} style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
-                      {m.recurrenteId && rec.get(m.recurrenteId) && <T.IconRepeat size={13} className="viol" aria-label={`Pago de ${rec.get(m.recurrenteId)!.nombre}`} />}
-                      {m.cuotas && m.cuotas > 1 ? <span className="mini" style={{ color: "var(--azul)" }}>{m.cuotas}×</span> : null}
-                      <span>{m.tipo === "ingreso" ? "+" : ""}{m.usd != null ? num(m.usd) : "…"}</span>
-                    </div>
-                  </span>
-                </button>
-              );
-            })}
+            {ms.map(m => <FilaMovimiento key={m.id} m={m} sinCategoria />)}
           </div>
         </div>
       ))}

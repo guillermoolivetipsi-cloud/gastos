@@ -230,3 +230,8 @@ select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); b
 /* Cómo venís y Lo que viene en una caja, separadas por una línea fina. */
 .lineas-arriba > * + * { border-top: 1px solid #1A1A24; }
 .lineas-arriba > button { padding: 7px 2px !important; }
+/* El Plan: la tabla «mes a mes» (debería · fue · diferencia). */
+.tabla-plan { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tabla-plan th { font-weight: 400; color: var(--tenue); text-align: right; padding: 4px; }
+.tabla-plan td { padding: 6px 4px; text-align: right; border-top: 1px solid #1A1A24; }
+.tabla-plan th:first-child, .tabla-plan td:first-child { text-align: left; }

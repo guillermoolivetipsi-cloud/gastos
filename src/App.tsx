@@ -13,6 +13,7 @@ import { DetalleCategoria, PantallaProyecciones, Resumen } from "./pantallas/Res
 import { Movimientos } from "./pantallas/Movimientos";
 import { LoQueViene } from "./pantallas/LoQueViene";
 import { Mas } from "./pantallas/Mas";
+import { PantallaPlan } from "./pantallas/Plan";
 import { Editor } from "./pantallas/Editor";
 import { EditorCategoria, ListaCategorias } from "./pantallas/Categorias";
 import { EditorCuenta, ListaCuentas, Tarjeta } from "./pantallas/Cuentas";
@@ -25,7 +26,7 @@ import { Etiquetas } from "./pantallas/Etiquetas";
 import { ComoVenis } from "./pantallas/ComoVenis";
 import { EditorProyeccion } from "./pantallas/Proyecciones";
 import { AvisoRespuesta, ConectarFinanzas, MandarFinanzas, RespuestaFinanzas } from "./pantallas/Finanzas";
-import { buscarRespuestas, marcarVisto, type EnvioHecho } from "./lib/finanzas";
+import { buscarRespuestas, marcarVisto, recibirDeFinanzas, type EnvioHecho } from "./lib/finanzas";
 import { T } from "./ui/Icono";
 
 function Encima({ p }: { p: Pantalla }) {
@@ -48,6 +49,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "como-venis": return <ComoVenis periodo={p.periodo} />;
     case "movimientos": return <Movimientos tipo={p.tipo} buscar={p.buscar} />;
     case "viene": return <LoQueViene periodo={p.periodo} />;
+    case "plan": return <PantallaPlan periodo={p.periodo} />;
     case "detalle-categoria": return <DetalleCategoria {...p} />;
     case "clases": return <Clases />;
     case "proyeccion": return <EditorProyeccion {...p} />;
@@ -131,7 +133,8 @@ export function App() {
   // Al abrir y al volver a la app: completar cotizaciones pendientes y cargar
   // los recurrentes automáticos que ya vencieron.
   useEffect(() => {
-    const ponerAlDia = async () => { await sembrar(); await cargarAutomaticos(); await completarPendientes(); traerRespuestas(); };
+    // También lo que manda Finanzas (cobros de Psicología y destinos del Plan).
+    const ponerAlDia = async () => { await sembrar(); await cargarAutomaticos(); await completarPendientes(); traerRespuestas(); recibirDeFinanzas(); };
     ponerAlDia();
     // Si los avisos están activados, se reprograman.
     leerAjuste<boolean>("notificaciones", false).then(on => { if (on) registrar(); });

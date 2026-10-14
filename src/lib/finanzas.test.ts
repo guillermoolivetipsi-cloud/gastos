@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Categoria, Cuenta, Movimiento } from "../tipos";
-import { armarEnvio, interpretar, mesesAMandar, nombreDeEnvio } from "./finanzas";
+import { armarDesdeFinanzas, armarEnvio, interpretar, mesesAMandar, nombreDeEnvio, validarDesdeFinanzas } from "./finanzas";
 
 const cuentas: Cuenta[] = [
   { id: "rev", nombre: "Revolut", moneda: "EUR", dolar: "blue", esTarjeta: false, orden: 0 },
@@ -57,4 +57,44 @@ it("lo de la cuenta «App anterior» no viaja: ya está en Finanzas", () => {
   const movs = [mov({ id: "a", cuentaId: "rev" }), mov({ id: "b", cuentaId: "vieja" })];
   const e = armarEnvio(["2026-09"], movs, cats, ctas);
   expect(e.movimientos.map(m => m.id)).toEqual(["a"]);
+});
+
+const desde = {
+  app: "finanzas", contrato: "1.0", generado: "2026-10-14T21:30:02.000Z", meses: ["2026-09", "2026-10"],
+  ingresos: [
+    { id: "p1", fecha: "2026-10-07", monto: 85000, moneda: "ARS", usd: 54.8, categoria: "Psicología", cuenta: "Revolut", comentario: "Sesiones" },
+    { id: "p2", fecha: "2026-09-20", monto: 120, moneda: "USD", usd: 120, categoria: "Psicología" },
+  ],
+  destinos: [{ periodo: "2026-09", liquidez: 300, inversion: 1500, deuda: 100 }, { periodo: "2026-10", liquidez: 500, inversion: 2000, deuda: 100 }],
+};
+
+it("lo que manda Finanzas: los cobros de Psicología entran como ingresos marcados, sin duplicar categorías", () => {
+  const d = validarDesdeFinanzas(desde)!;
+  expect(d).not.toBeNull();
+  const psico = { id: "psico", nombre: "Psicología", tipo: "ingreso", icono: "", color: "", orden: 0 } as Categoria;
+  const { movs, catsNuevas, cuentasNuevas, destinos } = armarDesdeFinanzas(d, [psico], cuentas);
+  expect(movs.map(m => [m.id, m.tipo, m.monto, m.moneda, m.usd, m.categoriaId, m.origen])).toEqual([
+    ["finanzas:p1", "ingreso", 85000, "ARS", 54.8, "psico", "finanzas"],
+    ["finanzas:p2", "ingreso", 120, "USD", 120, "psico", "finanzas"],
+  ]);
+  expect(movs[0].cuentaId).toBe("rev");
+  // Sin cuenta: va a una cuenta «Finanzas», que se crea una sola vez.
+  expect(catsNuevas).toEqual([]);
+  expect(cuentasNuevas.map(c => c.nombre)).toEqual(["Finanzas"]);
+  expect(destinos["2026-10"]).toEqual({ liquidez: 500, inversion: 2000, deuda: 100 });
+});
+
+it("lo que manda Finanzas no se vuelve a mandar", () => {
+  const { movs } = armarDesdeFinanzas(validarDesdeFinanzas(desde)!, cats, cuentas);
+  const e = armarEnvio(["2026-10"], [...movs, mov({ cuentaId: "rev", fecha: "2026-10-04" })], cats, cuentas);
+  expect(e.movimientos.every(m => !m.id.startsWith("finanzas:"))).toBe(true);
+  expect(e.movimientos).toHaveLength(1);
+});
+
+it("si no cumple el contrato, no se aplica nada", () => {
+  expect(validarDesdeFinanzas({ ...desde, contrato: "2.0" })).toBeNull();
+  expect(validarDesdeFinanzas({ ...desde, ingresos: [{ ...desde.ingresos[0], monto: -5 }] })).toBeNull();
+  expect(validarDesdeFinanzas({ ...desde, ingresos: [desde.ingresos[0], desde.ingresos[0]] })).toBeNull();
+  // Un ingreso de un mes que no viene en «meses» rompería el reemplazo por mes.
+  expect(validarDesdeFinanzas({ ...desde, ingresos: [{ ...desde.ingresos[0], fecha: "2026-08-01" }] })).toBeNull();
 });

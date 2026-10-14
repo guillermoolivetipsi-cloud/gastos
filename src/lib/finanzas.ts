@@ -1,5 +1,6 @@
-import { db, guardarAjuste, leerAjuste } from "../db";
-import type { Categoria, Cuenta, Movimiento } from "../tipos";
+import { db, guardarAjuste, leerAjuste, nuevoId } from "../db";
+import type { Categoria, Cuenta, Moneda, Movimiento } from "../tipos";
+import type { Destinos } from "./plan";
 import { periodoDe, periodoHoy, sumarMeses } from "./fecha";
 
 /* «Mandar a Finanzas» por el buzón: el celular deja el envío en un repo privado de
@@ -59,6 +60,8 @@ export const nombreDeEnvio = (d: Date) => `${d.toISOString().slice(0, 19).replac
 /** Lo que no viaja (contrato §5, "una fuente por hecho"): los cobros de pacientes
  *  entran a Finanzas por PsicoTracker. */
 export function seManda(m: Movimiento, cat: Categoria | undefined, cuenta?: Cuenta) {
+  // Lo que llegó de Finanzas no vuelve.
+  if (m.origen === "finanzas") return false;
   // Lo de la cuenta «App anterior» (lo que se trajo del Excel de la app vieja) ya está en Finanzas.
   if (cuenta?.nombre.trim().toLowerCase() === "app anterior") return false;
   return !(m.tipo === "ingreso" && cat?.nombre === "Psicología");
@@ -185,4 +188,107 @@ export async function marcarVisto(nombre: string) {
   const es = await leerEnvios();
   const e = es.find(x => x.nombre === nombre);
   if (e && !e.visto) { e.visto = true; await guardarEnvios(es); }
+}
+
+/* ── La vuelta: lo que manda Finanzas (CONTRATO-FINANZAS-A-GASTOS.md) ─────────────
+   Finanzas deja hacia-gastos/<fecha>.json con los cobros de Psicología y, por mes, lo
+   que fue a liquidez, inversión y deuda (USD). La app aplica el más nuevo (los meses
+   vienen completos: el último manda) y borra los que leyó. */
+
+export interface IngresoDeFinanzas { id: string; fecha: string; monto: number; moneda: Moneda; usd: number; categoria: string; cuenta?: string; comentario?: string }
+export interface DesdeFinanzas {
+  app: "finanzas"; contrato: string; generado: string; meses: string[];
+  ingresos: IngresoDeFinanzas[]; destinos: (Destinos & { periodo: string })[];
+}
+
+const esMes = (x: unknown) => typeof x === "string" && /^\d{4}-\d{2}$/.test(x);
+const esNum = (x: unknown) => typeof x === "number" && Number.isFinite(x);
+
+/** Lo que llegó, si cumple el contrato; si no, null (y no se aplica nada). */
+export function validarDesdeFinanzas(x: unknown): DesdeFinanzas | null {
+  const d = x as DesdeFinanzas;
+  if (!d || d.app !== "finanzas" || d.contrato !== "1.0" || !Array.isArray(d.meses) || !d.meses.every(esMes)) return null;
+  if (!Array.isArray(d.ingresos) || !Array.isArray(d.destinos)) return null;
+  const okIngreso = (i: IngresoDeFinanzas) => typeof i?.id === "string" && !!i.id && /^\d{4}-\d{2}-\d{2}$/.test(i.fecha ?? "")
+    && esNum(i.monto) && i.monto > 0 && ["ARS", "USD", "EUR"].includes(i.moneda) && esNum(i.usd) && typeof i.categoria === "string" && d.meses.includes(i.fecha.slice(0, 7));
+  const okDestino = (x: Destinos & { periodo: string }) => esMes(x?.periodo) && esNum(x.liquidez) && esNum(x.inversion) && esNum(x.deuda);
+  if (!d.ingresos.every(okIngreso) || !d.destinos.every(okDestino)) return null;
+  if (new Set(d.ingresos.map(i => i.id)).size !== d.ingresos.length) return null;
+  return d;
+}
+
+/** Arma lo que hay que guardar: los ingresos como movimientos de la app (con id
+ *  `finanzas:<id>`), las categorías o cuentas que falten, y los destinos por mes. */
+export function armarDesdeFinanzas(d: DesdeFinanzas, cats: Categoria[], cuentas: Cuenta[]) {
+  const catsNuevas: Categoria[] = [], cuentasNuevas: Cuenta[] = [];
+  const categoria = (nombre: string) => {
+    const n = nombre.trim().toLowerCase();
+    let c = [...cats, ...catsNuevas].find(x => x.tipo === "ingreso" && x.nombre.trim().toLowerCase() === n);
+    if (!c) { c = { id: nuevoId(), nombre: nombre.trim(), tipo: "ingreso", icono: "question-mark", color: "#3AA8E0", orden: cats.length + catsNuevas.length }; catsNuevas.push(c); }
+    return c;
+  };
+  const cuenta = (nombre: string | undefined, moneda: Moneda) => {
+    const n = (nombre || "Finanzas").trim();
+    let c = [...cuentas, ...cuentasNuevas].find(x => x.nombre.trim().toLowerCase() === n.toLowerCase());
+    if (!c) { c = { id: nuevoId(), nombre: n, moneda, dolar: "oficial", esTarjeta: false, orden: cuentas.length + cuentasNuevas.length }; cuentasNuevas.push(c); }
+    return c;
+  };
+  const movs: Movimiento[] = d.ingresos.map(i => ({
+    id: `finanzas:${i.id}`, tipo: "ingreso", fecha: i.fecha, monto: i.monto, moneda: i.moneda, usd: i.usd,
+    cuentaId: cuenta(i.cuenta, i.moneda).id, categoriaId: categoria(i.categoria).id, etiquetas: [],
+    comentario: i.comentario || undefined, origen: "finanzas",
+    // Ya está en Finanzas: no queda como «sin exportar».
+    exportado: d.generado, creado: d.generado, modificado: d.generado,
+  }));
+  const destinos: Record<string, Destinos> = {};
+  for (const x of d.destinos) destinos[x.periodo] = { liquidez: x.liquidez, inversion: x.inversion, deuda: x.deuda };
+  return { movs, catsNuevas, cuentasNuevas, destinos };
+}
+
+/** Guarda lo que llegó: reemplaza lo de Finanzas de esos meses. */
+export async function aplicarDesdeFinanzas(d: DesdeFinanzas) {
+  const [cats, cuentas] = await Promise.all([db.categorias.toArray(), db.cuentas.toArray()]);
+  const { movs, catsNuevas, cuentasNuevas, destinos } = armarDesdeFinanzas(d, cats, cuentas);
+  await db.transaction("rw", [db.movimientos, db.categorias, db.cuentas, db.ajustes], async () => {
+    if (catsNuevas.length) await db.categorias.bulkAdd(catsNuevas);
+    if (cuentasNuevas.length) await db.cuentas.bulkAdd(cuentasNuevas);
+    const viejos = await db.movimientos.filter(m => m.origen === "finanzas" && d.meses.includes(m.fecha.slice(0, 7))).primaryKeys();
+    await db.movimientos.bulkDelete(viejos);
+    await db.movimientos.bulkPut(movs);
+    const antes = await leerAjuste<Record<string, Destinos>>("destinosFinanzas", {});
+    for (const p of d.meses) delete antes[p];
+    await guardarAjuste("destinosFinanzas", { ...antes, ...destinos });
+    await guardarAjuste("ultimoDeFinanzas", { generado: d.generado, ingresos: movs.length, meses: d.meses });
+  });
+  return movs.length;
+}
+
+export const leerDestinos = () => leerAjuste<Record<string, Destinos>>("destinosFinanzas", {});
+
+/** Al abrir la app: busca lo que dejó Finanzas en hacia-gastos/, aplica el más nuevo y
+ *  borra lo leído. Devuelve cuántos ingresos llegaron, o null si no había nada. */
+export async function recibirDeFinanzas(): Promise<number | null> {
+  const token = await leerToken();
+  if (!token) return null;
+  try {
+    const r = await fetch(`${API}/contents/hacia-gastos`, { headers: cabeceras(token), cache: "no-store" });
+    if (!r.ok) return null; // 404: todavía no hay nada
+    const archivos = (await r.json() as { name: string; sha: string }[]).filter(a => a.name.endsWith(".json")).sort((a, b) => a.name.localeCompare(b.name));
+    if (!archivos.length) return null;
+    const ultimo = archivos[archivos.length - 1];
+    const crudo = await fetch(`${API}/contents/hacia-gastos/${ultimo.name}`, { headers: cabeceras(token, true), cache: "no-store" });
+    if (!crudo.ok) return null;
+    const d = validarDesdeFinanzas(await crudo.json());
+    if (!d) return null; // no cumple el contrato: no se aplica ni se borra
+    const cantidad = await aplicarDesdeFinanzas(d);
+    for (const a of archivos) {
+      await fetch(`${API}/contents/hacia-gastos/${a.name}`, {
+        method: "DELETE", headers: { ...cabeceras(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `Leído por el celular: ${a.name}`, sha: a.sha }),
+      }).catch(() => undefined);
+    }
+    return cantidad;
+  } catch {
+    return null; // sin conexión: la próxima vez
+  }
 }
