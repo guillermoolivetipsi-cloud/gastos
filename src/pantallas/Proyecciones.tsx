@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos, type Datos } from "../datos";
-import { leerEstimados } from "../lib/finanzas";
+import { leerEstimados, leerFuentesEstimados } from "../lib/finanzas";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
 import type { Moneda, Proyeccion, Tipo } from "../tipos";
@@ -30,6 +30,7 @@ export function Proyecciones() {
   const tasa = useMemo(() => tasaDeProyecciones(d), [d]);
   // La clínica, con la agenda que manda Finanzas (si la mandó).
   const estimados = useLiveQuery(leerEstimados, []) ?? {};
+  const fuentes = useLiveQuery(leerFuentesEstimados, []) ?? {};
   // El resto de los ingresos, con tus recurrentes de ingreso (lo suelto no se repite).
   const deRecurrentes = useMemo(() => ingresosRecurrentesPorMes(proximos(), d.recurrentes, d.movimientos, r => d.tasas.de(r.moneda)), [d]);
   const puntos = useMemo(() => serie(vista, proximos(), d.movimientos, d.proyecciones, tasa, estimados, deRecurrentes), [vista, d.movimientos, d.proyecciones, tasa, estimados, deRecurrentes]);
@@ -81,7 +82,7 @@ export function Proyecciones() {
                 </div>
                 <div className="mini tenue">
                   {[
-                    f.fuenteClinica && `clínica ~${num(f.clinica, 0)}${f.fuenteClinica === "agenda" ? " (agenda)" : ""}`,
+                    f.fuenteClinica && `clínica ~${num(f.clinica, 0)}${f.fuenteClinica === "agenda" ? ` (${fuentes[f.periodo] ?? "agenda"})` : ""}`,
                     f.otros > 0 && `${f.periodo === periodoHoy() ? "otros" : "recurrentes"} ~${num(f.otros, 0)}`,
                     ...f.proyecciones.map(p => `${p.nombre} ~${p.sinTasa ?? num(p.usd, 0)}`),
                   ].filter(Boolean).join(" · ")}

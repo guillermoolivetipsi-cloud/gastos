@@ -275,6 +275,9 @@ export async function aplicarDesdeFinanzas(d: DesdeFinanzas) {
 
 export const leerDestinos = () => leerAjuste<Record<string, Destinos>>("destinosFinanzas", {});
 /** La agenda de la clínica que manda Finanzas: USD esperados por mes (el actual y los que vienen). */
+/** De dónde sale la proyección de la clínica de cada mes, según el texto de Finanzas:
+ *  «agenda» si es la agenda de PsicoTracker; «proyección» si es un cálculo (más allá de la agenda). */
+export const leerFuentesEstimados = async () => Object.fromEntries((await leerAjuste<Estimado[]>("estimadosFinanzas", [])).map(e => [e.periodo, /agenda/i.test(e.texto ?? "") ? "agenda" : "proyección"])) as Record<string, "agenda" | "proyección">;
 export const leerEstimados = async () => Object.fromEntries((await leerAjuste<Estimado[]>("estimadosFinanzas", [])).map(e => [e.periodo, e.usd])) as Record<string, number>;
 
 /** Al abrir la app: busca lo que dejó Finanzas en hacia-gastos/, aplica el más nuevo y
