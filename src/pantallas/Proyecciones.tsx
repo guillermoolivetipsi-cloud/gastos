@@ -7,7 +7,7 @@ import { useNav, type Pantalla } from "../nav";
 import type { Moneda, Proyeccion, Tipo } from "../tipos";
 import { fechaEnMes, hoy, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
-import { serie, type PuntoMes, type TasaMoneda, type Vista } from "../lib/proyecciones";
+import { desgloseIngresos, mesesQueQuedan, serie, type PuntoMes, type TasaMoneda, type Vista } from "../lib/proyecciones";
 import { Interruptor, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 import { categoriasPorUso } from "./editorLogica";
@@ -37,8 +37,8 @@ export function Proyecciones() {
   const nombreVista = { gasto: "gasto", ingreso: "ingreso", queda: "lo que queda" }[vista];
 
   const noPaso = async (p: Proyeccion) => {
-    await db.proyecciones.delete(p.id);
-    toast({ texto: `${p.nombre}: no pasó`, deshacer: () => { db.proyecciones.put(p); } });
+    await pasarAlMesQueSigue(p);
+    toast({ texto: `${p.nombre} de ${nombreMes(p.periodo, false)}: no ${p.tipo === "ingreso" ? "entró" : "pasó"}`, deshacer: () => { db.proyecciones.put(p); } });
   };
   const paso = (p: Proyeccion) => nav.abrir({
     p: "editor", tipo: p.tipo, monto: p.montoMax ? undefined : p.monto, categoriaId: p.categoriaId, comentario: p.nombre, proyeccionId: p.id, moneda: p.moneda,
@@ -64,6 +64,31 @@ export function Proyecciones() {
         </div>
       </div>
 
+      {vista === "ingreso" && (() => {
+        // Mes a mes: de dónde sale lo que se espera que entre (regla de la proyección de ingresos).
+        const meses = proximos(), filas = desgloseIngresos(meses, d.movimientos, d.proyecciones, tasa, estimados);
+        return <>
+          <div className="grupo-t"><span>Mes a mes</span><span className="num">se espera</span></div>
+          <div className="caja lista">
+            {filas.map(f => (
+              <div key={f.periodo} className="fila" style={{ flexDirection: "column", alignItems: "stretch", gap: 2 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{nombreMes(f.periodo, false)}{f.periodo === periodoHoy() && <span className="mini tenue"> · en curso</span>}</span>
+                  <span className="num ok">~{num(f.total, 0)}</span>
+                </div>
+                <div className="mini tenue">
+                  {[
+                    f.fuenteClinica && `clínica ~${num(f.clinica, 0)} (${f.fuenteClinica === "agenda" ? "agenda" : "promedio"})`,
+                    `otros ~${num(f.otros, 0)}`,
+                    ...f.proyecciones.map(p => `${p.nombre} ~${p.sinTasa ?? num(p.usd, 0)}`),
+                  ].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>;
+      })()}
+
       <div className="titulo-sec"><span>Tus proyecciones</span><span className="mini">prendé para sumar al gráfico</span></div>
       {!lista.length && <div className="mini tenue" style={{ margin: "0 2px 8px" }}>Algo que va a pasar (el service, un cobro) o que podría pasar (un viaje, unas zapatillas).</div>}
       {lista.length > 0 && (
@@ -77,7 +102,7 @@ export function Proyecciones() {
                 <button className="izq" style={{ textAlign: "left", flex: 1, minWidth: 0 }} onClick={() => nav.abrir({ p: "proyeccion", id: p.id })}>
                   <span style={{ minWidth: 0 }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nombre}</div>
-                    <div className="mini tenue"><span className={`etiq ${p.clase === "seguro" ? "e-fijo" : "e-variable"}`}>{p.clase}</span> {cat?.nombre} · {nombreMes(p.periodo, false)}</div>
+                    <div className="mini tenue"><span className={`etiq ${p.clase === "seguro" ? "e-fijo" : "e-variable"}`}>{p.clase}</span> {cat?.nombre} · {p.hasta && p.hasta > p.periodo ? `${mesCorto(p.periodo)} – ${mesCorto(p.hasta)} · ${mesesQueQuedan(p)} meses` : nombreMes(p.periodo, false)}</div>
                   </span>
                 </button>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -85,16 +110,17 @@ export function Proyecciones() {
                     // Dólares primero; la moneda original abajo.
                     const rango = (a: number, b?: number) => `${num(a)}${b && b > a ? `–${num(b)}` : ""}`;
                     const t = tasa(p.moneda), clase = `num chico${p.activa ? (ing ? " ok" : "") : " tenue"}`;
-                    const original = `${ing ? "+" : ""}${rango(p.monto, p.montoMax)} ${p.moneda}`;
+                    const porMes = p.hasta && p.hasta > p.periodo ? " /mes" : "";
+                    const original = `${ing ? "+" : ""}${rango(p.monto, p.montoMax)} ${p.moneda}${porMes}`;
                     if (p.moneda === "USD" || !t) return <div className={clase}>{original}</div>;
-                    return <><div className={clase}>~{ing ? "+" : ""}{rango(Math.round(p.monto / t), p.montoMax ? Math.round(p.montoMax / t) : undefined)} USD</div><div className="mini tenue num">{original}</div></>;
+                    return <><div className={clase}>~{ing ? "+" : ""}{rango(Math.round(p.monto / t), p.montoMax ? Math.round(p.montoMax / t) : undefined)} USD{porMes}</div><div className="mini tenue num">{original}</div></>;
                   })()}</span>
                   {!termino && <Interruptor on={p.activa} cambiar={v => db.proyecciones.update(p.id, { activa: v })} />}
                 </span>
                 {termino && (
                   <div style={{ width: "100%", display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 4 }}>
-                    <span className="mini ambar" style={{ alignSelf: "center", marginRight: "auto" }}>Terminó {nombreMes(p.periodo, false)}: ¿pasó?</span>
-                    <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => noPaso(p)}>No pasó</button>
+                    <span className="mini ambar" style={{ alignSelf: "center", marginRight: "auto" }}>{ing ? "¿Entró" : "¿Pasó"} {p.nombre} de {nombreMes(p.periodo, false)}?</span>
+                    <button className="btn2" style={{ padding: "3px 8px", fontSize: 12 }} onClick={() => noPaso(p)}>No</button>
                     <button className="btn1" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => paso(p)}>Sí, cargarlo</button>
                   </div>
                 )}
@@ -154,7 +180,7 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
   const toast = useToast();
   const existente = props.id ? d.proyecciones.find(p => p.id === props.id) : undefined;
   const listo = useRef(false);
-  const [f, setF] = useState({ nombre: "", tipo: "gasto" as Tipo, clase: "seguro" as Proyeccion["clase"], montoTxt: "", maxTxt: "", moneda: "USD" as Moneda, periodo: props.periodo ?? periodoHoy(), categoriaId: "" });
+  const [f, setF] = useState({ nombre: "", tipo: "gasto" as Tipo, clase: "seguro" as Proyeccion["clase"], montoTxt: "", maxTxt: "", moneda: "USD" as Moneda, periodo: props.periodo ?? periodoHoy(), hasta: "", categoriaId: "" });
   const [rango, setRango] = useState(false);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF(x => ({ ...x, [k]: v }));
 
@@ -162,7 +188,7 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
     if (listo.current || !d.listo || !existente) return;
     listo.current = true;
     const e = existente;
-    setF({ nombre: e.nombre, tipo: e.tipo, clase: e.clase, montoTxt: String(e.monto).replace(".", ","), maxTxt: e.montoMax ? String(e.montoMax).replace(".", ",") : "", moneda: e.moneda, periodo: e.periodo, categoriaId: e.categoriaId });
+    setF({ nombre: e.nombre, tipo: e.tipo, clase: e.clase, montoTxt: String(e.monto).replace(".", ","), maxTxt: e.montoMax ? String(e.montoMax).replace(".", ",") : "", moneda: e.moneda, periodo: e.periodo, hasta: e.hasta ?? "", categoriaId: e.categoriaId });
     setRango(!!e.montoMax);
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -177,7 +203,7 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
     const activa = existente && existente.clase === f.clase ? existente.activa : f.clase === "seguro";
     await db.proyecciones.put({
       id: existente?.id ?? nuevoId(), nombre: f.nombre.trim(), tipo: f.tipo, clase: f.clase, monto, montoMax: rango ? max : undefined, moneda: f.moneda,
-      periodo: f.periodo, categoriaId: f.categoriaId, activa, creado: existente?.creado ?? new Date().toISOString(),
+      periodo: f.periodo, hasta: f.hasta && f.hasta > f.periodo ? f.hasta : undefined, categoriaId: f.categoriaId, activa, creado: existente?.creado ?? new Date().toISOString(),
     });
     toast({ texto: existente ? "Proyección guardada" : f.clase === "opcional" ? "Agregada (apagada: prendela para verla en el gráfico)" : "Proyección agregada" });
     nav.volver();
@@ -197,11 +223,18 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
           {/* El mes en el título, como la fecha al cargar un gasto. */}
           <FechaEnTitulo titulo="¿En qué mes?" texto={meses.includes(f.periodo) ? mesCorto(f.periodo) : nombreMes(f.periodo, false)}>
             {cerrar => <>
-              {meses.map(p => <button key={p} className={`pill${f.periodo === p ? " on" : ""}`} onClick={() => { set("periodo", p); cerrar(); }}>{nombreMes(p, false)}</button>)}
+              {meses.map(p => <button key={p} className={`pill${f.periodo === p ? " on" : ""}`} onClick={() => { setF(x => ({ ...x, periodo: p, hasta: x.hasta && x.hasta > p ? x.hasta : "" })); cerrar(); }}>{nombreMes(p, false)}</button>)}
               <label className={`pill${!meses.includes(f.periodo) ? " on" : ""}`} style={{ position: "relative" }}>
                 otro mes
                 <input type="month" value={f.periodo} onChange={e => { if (e.target.value) { set("periodo", e.target.value); cerrar(); } }} style={{ position: "absolute", inset: 0, opacity: 0 }} aria-label="Elegir mes" />
               </label>
+            </>}
+          </FechaEnTitulo>
+          {/* Hasta qué mes se repite (el alquiler de dic a mar): un solo mes si no se elige. */}
+          <FechaEnTitulo titulo="¿Hasta qué mes?" separador="–" texto={f.hasta && f.hasta > f.periodo ? mesCorto(f.hasta) : "un mes"}>
+            {cerrar => <>
+              <button className={`pill${!f.hasta || f.hasta <= f.periodo ? " on" : ""}`} onClick={() => { set("hasta", ""); cerrar(); }}>solo {nombreMes(f.periodo, false)}</button>
+              {Array.from({ length: 11 }, (_, k) => sumarMeses(f.periodo, k + 1)).map(p => <button key={p} className={`pill${f.hasta === p ? " on" : ""}`} onClick={() => { set("hasta", p); cerrar(); }}>hasta {nombreMes(p, false)}</button>)}
             </>}
           </FechaEnTitulo>
         </h1>
@@ -233,4 +266,11 @@ export function EditorProyeccion(props: Extract<Pantalla, { p: "proyeccion" }>) 
       <div className="pie-fijo"><button className="btn" disabled={!valido} onClick={guardar}>Guardar</button></div>
     </div>
   );
+}
+
+/** Cuando pasa (o no pasa) el mes de una proyección: si se repite, sigue con el mes que
+ *  viene; si era el último (o de un solo mes), se borra. */
+export async function pasarAlMesQueSigue(p: Proyeccion) {
+  if (p.hasta && p.hasta > p.periodo) await db.proyecciones.update(p.id, { periodo: sumarMeses(p.periodo, 1) });
+  else await db.proyecciones.delete(p.id);
 }

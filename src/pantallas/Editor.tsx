@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { pasarAlMesQueSigue } from "./Proyecciones";
 import { useDatos } from "../datos";
 import { db, guardarAjuste, leerAjuste, nuevoId } from "../db";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -170,7 +171,8 @@ export function Editor(props: Props) {
         ...(props.proyeccionId ? { eventual: true } : {}),
       }, cuenta);
       // Venía de una proyección que pasó: ya es un gasto real.
-      if (props.proyeccionId) await db.proyecciones.delete(props.proyeccionId);
+      // (si se repite varios meses, sigue con el que viene).
+      if (props.proyeccionId) { const pr = await db.proyecciones.get(props.proyeccionId); if (pr) await pasarAlMesQueSigue(pr); }
       const sumar = etiquetas.filter(e => asignadas[e]?.length && !asignadas[e].includes(categoriaId));
     if (sumar.length) await db.transaction("rw", db.ajustes, async () => {
       const actual = await leerAjuste<Record<string, string[]>>("etiquetasCategorias", {});

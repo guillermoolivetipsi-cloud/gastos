@@ -116,8 +116,10 @@ export interface Proyeccion {
   monto: number;
   montoMax?: number;
   moneda: Moneda;
-  /** El mes en que pasaría: "2026-10". */
+  /** El mes en que pasaría: "2026-10". Si se repite, el primero que falta. */
   periodo: string;
+  /** Si se repite varios meses (el alquiler de dic a mar): el último. */
+  hasta?: string;
   categoriaId: string;
   /** Si suma en el gráfico. Los seguros arrancan prendidos; los opcionales, apagados. */
   activa: boolean;

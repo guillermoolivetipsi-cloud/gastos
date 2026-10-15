@@ -44,11 +44,11 @@ export function GrillaCategorias({ categorias, valor, cambiar }: { categorias: C
 }
 
 /** La fecha (o el mes) en el título: "· hoy ▾". Abre una hoja con las opciones. */
-export function FechaEnTitulo({ texto, titulo, children }: { texto: string; titulo: string; children: (cerrar: () => void) => ReactNode }) {
+export function FechaEnTitulo({ texto, titulo, children, separador = "·" }: { texto: string; titulo: string; children: (cerrar: () => void) => ReactNode; separador?: string }) {
   const [abierta, setAbierta] = useState(false);
   return (
     <>
-      <button type="button" className="fecha-titulo" onClick={() => setAbierta(true)} aria-label={`${titulo}: ${texto}`}>· {texto} ▾</button>
+      <button type="button" className="fecha-titulo" onClick={() => setAbierta(true)} aria-label={`${titulo}: ${texto}`}>{separador} {texto} ▾</button>
       <Hoja abierta={abierta} cerrar={() => setAbierta(false)}>
         <h2>{titulo}</h2>
         <div className="pills" style={{ marginTop: 8 }}>{children(() => setAbierta(false))}</div>

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Movimiento, Proyeccion } from "../tipos";
-import { promedio, proyectadoPorCategoria, serie, usdDeProyeccion } from "./proyecciones";
+import { cubre, desgloseIngresos, mesesQueQuedan, promedio, proyectadoPorCategoria, serie, usdDeProyeccion } from "./proyecciones";
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(2026, 8, 29, 12)); });
 
@@ -42,4 +42,16 @@ it("ingresos: la clínica con la agenda de Finanzas; sin agenda, con su promedio
   const s = serie("ingreso", ["2026-11", "2026-12"], movs, [], tasa, { "2026-11": 3900 });
   // noviembre: 500 (promedio del resto) + 3.900 (agenda); diciembre, sin agenda: 500 + 2.600 (promedio de la clínica)
   expect(s.map(p => p.normal)).toEqual([4400, 3100]);
+});
+
+it("una proyección de varios meses suma en cada uno, y el desglose dice de dónde sale cada mes", () => {
+  const alquiler = { id: "bcn", nombre: "Alquiler Barcelona", tipo: "ingreso", clase: "opcional", monto: 1150, moneda: "USD", periodo: "2026-12", hasta: "2027-03", categoriaId: "alq", activa: true, creado: "" } as Proyeccion;
+  expect([cubre(alquiler, "2026-11"), cubre(alquiler, "2026-12"), cubre(alquiler, "2027-03"), cubre(alquiler, "2027-04")]).toEqual([false, true, true, false]);
+  expect(mesesQueQuedan(alquiler)).toBe(4);
+  const movs = ["2026-06", "2026-07", "2026-08"].map(p => mov({ tipo: "ingreso", fecha: `${p}-05`, usd: 500 }));
+  const s = serie("ingreso", ["2026-11", "2026-12", "2027-04"], movs, [alquiler], tasa);
+  expect(s.map(p => p.medio)).toEqual([500, 1650, 500]);
+  const d = desgloseIngresos(["2026-12"], movs, [alquiler], tasa, { "2026-12": 3400 });
+  expect(d[0]).toMatchObject({ clinica: 3400, fuenteClinica: "agenda", otros: 500, total: 5050 });
+  expect(d[0].proyecciones).toEqual([{ nombre: "Alquiler Barcelona", usd: 1150 }]);
 });
