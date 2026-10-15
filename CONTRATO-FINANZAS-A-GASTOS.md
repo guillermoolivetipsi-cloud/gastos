@@ -144,7 +144,7 @@ y cuando Finanzas manda `deuda` para un mes usa ese número y no el suyo.
 
 | campo | obligatorio | qué es |
 |---|---|---|
-| `estimados[].periodo` | sí | el mes en curso y los siguientes que tenga la agenda (hasta 6). Nunca meses pasados. |
+| `estimados[].periodo` | sí | **siempre el mes en curso y los 5 siguientes** (la proyección de la clínica que ya tiene Finanzas, la de `proyeccion_mes`/PsicoTracker). Nunca meses pasados. |
 | `estimados[].usd` | sí | cuánto se espera que entre por la clínica **en total** ese mes, según la proyección de PsicoTracker/Finanzas |
 | `estimados[].texto` | no | de dónde sale, corto |
 
@@ -154,8 +154,13 @@ Para qué lo usa la app:
   (lo que entró de la clínica hasta hoy y lo que falta hasta el estimado, aparte). No se
   suma como si fuera real.
 - **Los meses que vienen**, en Proyecciones: la línea «normal» de ingresos usa la agenda
-  para la clínica y el promedio de los últimos 3 meses para el resto. Si un mes no viene,
-  la clínica usa su propio promedio. Cada archivo reemplaza todos los estimados anteriores.
+  para la clínica y los recurrentes de ingreso de la app para el resto. Si un mes no viene,
+  la app repite la última proyección que llegó (no el promedio, que achica una clínica que
+  crece). Cada archivo reemplaza todos los estimados anteriores.
+
+**Lo ejecutado y lo proyectado, siempre.** Lo ejecutado son los `ingresos` (hasta el mes en
+curso); lo proyectado, los `estimados` (del mes en curso a 5 meses adelante). Los dos van en
+cada archivo.
 
 **No son cobros sueltos.** Finanzas tiene los ingresos de la clínica como **totales por mes
 y por moneda** (pesos, euros, USDT): llegan unos tres por mes, y la app los muestra así.

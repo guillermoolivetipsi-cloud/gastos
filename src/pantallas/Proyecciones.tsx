@@ -7,6 +7,7 @@ import { useNav, type Pantalla } from "../nav";
 import type { Moneda, Proyeccion, Tipo } from "../tipos";
 import { fechaEnMes, hoy, mesCorto, nombreMes, periodoHoy, sumarMeses } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
+import { ingresosRecurrentesPorMes } from "../lib/recurrentes";
 import { desgloseIngresos, mesesQueQuedan, serie, type PuntoMes, type TasaMoneda, type Vista } from "../lib/proyecciones";
 import { Interruptor, Seg, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
@@ -29,7 +30,9 @@ export function Proyecciones() {
   const tasa = useMemo(() => tasaDeProyecciones(d), [d]);
   // La clínica, con la agenda que manda Finanzas (si la mandó).
   const estimados = useLiveQuery(leerEstimados, []) ?? {};
-  const puntos = useMemo(() => serie(vista, proximos(), d.movimientos, d.proyecciones, tasa, estimados), [vista, d.movimientos, d.proyecciones, tasa, estimados]);
+  // El resto de los ingresos, con tus recurrentes de ingreso (lo suelto no se repite).
+  const deRecurrentes = useMemo(() => ingresosRecurrentesPorMes(proximos(), d.recurrentes, d.movimientos, r => d.tasas.de(r.moneda)), [d]);
+  const puntos = useMemo(() => serie(vista, proximos(), d.movimientos, d.proyecciones, tasa, estimados, deRecurrentes), [vista, d.movimientos, d.proyecciones, tasa, estimados, deRecurrentes]);
   const lista = [...d.proyecciones].sort((a, b) => a.periodo.localeCompare(b.periodo) || a.creado.localeCompare(b.creado));
 
   // El mes que más se mueve por lo proyectado.
@@ -60,13 +63,13 @@ export function Proyecciones() {
           {mayor
             ? <>El mes que más cambia: <span className="ambar">{nombreMes(mayor.periodo, false)}, {mayor.medio > mayor.normal ? "+" : "−"}{num(Math.abs(mayor.medio - mayor.normal), 0)} USD</span> de {nombreVista}.</>
             : "Sin proyecciones prendidas: ves solo tu normal."}
-          {" "}El normal es tu promedio de los últimos 3 meses{vista !== "gasto" && Object.keys(estimados).length ? "; la clínica, con la agenda de Finanzas" : ""}.
+          {" "}{vista === "gasto" ? "El normal es tu promedio de los últimos 3 meses." : vista === "ingreso" ? "El normal es la clínica (la proyección de Finanzas) y tus recurrentes de ingreso; lo de una vez, cargalo como proyección." : "El normal: tus gastos de siempre contra la clínica y tus recurrentes de ingreso."}
         </div>
       </div>
 
       {vista === "ingreso" && (() => {
         // Mes a mes: de dónde sale lo que se espera que entre (regla de la proyección de ingresos).
-        const meses = proximos(), filas = desgloseIngresos(meses, d.movimientos, d.proyecciones, tasa, estimados);
+        const meses = proximos(), filas = desgloseIngresos(meses, d.movimientos, d.proyecciones, tasa, estimados, deRecurrentes);
         return <>
           <div className="grupo-t"><span>Mes a mes</span><span className="num">se espera</span></div>
           <div className="caja lista">
@@ -78,8 +81,8 @@ export function Proyecciones() {
                 </div>
                 <div className="mini tenue">
                   {[
-                    f.fuenteClinica && `clínica ~${num(f.clinica, 0)} (${f.fuenteClinica === "agenda" ? "agenda" : "promedio"})`,
-                    `otros ~${num(f.otros, 0)}`,
+                    f.fuenteClinica && `clínica ~${num(f.clinica, 0)}${f.fuenteClinica === "agenda" ? " (agenda)" : ""}`,
+                    f.otros > 0 && `${f.periodo === periodoHoy() ? "otros" : "recurrentes"} ~${num(f.otros, 0)}`,
                     ...f.proyecciones.map(p => `${p.nombre} ~${p.sinTasa ?? num(p.usd, 0)}`),
                   ].filter(Boolean).join(" · ")}
                 </div>

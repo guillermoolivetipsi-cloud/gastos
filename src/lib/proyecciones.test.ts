@@ -18,12 +18,12 @@ it("el promedio: los 3 meses completos anteriores con datos", () => {
   expect(promedio([mov({ usd: 300 }), mov({ fecha: "2026-07-10", usd: 100 }), mov({ fecha: "2026-09-10", usd: 999 })], "gasto")).toBe(200);
 });
 
-it("normal = promedio (este mes, lo real si ya lo pasó) + solo lo prendido del tipo", () => {
+it("normal = promedio de gastos (este mes, lo real si ya lo pasó) + solo lo prendido del tipo", () => {
   const movs = [mov({ usd: 1000 }), mov({ fecha: "2026-09-05", usd: 1200 }), mov({ tipo: "ingreso", usd: 3000 })];
   const ps = [proy({ monto: 150, montoMax: 250, clase: "opcional" }), proy({ monto: 500, activa: false }), proy({ tipo: "ingreso", monto: 1000, periodo: "2026-11" })];
   const g = serie("gasto", ["2026-09", "2026-10", "2026-11"], movs, ps, tasa);
   expect(g.map(p => [p.normal, p.min, p.medio, p.max])).toEqual([[1200, 1200, 1200, 1200], [1000, 1150, 1200, 1250], [1000, 1000, 1000, 1000]]);
-  const q = serie("queda", ["2026-10", "2026-11"], movs, ps, tasa);
+  const q = serie("queda", ["2026-10", "2026-11"], movs, ps, tasa, {}, { "2026-10": 3000, "2026-11": 3000 });
   expect(q.map(p => [p.normal, p.min, p.medio, p.max])).toEqual([[2000, 1750, 1800, 1850], [2000, 3000, 3000, 3000]]);
 });
 
@@ -39,9 +39,12 @@ it("ingresos: la clínica con la agenda de Finanzas; sin agenda, con su promedio
     ...meses.map(p => mov({ tipo: "ingreso", fecha: `${p}-05`, usd: 500 })),
     ...meses.map((p, i) => mov({ tipo: "ingreso", fecha: `${p}-28`, usd: 2000 + i * 600, origen: "finanzas" })),
   ];
-  const s = serie("ingreso", ["2026-11", "2026-12"], movs, [], tasa, { "2026-11": 3900 });
-  // noviembre: 500 (promedio del resto) + 3.900 (agenda); diciembre, sin agenda: 500 + 2.600 (promedio de la clínica)
-  expect(s.map(p => p.normal)).toEqual([4400, 3100]);
+  const recurrentes = { "2026-11": 300, "2026-12": 300 };
+  // noviembre: 3.900 (agenda) + 300 (recurrentes; lo suelto de 500 no se repite);
+  // diciembre, sin agenda: la última que mandó Finanzas (3.900), no el promedio.
+  expect(serie("ingreso", ["2026-11", "2026-12"], movs, [], tasa, { "2026-11": 3900 }, recurrentes).map(p => p.normal)).toEqual([4200, 4200]);
+  // Sin ninguna agenda: el último mes cerrado de la clínica (agosto, 3.200).
+  expect(serie("ingreso", ["2026-11"], movs, [], tasa).map(p => p.normal)).toEqual([3200]);
 });
 
 it("una proyección de varios meses suma en cada uno, y el desglose dice de dónde sale cada mes", () => {
@@ -50,8 +53,8 @@ it("una proyección de varios meses suma en cada uno, y el desglose dice de dón
   expect(mesesQueQuedan(alquiler)).toBe(4);
   const movs = ["2026-06", "2026-07", "2026-08"].map(p => mov({ tipo: "ingreso", fecha: `${p}-05`, usd: 500 }));
   const s = serie("ingreso", ["2026-11", "2026-12", "2027-04"], movs, [alquiler], tasa);
-  expect(s.map(p => p.medio)).toEqual([500, 1650, 500]);
-  const d = desgloseIngresos(["2026-12"], movs, [alquiler], tasa, { "2026-12": 3400 });
+  expect(s.map(p => p.medio)).toEqual([0, 1150, 0]);
+  const d = desgloseIngresos(["2026-12"], movs, [alquiler], tasa, { "2026-12": 3400 }, { "2026-12": 500 });
   expect(d[0]).toMatchObject({ clinica: 3400, fuenteClinica: "agenda", otros: 500, total: 5050 });
   expect(d[0].proyecciones).toEqual([{ nombre: "Alquiler Barcelona", usd: 1150 }]);
 });
