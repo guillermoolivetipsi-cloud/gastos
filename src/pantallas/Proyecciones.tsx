@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos, type Datos } from "../datos";
+import { leerEstimados } from "../lib/finanzas";
 import { db, nuevoId } from "../db";
 import { useNav, type Pantalla } from "../nav";
 import type { Moneda, Proyeccion, Tipo } from "../tipos";
@@ -25,7 +27,9 @@ export function Proyecciones() {
   const toast = useToast();
   const [vista, setVista] = useState<Vista>("gasto");
   const tasa = useMemo(() => tasaDeProyecciones(d), [d]);
-  const puntos = useMemo(() => serie(vista, proximos(), d.movimientos, d.proyecciones, tasa), [vista, d.movimientos, d.proyecciones, tasa]);
+  // La clínica, con la agenda que manda Finanzas (si la mandó).
+  const estimados = useLiveQuery(leerEstimados, []) ?? {};
+  const puntos = useMemo(() => serie(vista, proximos(), d.movimientos, d.proyecciones, tasa, estimados), [vista, d.movimientos, d.proyecciones, tasa, estimados]);
   const lista = [...d.proyecciones].sort((a, b) => a.periodo.localeCompare(b.periodo) || a.creado.localeCompare(b.creado));
 
   // El mes que más se mueve por lo proyectado.
@@ -56,7 +60,7 @@ export function Proyecciones() {
           {mayor
             ? <>El mes que más cambia: <span className="ambar">{nombreMes(mayor.periodo, false)}, {mayor.medio > mayor.normal ? "+" : "−"}{num(Math.abs(mayor.medio - mayor.normal), 0)} USD</span> de {nombreVista}.</>
             : "Sin proyecciones prendidas: ves solo tu normal."}
-          {" "}El normal es tu promedio de los últimos 3 meses.
+          {" "}El normal es tu promedio de los últimos 3 meses{vista !== "gasto" && Object.keys(estimados).length ? "; la clínica, con la agenda de Finanzas" : ""}.
         </div>
       </div>
 

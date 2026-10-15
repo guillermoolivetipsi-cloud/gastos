@@ -274,6 +274,8 @@ export async function aplicarDesdeFinanzas(d: DesdeFinanzas) {
 }
 
 export const leerDestinos = () => leerAjuste<Record<string, Destinos>>("destinosFinanzas", {});
+/** La agenda de la clínica que manda Finanzas: USD esperados por mes (el actual y los que vienen). */
+export const leerEstimados = async () => Object.fromEntries((await leerAjuste<Estimado[]>("estimadosFinanzas", [])).map(e => [e.periodo, e.usd])) as Record<string, number>;
 
 /** Al abrir la app: busca lo que dejó Finanzas en hacia-gastos/, aplica el más nuevo y
  *  borra lo leído. Devuelve cuántos ingresos llegaron, o null si no había nada. */

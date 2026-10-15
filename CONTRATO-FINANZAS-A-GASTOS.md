@@ -8,7 +8,7 @@ Para qué: la app de gastos muestra un **Plan** (cómo se reparte lo que ganás:
 Liquidez 15% · Inversión 40% · Deuda 5%). Para eso necesita tres cosas que solo sabe
 Finanzas: los **ingresos de la clínica** (Psicología, que entran por PsicoTracker), lo que
 fue a **inversión y deuda** cada mes (y a **liquidez**, cuando haya una cuenta aparte para
-eso), la **proyección de la clínica** para el mes en curso, y **en qué etapa de la
+eso), la **proyección de la clínica** para el mes en curso y los que vienen, y **en qué etapa de la
 cascada** estás.
 
 **Un solo plan, dos vistas.** Los porcentajes de la app dicen *cuánto* de lo que entra va
@@ -111,7 +111,7 @@ Además cada archivo lleva la fecha y la hora en el nombre: dos envíos nunca ti
 | `destinos[].inversion` | sí | USD que fueron a inversión: **Nexo (el colchón), Invertir Online** y lo que Finanzas ya llama inversión. Cocos no. |
 | `destinos[].deuda` | sí | USD que fueron a **préstamos y deudas**. **Sin el pago del resumen de la tarjeta**: esas compras ya cuentan como gasto en la app el mes de la compra; contarlas acá sería contarlas dos veces. |
 | `etapa` | no | la etapa de la cascada hoy (ver abajo). Si no viene, la app no la muestra. |
-| `estimados` | no | la proyección de la clínica para el mes en curso (ver abajo). |
+| `estimados` | no | la proyección de la clínica para el mes en curso y los que vienen (ver abajo). |
 
 `inversion` y `deuda` van **en dólares y positivos**; `liquidez`, cuando venga, en dólares y
 puede ser negativa. Ya sumados por mes: la app no los muestra uno por uno,
@@ -133,21 +133,29 @@ solo los compara con el plan.
 cargado en la app con la categoría «Deuda» (meses anteriores) la app no lo cuenta en Vivir,
 y cuando Finanzas manda `deuda` para un mes usa ese número y no el suyo.
 
-### La proyección de la clínica (mes en curso)
+### La proyección de la clínica (el mes en curso y los que vienen)
 
 ```json
-"estimados": [{ "periodo": "2026-10", "usd": 3300, "texto": "proyección de la clínica" }]
+"estimados": [
+  { "periodo": "2026-10", "usd": 3784, "texto": "74 sesiones agendadas" },
+  { "periodo": "2026-11", "usd": 3900, "texto": "agenda de PsicoTracker" }
+]
 ```
 
 | campo | obligatorio | qué es |
 |---|---|---|
-| `estimados[].periodo` | sí | solo el mes en curso |
+| `estimados[].periodo` | sí | el mes en curso y los siguientes que tenga la agenda (hasta 6). Nunca meses pasados. |
 | `estimados[].usd` | sí | cuánto se espera que entre por la clínica **en total** ese mes, según la proyección de PsicoTracker/Finanzas |
 | `estimados[].texto` | no | de dónde sale, corto |
 
-La app lo muestra **en gris, como estimado**, para que el mes en curso tenga contra qué
-comparar: lo que entró de la clínica hasta hoy, y lo que falta hasta el estimado, aparte.
-No se suma como si fuera real.
+Para qué lo usa la app:
+
+- **El mes en curso**, en el Plan: en gris, como estimado, para tener contra qué comparar
+  (lo que entró de la clínica hasta hoy y lo que falta hasta el estimado, aparte). No se
+  suma como si fuera real.
+- **Los meses que vienen**, en Proyecciones: la línea «normal» de ingresos usa la agenda
+  para la clínica y el promedio de los últimos 3 meses para el resto. Si un mes no viene,
+  la clínica usa su propio promedio. Cada archivo reemplaza todos los estimados anteriores.
 
 **No son cobros sueltos.** Finanzas tiene los ingresos de la clínica como **totales por mes
 y por moneda** (pesos, euros, USDT): llegan unos tres por mes, y la app los muestra así.

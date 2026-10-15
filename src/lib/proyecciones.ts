@@ -32,11 +32,19 @@ export function promedio(movs: Movimiento[], tipo: Tipo) {
 
 export interface PuntoMes { periodo: string; normal: number; min: number; medio: number; max: number }
 
-/** Una serie por mes: el normal y con las proyecciones prendidas de ese tipo. */
-function serieDe(meses: string[], movs: Movimiento[], proys: Proyeccion[], tasa: TasaMoneda, tipo: Tipo): PuntoMes[] {
-  const prom = promedio(movs, tipo);
+/** Una serie por mes: el normal y con las proyecciones prendidas de ese tipo.
+ *  En los ingresos, la clínica (lo que llega de Finanzas) va aparte: con la agenda que
+ *  manda Finanzas para ese mes (`estimados`, USD) y, si no hay, con su propio promedio.
+ *  El resto de los ingresos, con su promedio. */
+function serieDe(meses: string[], movs: Movimiento[], proys: Proyeccion[], tasa: TasaMoneda, tipo: Tipo, estimados: Record<string, number> = {}): PuntoMes[] {
+  const hoy = periodoHoy();
+  const parte = (ms: Movimiento[], periodo: string, prom: number) => (periodo === hoy ? Math.max(prom, totalDelMes(ms, tipo, periodo)) : prom);
+  const app = tipo === "ingreso" ? movs.filter(m => m.origen !== "finanzas") : movs;
+  const clinica = tipo === "ingreso" ? movs.filter(m => m.origen === "finanzas") : [];
+  const promApp = promedio(app, tipo), promClinica = promedio(clinica, tipo);
   return meses.map(periodo => {
-    const normal = redondear(periodo === periodoHoy() ? Math.max(prom, totalDelMes(movs, tipo, periodo)) : prom);
+    const deClinica = clinica.length || estimados[periodo] != null ? parte(clinica, periodo, estimados[periodo] ?? promClinica) : 0;
+    const normal = redondear(parte(app, periodo, promApp) + deClinica);
     let min = 0, medio = 0, max = 0;
     for (const p of proys) if (p.activa && p.tipo === tipo && p.periodo === periodo) {
       const u = usdDeProyeccion(p, tasa);
@@ -48,9 +56,9 @@ function serieDe(meses: string[], movs: Movimiento[], proys: Proyeccion[], tasa:
 
 /** Los puntos del gráfico. "Lo que queda" = ingresos − gastos: su peor caso es el
  *  mínimo de ingresos menos el máximo de gastos. */
-export function serie(vista: Vista, meses: string[], movs: Movimiento[], proys: Proyeccion[], tasa: TasaMoneda): PuntoMes[] {
-  if (vista !== "queda") return serieDe(meses, movs, proys, tasa, vista);
-  const g = serieDe(meses, movs, proys, tasa, "gasto"), i = serieDe(meses, movs, proys, tasa, "ingreso");
+export function serie(vista: Vista, meses: string[], movs: Movimiento[], proys: Proyeccion[], tasa: TasaMoneda, estimados: Record<string, number> = {}): PuntoMes[] {
+  if (vista !== "queda") return serieDe(meses, movs, proys, tasa, vista, estimados);
+  const g = serieDe(meses, movs, proys, tasa, "gasto"), i = serieDe(meses, movs, proys, tasa, "ingreso", estimados);
   return meses.map((periodo, k) => ({
     periodo,
     normal: redondear(i[k].normal - g[k].normal),

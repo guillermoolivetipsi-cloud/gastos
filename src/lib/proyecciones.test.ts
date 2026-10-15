@@ -31,3 +31,15 @@ it("por categoría: seguro y opcional por separado, solo lo prendido", () => {
   const ps = [proy({ monto: 300 }), proy({ clase: "opcional", monto: 200 }), proy({ clase: "opcional", monto: 999, activa: false })];
   expect(proyectadoPorCategoria("2026-10", "gasto", ps, tasa).get("ropa")).toEqual({ seguro: 300, opcional: 200 });
 });
+
+it("ingresos: la clínica con la agenda de Finanzas; sin agenda, con su promedio; el resto, con el suyo", () => {
+  // Hoy es 29/9 (ver arriba): los últimos 3 meses cerrados son junio a agosto.
+  const meses = ["2026-06", "2026-07", "2026-08"];
+  const movs = [
+    ...meses.map(p => mov({ tipo: "ingreso", fecha: `${p}-05`, usd: 500 })),
+    ...meses.map((p, i) => mov({ tipo: "ingreso", fecha: `${p}-28`, usd: 2000 + i * 600, origen: "finanzas" })),
+  ];
+  const s = serie("ingreso", ["2026-11", "2026-12"], movs, [], tasa, { "2026-11": 3900 });
+  // noviembre: 500 (promedio del resto) + 3.900 (agenda); diciembre, sin agenda: 500 + 2.600 (promedio de la clínica)
+  expect(s.map(p => p.normal)).toEqual([4400, 3100]);
+});
