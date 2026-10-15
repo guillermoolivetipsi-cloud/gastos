@@ -201,7 +201,7 @@ export function sugerirVinculos(insts: EstadoInstancia[], movs: Movimiento[], ta
   // Solo importan los gastos sueltos del mes de cada instancia (±3 días en las semanales).
   const fechas = pendientes.map(i => i.fecha).sort();
   const desde = sumarDias(`${periodoDe(fechas[0])}-01`, -3), hasta = sumarDias(fechaEnMes(periodoDe(fechas[fechas.length - 1]), 31), 3);
-  const cerca = movs.filter(m => !m.recurrenteId && m.fecha >= desde && m.fecha <= hasta);
+  const cerca = movs.filter(m => !m.recurrenteId && m.origen !== "finanzas" && m.fecha >= desde && m.fecha <= hasta);
   for (const inst of pendientes) {
     for (const mov of cerca) {
       const s = parecido(mov, inst, tasa(inst.rec));

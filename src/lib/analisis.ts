@@ -140,7 +140,8 @@ const normal = sinAcentos;
  *  con el mismo comentario o etiqueta (o que es lo único de su categoría). */
 export function detectarRecurrentes(movs: Movimiento[], cats: Categoria[], recs: Recurrente[], descartes: Set<string>): SugerenciaRecurrente[] {
   const desde = sumarMeses(periodoHoy(), -4);
-  const recientes = movs.filter(m => !m.recurrenteId && periodoDe(m.fecha) >= desde && periodoDe(m.fecha) < periodoHoy());
+  // Lo que llega de Finanzas (los totales de la clínica) no es un recurrente: se proyecta aparte.
+  const recientes = movs.filter(m => !m.recurrenteId && m.origen !== "finanzas" && periodoDe(m.fecha) >= desde && periodoDe(m.fecha) < periodoHoy());
   const grupos = agrupar(recientes, m => `${m.tipo}|${m.categoriaId}|${normal(m.comentario || m.etiquetas[0] || "")}`);
   const yaHay = new Set(recs.map(r => `${r.categoriaId}|${normal(r.nombre)}`));
   const catNombre = new Map(cats.map(c => [c.id, c.nombre]));

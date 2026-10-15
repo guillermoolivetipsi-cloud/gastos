@@ -116,6 +116,10 @@ describe("sugerencias", () => {
     expect(s.clase).toBe("variable");
     expect(s.dia).toBe(10);
   });
+  it("lo que llega de Finanzas (la clínica) no se propone como recurrente", () => {
+    const ms = meses.slice(0, 3).map(p => mov({ categoriaId: "casa", fecha: `${p}-28`, comentario: "Clínica", origen: "finanzas" }));
+    expect(detectarRecurrentes(ms, [casa], [], new Set())).toEqual([]);
+  });
 });
 
 describe("fechas y números", () => {
