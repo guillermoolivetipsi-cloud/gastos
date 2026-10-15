@@ -246,19 +246,18 @@ export function enUsdDe(r: Recurrente, monto: number, tasa: number | null) {
   return r.moneda === "USD" || !tasa ? null : redondear(monto / tasa);
 }
 
-/** Lo que se espera que entre cada mes por los recurrentes de ingreso, en USD (para la
- *  proyección de ingresos). Los que se pagan una sola vez no cuentan. */
+/** Lo que se espera que entre cada mes por los recurrentes de ingreso, en USD y uno por
+ *  uno (para la proyección de ingresos). Los que se pagan una sola vez no cuentan. */
 export function ingresosRecurrentesPorMes(meses: string[], recs: Recurrente[], movs: Movimiento[], tasa: (r: Recurrente) => number | null) {
-  const out: Record<string, number> = {};
+  const out: Record<string, { nombre: string; usd: number }[]> = {};
   for (const periodo of meses) {
-    let total = 0;
+    out[periodo] = [];
     for (const r of recs) {
       if (r.tipo !== "ingreso" || r.frecuencia === "una-vez") continue;
-      const t = tasa(r);
-      if (!t) continue;
-      total += instanciasDelMes(r, periodo).length * montoHabitual(r, movs, t) / t;
+      const t = tasa(r), n = instanciasDelMes(r, periodo).length;
+      if (t && n) out[periodo].push({ nombre: r.nombre, usd: redondear(n * montoHabitual(r, movs, t) / t) });
     }
-    out[periodo] = redondear(total);
+    out[periodo].sort((a, b) => b.usd - a.usd);
   }
   return out;
 }

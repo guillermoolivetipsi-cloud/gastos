@@ -32,7 +32,8 @@ export function Proyecciones() {
   const estimados = useLiveQuery(leerEstimados, []) ?? {};
   const fuentes = useLiveQuery(leerFuentesEstimados, []) ?? {};
   // El resto de los ingresos, con tus recurrentes de ingreso (lo suelto no se repite).
-  const deRecurrentes = useMemo(() => ingresosRecurrentesPorMes(proximos(), d.recurrentes, d.movimientos, r => d.tasas.de(r.moneda)), [d]);
+  const recurrentesDelMes = useMemo(() => ingresosRecurrentesPorMes(proximos(), d.recurrentes, d.movimientos, r => d.tasas.de(r.moneda)), [d]);
+  const deRecurrentes = useMemo(() => Object.fromEntries(Object.entries(recurrentesDelMes).map(([p, rs]) => [p, rs.reduce((s, r) => s + r.usd, 0)])), [recurrentesDelMes]);
   const puntos = useMemo(() => serie(vista, proximos(), d.movimientos, d.proyecciones, tasa, estimados, deRecurrentes), [vista, d.movimientos, d.proyecciones, tasa, estimados, deRecurrentes]);
   const lista = [...d.proyecciones].sort((a, b) => a.periodo.localeCompare(b.periodo) || a.creado.localeCompare(b.creado));
 
@@ -83,7 +84,8 @@ export function Proyecciones() {
                 <div className="mini tenue">
                   {[
                     f.fuenteClinica && `clínica ~${num(f.clinica, 0)}${f.fuenteClinica === "agenda" ? ` (${fuentes[f.periodo] ?? "agenda"})` : ""}`,
-                    f.otros > 0 && `${f.periodo === periodoHoy() ? "otros" : "recurrentes"} ~${num(f.otros, 0)}`,
+                    // Cada recurrente de ingreso por su nombre; si en el mes en curso ya entró más, lo que entró.
+                    ...(f.otros > (deRecurrentes[f.periodo] ?? 0) + 0.5 ? [`otros ingresos ${num(f.otros, 0)} (ya entraron)`] : (recurrentesDelMes[f.periodo] ?? []).map(r => `${r.nombre} ~${num(r.usd, 0)}`)),
                     ...f.proyecciones.map(p => `${p.nombre} ~${p.sinTasa ?? num(p.usd, 0)}`),
                   ].filter(Boolean).join(" · ")}
                 </div>
