@@ -46,6 +46,15 @@ export function Revisar() {
       no: { texto: "No", hacer: () => descartar(`vinc|${mov.id}|${inst.rec.id}`) },
       mas: [{ texto: "Otra cosa…", hacer: () => nav.abrir({ p: "instancia", id: inst.rec.id, clave: inst.clave }) }, ahoraNo(`vinc|${mov.id}|${inst.rec.id}`)],
     })) },
+    // Un cobro de Psicología cargado acá cuando Finanzas ya trajo la clínica de ese mes (regla de los repetidos).
+    { id: "traidos", titulo: "¿Ya está en Finanzas?", urgente: true, preguntas: p.traidos.map(({ mov, total }) => ({
+      id: `traido|${mov.id}`, punto: cat.get(mov.categoriaId),
+      titulo: `¿El cobro de Psicología del ${fechaCorta(mov.fecha, false)} ya está en el total de la clínica?`,
+      dato: `${num(mov.monto)} ${mov.moneda}${d.cuentaPorId.get(mov.cuentaId) ? ` · ${d.cuentaPorId.get(mov.cuentaId)!.nombre}` : ""} · Finanzas trajo ${nombreMes(total.fecha.slice(0, 7), false)}: ${num(total.monto, 0)} ${total.moneda}`,
+      si: { texto: "Sí, sacarlo", hacer: async () => { await db.movimientos.delete(mov.id); toast({ texto: "Sacado: ya estaba en Finanzas", deshacer: () => { db.movimientos.put(mov); } }); } },
+      no: { texto: "No, es otra cosa", hacer: () => descartar(`traido|${mov.id}`) },
+      mas: [ahoraNo(`traido|${mov.id}`)],
+    })) },
     { id: "cierres", titulo: "Cierres de tarjeta", urgente: true, preguntas: p.cierres.map(c => ({
       id: c.cuenta.id + c.periodo, titulo: `¿Qué día cerró la ${c.cuenta.nombre} en ${nombreMes(c.periodo, false)}?`,
       dato: c.compras === 1 ? "1 compra en esos días" : `${c.compras} compras en esos días`,

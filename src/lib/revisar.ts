@@ -6,7 +6,8 @@ import { cambiosDePrecio, cierresDudosos, descartesSet, detectarRecurrentes, typ
 import { diaLocal, diasEntre, hoy, periodoHoy, sumarMeses } from "./fecha";
 import { recurrentesDelMes } from "./analisis";
 import { sugerirVinculos, type EstadoInstancia } from "./recurrentes";
-import type { Movimiento } from "../tipos";
+import type { Categoria, Movimiento } from "../tipos";
+import { sinAcentos } from "./formato";
 
 /* La bandeja "Para revisar": todo lo que la app te propone, en un solo lugar.
    Nada de esto se aplica solo; vos confirmás o cambiás. */
@@ -18,6 +19,8 @@ export interface Pendientes {
   tareas: Tarea[];
   /** Gastos cargados sueltos que parecen el pago de un recurrente pendiente. */
   vinculos: { inst: EstadoInstancia; mov: Movimiento }[];
+  /** Cobros de Psicología cargados en la app en un mes en que Finanzas ya trajo la clínica. */
+  traidos: { mov: Movimiento; total: Movimiento }[];
   total: number;
 }
 
@@ -52,8 +55,20 @@ export function pendientes(d: Datos, x: Extras): Pendientes {
   const insts = [sumarMeses(periodoHoy(), -1), periodoHoy()].flatMap(p => recurrentesDelMes(d.recurrentes, d.movimientos, p, tasa));
   const sug = sugerirVinculos(insts, d.movimientos, tasa, (m, r) => ds.has(`vinc|${m}|${r}`) || pausado(`vinc|${m}|${r}`));
   const vinculos: Pendientes["vinculos"] = insts.filter(i => sug.has(i.rec.id + i.clave)).map(inst => ({ inst, mov: sug.get(inst.rec.id + inst.clave)! }));
+  const traidos = yaTraidos(d.movimientos, d.categorias).filter(x => !ds.has(`traido|${x.mov.id}`) && !pausado(`traido|${x.mov.id}`));
   return {
-    recurrentes, precios, cierres, tareas: ts, vinculos,
-    total: ts.length + vinculos.length + recurrentes.length + precios.length + cierres.length,
+    recurrentes, precios, cierres, tareas: ts, vinculos, traidos,
+    total: ts.length + vinculos.length + traidos.length + recurrentes.length + precios.length + cierres.length,
   };
+}
+
+/** Los cobros de Psicología cargados en la app (no llegados de Finanzas) en un mes y una
+ *  moneda en que Finanzas ya trajo el total de la clínica: la app pregunta si ya está ahí
+ *  (regla de los repetidos). Cada uno, con el total de Finanzas de ese mes y esa moneda. */
+export function yaTraidos(movs: Movimiento[], cats: Categoria[]) {
+  const psico = new Set(cats.filter(c => c.tipo === "ingreso" && sinAcentos(c.nombre).trim().toLowerCase() === "psicologia").map(c => c.id));
+  const totales = new Map(movs.filter(m => m.origen === "finanzas").map(m => [`${m.fecha.slice(0, 7)}|${m.moneda}`, m]));
+  return movs
+    .filter(m => m.tipo === "ingreso" && m.origen !== "finanzas" && psico.has(m.categoriaId))
+    .flatMap(m => { const total = totales.get(`${m.fecha.slice(0, 7)}|${m.moneda}`); return total ? [{ mov: m, total }] : []; });
 }

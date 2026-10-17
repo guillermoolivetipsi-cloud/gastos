@@ -57,3 +57,15 @@ it("lo que más pesa en Vivir, sin la categoría Deuda", () => {
   const movs = [mov("gasto", "casa", 900), mov("gasto", "ocio", 300), mov("gasto", "ocio", 50), mov("gasto", "deuda", 500)];
   expect(vivirPorCategoria("2026-10", movs, cats).map(x => [x.cat?.id, x.usd])).toEqual([["casa", 900], ["ocio", 350]]);
 });
+
+it("pregunta por un cobro de Psicología de la app solo si Finanzas ya trajo ese mes y esa moneda", async () => {
+  const { yaTraidos } = await import("./revisar");
+  const movs = [
+    mov("ingreso", "psico", 2000, { origen: "finanzas", moneda: "ARS", fecha: "2026-10-31" }),
+    mov("ingreso", "psico", 33, { id: "app-oct", moneda: "ARS", fecha: "2026-10-14" }),
+    mov("ingreso", "psico", 40, { id: "app-eur", moneda: "EUR", fecha: "2026-10-14" }),   // en EUR no llegó nada
+    mov("ingreso", "psico", 20, { id: "app-sep", moneda: "ARS", fecha: "2026-09-14" }),   // septiembre no llegó
+    mov("ingreso", "alq", 470, { moneda: "ARS", fecha: "2026-10-08" }),                   // no es Psicología
+  ];
+  expect(yaTraidos(movs, cats).map(x => x.mov.id)).toEqual(["app-oct"]);
+});

@@ -64,8 +64,9 @@ Además cada archivo lleva la fecha y la hora en el nombre: dos envíos nunca ti
    se archiva).
 6. **Si igual el mismo ingreso quedó cargado en los dos lados** (mismo día, mismo importe, misma
    moneda), no se pisa: Finanzas lo avisa en la respuesta del envío (`atencion: «… parece
-   repetido con …»`). La app no pregunta por repetidos de Psicología: la clínica entra
-   solo por PsicoTracker → Finanzas → app. Nadie borra nada solo.
+   repetido con …»`). La clínica entra solo por PsicoTracker → Finanzas → app: si en la
+   app se cargó un cobro de Psicología en un mes y moneda que Finanzas ya mandó, la app
+   pregunta en «Para revisar» si ya está en ese total. Nadie borra nada solo.
 
 ## 3 · Forma
 

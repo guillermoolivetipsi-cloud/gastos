@@ -8,7 +8,7 @@ import { type Cuenta, type Moneda, type Movimiento, type Tipo } from "../tipos";
 import { eliminarMovimiento, guardarMovimiento } from "../lib/acciones";
 import { esClaro } from "../lib/recurrentes";
 import { fechaCorta, hoy, nombreMes, periodoDe, sumarDias } from "../lib/fecha";
-import { leerNumero, num, redondear, simbolo } from "../lib/formato";
+import { leerNumero, num, redondear, simbolo, sinAcentos } from "../lib/formato";
 import { cuotasDe, esDudosa, resumenDe, vencimiento } from "../lib/tarjeta";
 import { Hoja, Interruptor, Seg, useToast } from "../ui/piezas";
 import { categoriasDeEtiquetas, categoriasPorUso, etiquetasParaCategoria, gastosFrecuentes, useRecurrenteSugerido } from "./editorLogica";
@@ -218,6 +218,10 @@ export function Editor(props: Props) {
 
       <div className="titulo-sec"><span>Categoría</span></div>
       <GrillaCategorias categorias={cats} valor={categoriaId} cambiar={setCategoriaId} />
+      {/* La clínica entra por PsicoTracker y Finanzas (regla de los repetidos): avisa, pero deja guardar. */}
+      {tipo === "ingreso" && sinAcentos(d.catPorId.get(categoriaId)?.nombre ?? "") === "psicologia" && (
+        <div className="mini ambar" style={{ margin: "6px 2px 0" }}>La clínica llega de Finanzas: si es un cobro de pacientes, ya va a estar en el total del mes.</div>
+      )}
 
       {tipo === "gasto" && frecuentes.length > 0 && !montoTxt && (
         <div style={{ marginTop: 4 }}>
