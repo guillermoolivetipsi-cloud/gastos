@@ -1,6 +1,6 @@
 import type { Categoria, Clase, Cuenta, Descarte, Movimiento, Recurrente } from "../tipos";
 import { diasDelMes, diasEntre, fechaEnMes, hoy, periodoDe, periodoHoy, sumarDias, sumarMeses } from "./fecha";
-import { agrupar, num, redondear, sinAcentos } from "./formato";
+import { agrupar, redondear, sinAcentos } from "./formato";
 import { esDudosa, fechaCierre, resumenQueVence } from "./tarjeta";
 import { estadoDe, instanciasDelMes, pagosPorRecurrente, type EstadoInstancia } from "./recurrentes";
 
@@ -29,13 +29,10 @@ export function porCategoria(movs: Movimiento[], cats: Categoria[]): PorCategori
     .sort((a, b) => b.total - a.total);
 }
 
-export const claseDe = (c: Categoria | undefined): Clase => c?.clase ?? "variable";
-
-/** La clase confirmada o, mientras tanto, la sugerida. */
-export function claseProvisoria(cats: Categoria[], movs: Movimiento[]) {
-  const map = new Map(cats.map(c => [c.id, c.clase ?? sugerirClase(c, movs)?.clase ?? "variable"] as [string, Clase]));
-  return (c: Categoria | undefined): Clase => (c ? map.get(c.id) : undefined) ?? "variable";
-}
+/** Fijo o variable de un gasto. Fijo: se paga siempre igual; variable: el monto cambia.
+ *  Lo dice su recurrente (cada recurrente es fijo o variable); un gasto suelto, que no
+ *  se repite, es variable. La categoría no decide. */
+export const claseDeGasto = (m: Movimiento, recs: Map<string, Recurrente>): Clase => recs.get(m.recurrenteId ?? "")?.clase ?? "variable";
 
 export interface Bloques {
   fijos: { total: number; pagado: number; falta: number };
@@ -43,20 +40,17 @@ export interface Bloques {
   variables: { todo: number; gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };
 }
 
-/** Los dos bloques del resumen del mes. Fijos: lo gastado en categorías fijas más
- *  lo que falta pagar de los recurrentes fijos. Variables: contra la suma de los
+/** Los dos bloques del resumen del mes. Fijos: lo pagado de los recurrentes fijos más
+ *  lo que falta pagar de ellos. Variables: contra la suma de los
  *  objetivos, y cuánto te queda por día. */
-export function bloques(periodo: string, gastos: Movimiento[], cats: Categoria[], recs: Recurrente[], pendientes: EstadoInstancia[], tasaUsd: (r: Recurrente) => number | null, clase: (c: Categoria | undefined) => Clase = claseDe): Bloques {
-  const porId = new Map(cats.map(c => [c.id, c]));
+export function bloques(periodo: string, gastos: Movimiento[], cats: Categoria[], recs: Recurrente[], pendientes: EstadoInstancia[], tasaUsd: (r: Recurrente) => number | null): Bloques {
   const recPorId = new Map(recs.map(r => [r.id, r]));
-  // Un pago de un recurrente toma la clase del recurrente (el alquiler es fijo
-  // aunque la categoría Casa sea variable por las expensas); el resto, la de su categoría.
-  const claseMov = (m: Movimiento) => recPorId.get(m.recurrenteId ?? "")?.clase ?? clase(porId.get(m.categoriaId));
+  const claseMov = (m: Movimiento) => claseDeGasto(m, recPorId);
   const fijosPagado = suma(gastos.filter(m => claseMov(m) === "fijo"));
   const faltaFijos = redondear(pendientes
     .filter(e => e.rec.tipo === "gasto" && e.rec.clase === "fijo")
     .reduce((s, e) => { const t = tasaUsd(e.rec); return s + (t ? e.falta / t : 0); }, 0));
-  const conObjetivo = new Set(cats.filter(c => c.tipo === "gasto" && !c.archivada && clase(c) === "variable" && (c.objetivo ?? 0) > 0).map(c => c.id));
+  const conObjetivo = new Set(cats.filter(c => c.tipo === "gasto" && !c.archivada && (c.objetivo ?? 0) > 0).map(c => c.id));
   const objetivo = cats.filter(c => conObjetivo.has(c.id)).reduce((s, c) => s + (c.objetivo ?? 0), 0);
   // Contra los objetivos se compara solo lo de las categorías que tienen objetivo, y se
   // descuenta lo que falta pagar de sus recurrentes variables (la luz, las expensas).
@@ -93,22 +87,6 @@ const cv = (xs: number[]) => {
   if (!media) return 0;
   return Math.sqrt(xs.reduce((s, x) => s + (x - media) ** 2, 0) / xs.length) / media;
 };
-
-export interface SugerenciaClase { cat: Categoria; clase: Clase; porque: string }
-
-/** Fijo si aparece casi todos los meses con casi el mismo monto. */
-export function sugerirClase(cat: Categoria, movs: Movimiento[]): SugerenciaClase | null {
-  const serie = mensuales(movs.filter(m => m.categoriaId === cat.id), 6);
-  const con = serie.filter(s => s.total > 0);
-  if (con.length < 2) return null;
-  const desde = serie.findIndex(s => s.total > 0);
-  const presencia = con.length / (serie.length - desde);
-  const var_ = cv(con.map(s => s.total));
-  const min = Math.min(...con.map(s => s.total)), max = Math.max(...con.map(s => s.total));
-  if (con.length >= 3 && presencia >= 0.75 && var_ <= 0.08)
-    return { cat, clase: "fijo", porque: min === max ? `Mismo monto los últimos ${con.length} meses` : `Casi el mismo monto los últimos ${con.length} meses (${num(min)}–${num(max)} USD)` };
-  return { cat, clase: "variable", porque: `Entre ${num(min)} y ${num(max)} USD por mes` };
-}
 
 export interface SugerenciaObjetivo { cat: Categoria; objetivo: number; promedio: number }
 

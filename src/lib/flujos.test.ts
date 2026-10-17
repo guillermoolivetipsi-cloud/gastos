@@ -36,13 +36,13 @@ describe("editar un gasto", () => {
 });
 
 describe("bloques del resumen", () => {
-  it("fijos (por categoría o por recurrente fijo) y variables contra el objetivo", async () => {
+  it("fijos: solo lo que se paga siempre igual (un recurrente fijo); lo suelto es variable, sea de la categoría que sea", async () => {
     const { bloques } = await import("./analisis");
     const alquiler: Recurrente = { id: "alq", nombre: "Alquiler", tipo: "gasto", categoriaId: "super", cuentaId: "rev", monto: 400, moneda: "USD", clase: "fijo", frecuencia: "mensual", dia: 1, inicio: "2026-09-01", modo: "avisar", activo: true };
     const gastos = [mov({ categoriaId: "sus", usd: 100 }), mov({ usd: 50 }), mov({ usd: 400, recurrenteId: "alq", periodo: "2026-09" })];
     const conObjetivo = cats.map(c => (c.id === "super" ? { ...c, objetivo: 200 } : c));
     const b = bloques("2026-09", gastos, conObjetivo, [alquiler], [], () => 1);
-    expect([b.fijos.pagado, b.variables.gastado, b.variables.objetivo, b.variables.queda]).toEqual([500, 50, 200, 150]);
+    expect([b.fijos.pagado, b.variables.gastado, b.variables.objetivo, b.variables.queda]).toEqual([400, 50, 200, 150]);
   });
 });
 

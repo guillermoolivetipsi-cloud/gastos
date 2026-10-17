@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { Cuenta, Movimiento, Recurrente } from "../tipos";
 import { cuotasDe, esDudosa, resumen, resumenDe, vencimiento } from "./tarjeta";
 import { candidatos, esClaro, estadoDe, instanciasDelMes, recurrenteDe, sugerirVinculos } from "./recurrentes";
-import { detectarRecurrentes, sugerirClase, sugerirObjetivo } from "./analisis";
+import { detectarRecurrentes, sugerirObjetivo } from "./analisis";
 import { fechaEnMes, rango, sumarMeses } from "./fecha";
 import { leerNumero } from "./formato";
 
@@ -95,16 +95,6 @@ describe("sugerencias", () => {
   const casa = { id: "casa", nombre: "Casa", tipo: "gasto" as const, icono: "home", color: "#000", orden: 0 };
   const meses = [1, 2, 3, 4, 5, 6].map(i => sumarMeses("2026-09", -i));
 
-  it("propone fijo si el monto se repite todos los meses", () => {
-    const ms = meses.map(p => mov({ categoriaId: "casa", fecha: `${p}-01`, usd: 478 }));
-    expect(sugerirClase(casa, ms)?.clase).toBe("fijo");
-  });
-  it("propone variable si el monto cambia", () => {
-    const ms = meses.map((p, i) => mov({ categoriaId: "casa", fecha: `${p}-05`, usd: 90 + i * 45 }));
-    const s = sugerirClase(casa, ms)!;
-    expect(s.clase).toBe("variable");
-    expect(s.porque).toContain("Entre");
-  });
   it("objetivo sugerido: 10% menos que el promedio, redondeado", () => {
     const ms = meses.slice(0, 3).map(p => mov({ categoriaId: "casa", fecha: `${p}-05`, usd: 505 }));
     expect(sugerirObjetivo(casa, ms)?.objetivo).toBe(450);

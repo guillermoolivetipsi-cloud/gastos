@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos, usePendientes } from "../datos";
 import { leerAjuste } from "../db";
-import { diasEntre, fechaCorta, hoy, nombreMes } from "../lib/fecha";
-import type { Tarea } from "../lib/recordatorios";
+import { diasEntre, hoy } from "../lib/fecha";
 import { useReparto } from "./Plan";
 import { useNav, type Pantalla } from "../nav";
 import { T } from "../ui/Icono";
+import { useToast } from "../ui/piezas";
 import { esApp } from "../lib/guardar";
 import { ItemActualizar, useActualizacion } from "./Actualizaciones";
 
@@ -14,11 +14,13 @@ export function Mas() {
   return esApp() ? <MasConVersion /> : <Menu />;
 }
 
-/** En la app: además, actualizar (se fija al entrar a Más). */
+/** En la app: si hay versión nueva, arriba; si no, buscarla se hace tocando la versión al pie. */
 function MasConVersion() {
   const a = useActualizacion();
-  return <Menu arriba={a.nueva ? <ItemActualizar a={a} /> : null} abajo={a.nueva ? null : <ItemActualizar a={a} />}
-    pie={<>Gastos <b style={{ fontWeight: 500 }}>{a.version ?? ""}</b> · app de Android</>} />;
+  const toast = useToast();
+  const buscar = async () => { const n = await a.buscar(); if (!n) toast({ texto: `Tenés la última versión${a.version ? ` (${a.version})` : ""}` }); };
+  return <Menu arriba={a.nueva ? <ItemActualizar a={a} /> : null}
+    pie={<button disabled={a.buscando} onClick={buscar}>Gastos <b style={{ fontWeight: 500 }}>{a.version ?? ""}</b> · app de Android · <span className="viol">{a.buscando ? "buscando…" : "buscar actualización"}</span></button>} />;
 }
 
 /** El estado de cada cosa, en una línea gris debajo del nombre (regla de Más). */
@@ -26,7 +28,6 @@ function useEstados() {
   const d = useDatos();
   const p = usePendientes();
   const respaldo = useLiveQuery(() => leerAjuste<string | null>("ultimoRespaldo", null), []);
-  const exportado = useLiveQuery(() => leerAjuste<string | null>("ultimaExportacion", null), []);
   const avisos = useLiveQuery(() => leerAjuste<boolean>("notificaciones", false), []);
   const reparto = useReparto();
   if (!d.listo) return null;
@@ -35,7 +36,6 @@ function useEstados() {
   const activos = d.recurrentes.filter(r => r.activo && r.frecuencia !== "una-vez" && (!r.fin || r.fin >= hoy())).length;
   const cuentas = d.cuentas.filter(c => !c.archivada);
   const tarjetas = cuentas.filter(c => c.esTarjeta).length;
-  const resumenes = (p?.tareas ?? []).filter(t => t.tipo === "resumen") as Extract<Tarea, { tipo: "resumen" }>[];
   const diasCopia = respaldo ? diasEntre(respaldo.slice(0, 10), hoy()) : null;
   return {
     revisar: p?.total ? `${p.total} ${p.total === 1 ? "pregunta" : "preguntas"}` : "nada pendiente",
@@ -43,8 +43,6 @@ function useEstados() {
     etiquetas: `${etiquetas} ${etiquetas === 1 ? "etiqueta" : "etiquetas"}`,
     recurrentes: `${activos} ${activos === 1 ? "activo" : "activos"}`,
     cuentas: `${cuentas.length - tarjetas} ${cuentas.length - tarjetas === 1 ? "cuenta" : "cuentas"} · ${tarjetas} ${tarjetas === 1 ? "tarjeta" : "tarjetas"}`,
-    resumen: resumenes.length ? <span className="ambar">{resumenes.map(t => `${t.cuenta.nombre}: falta el de ${nombreMes(t.periodo, false)}`).join(" · ")}</span> : "al día",
-    exportar: exportado ? `último envío: ${fechaCorta(exportado.slice(0, 10), false)}` : "todavía no mandaste nada",
     respaldo: diasCopia == null ? <span className="ambar">todavía no hiciste ninguna</span>
       : <span className={diasCopia > 30 ? "ambar" : ""}>última copia: {diasCopia === 0 ? "hoy" : diasCopia === 1 ? "ayer" : `hace ${diasCopia} días`}</span>,
     ajustes: avisos ? "avisos activados" : "avisos apagados",
@@ -52,7 +50,7 @@ function useEstados() {
   };
 }
 
-function Menu({ arriba, abajo, pie = "Gastos · prueba en el navegador" }: { arriba?: ReactNode; abajo?: ReactNode; pie?: ReactNode }) {
+function Menu({ arriba, pie = "Gastos · prueba en el navegador" }: { arriba?: ReactNode; pie?: ReactNode }) {
   const nav = useNav();
   const revisar = usePendientes()?.total ?? 0;
   const e = useEstados();
@@ -78,16 +76,14 @@ function Menu({ arriba, abajo, pie = "Gastos · prueba en el navegador" }: { arr
         {item({ p: "recurrentes" }, <T.IconRepeat size={20} />, "Recurrentes", e?.recurrentes)}
         {item({ p: "cuentas" }, <T.IconBuildingBank size={20} />, "Cuentas y tarjetas", e?.cuentas)}
       </div>
-      <div className="grupo-t"><span>Archivos y Finanzas</span></div>
+      {/* Subir resumen está en cada tarjeta (Lo que viene) y el Excel, adentro de la copia (regla de simplificar). */}
+      <div className="grupo-t"><span>Archivos</span></div>
       <div className="caja lista">
-        {item({ p: "subir-resumen" }, <T.IconFileImport size={20} />, "Subir resumen de tarjeta", e?.resumen)}
-        {item({ p: "exportar" }, <T.IconFileExport size={20} />, "Exportar a Finanzas", e?.exportar)}
         {item({ p: "respaldo" }, <T.IconDatabaseExport size={20} />, "Copia de seguridad e importar", e?.respaldo)}
       </div>
       <div className="grupo-t"><span>La app</span></div>
       <div className="caja lista">
         {item({ p: "ajustes" }, <T.IconSettings size={20} />, "Ajustes", e?.ajustes)}
-        {abajo}
       </div>
       {/* Para saber cuál es cuál si quedaron instaladas las dos. */}
       <div className="chico centro" style={{ marginTop: 20 }}>{pie}</div>

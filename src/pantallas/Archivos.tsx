@@ -136,6 +136,15 @@ export function Respaldo() {
         )}
       </div>
 
+      {/* El Excel para Finanzas vive acá (antes era un ítem de Más; hoy se manda con la nube). */}
+      <div className="titulo-sec"><span>Excel para Finanzas</span></div>
+      <div className="caja lista">
+        <button className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "exportar" })}>
+          <span><div>Exportar a Finanzas en Excel</div><div className="mini tenue">por meses enteros; lo de siempre va con la nube</div></span>
+          <T.IconChevronRight size={18} className="tenue" />
+        </button>
+      </div>
+
       <div className="titulo-sec"><span>Traer lo de la app anterior</span></div>
       <div className="caja">
         <div className="chico">Exportá desde la app vieja a Excel (el mismo archivo que importás en Finanzas) y elegilo acá. Se crean las categorías y cuentas que falten.</div>

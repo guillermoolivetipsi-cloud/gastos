@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useDatos } from "../datos";
 import { db, nuevoId } from "../db";
 import { useNav } from "../nav";
-import type { Categoria, Clase, Movimiento, Tipo } from "../tipos";
-import { claseDe, sugerirClase, sugerirObjetivo, usdDe } from "../lib/analisis";
+import type { Categoria, Movimiento, Tipo } from "../tipos";
+import { sugerirObjetivo, usdDe } from "../lib/analisis";
 import { periodoHoy } from "../lib/fecha";
 import { leerNumero, num } from "../lib/formato";
 import { ICONOS } from "../ui/Icono";
@@ -23,7 +23,8 @@ function delMes(movs: Movimiento[]) {
 }
 
 /* Reglas de Categorías: una lista como el resto de la app, los objetivos acá mismo
-   (Variables y Fijos con lo gastado contra el objetivo), y las archivadas plegadas. */
+   (lo gastado contra el objetivo), y las archivadas plegadas. Las categorías no son
+   fijas ni variables: eso lo dice cada recurrente. */
 export function ListaCategorias() {
   const d = useDatos();
   const nav = useNav();
@@ -44,10 +45,7 @@ export function ListaCategorias() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button className="izq" style={{ textAlign: "left" }} onClick={() => nav.abrir({ p: "categoria", id: c.id })}>
             <Punto cat={c} chico />
-            <span style={{ minWidth: 0 }}>
-              <div>{c.nombre}</div>
-              {tipo === "gasto" && !c.claseConfirmada && <div className="mini tenue">{claseDe(c)} · sin confirmar</div>}
-            </span>
+            <span style={{ minWidth: 0 }}>{c.nombre}</span>
           </button>
           <span className="num derecha">{num(g, 0)}{obj != null && <span className="tenue chico"> / {num(obj)}</span>}</span>
         </div>
@@ -56,8 +54,7 @@ export function ListaCategorias() {
       </div>
     );
   };
-  const variables = activas.filter(c => claseDe(c) === "variable"), fijos = activas.filter(c => claseDe(c) === "fijo");
-  const totalObj = variables.reduce((s, c) => s + (c.objetivo ?? 0), 0);
+  const totalObj = activas.reduce((s, c) => s + (c.objetivo ?? 0), 0);
 
   return (
     <div className="pantalla sin-tabs">
@@ -72,13 +69,9 @@ export function ListaCategorias() {
       </div>
       {tipo === "gasto" ? (
         <>
-          <div className="grupo-t" style={{ marginTop: 6 }}><span>Variables</span><span className="num">{totalObj > 0 ? `objetivo ${num(totalObj)} USD/mes` : "sin objetivos"}</span></div>
+          <div className="grupo-t" style={{ marginTop: 6 }}><span>Gastos</span><span className="num">{totalObj > 0 ? `objetivo ${num(totalObj)} USD/mes` : "sin objetivos"}</span></div>
           <div className="mini tenue" style={{ margin: "-4px 2px 8px" }}>Lo gastado este mes contra tu objetivo. Pasarte no bloquea nada: solo se marca en rojo.</div>
-          {variables.length > 0 && <div className="caja lista">{variables.map(fila)}</div>}
-          {fijos.length > 0 && <>
-            <div className="grupo-t"><span>Fijos</span><span className="num">{num(fijos.reduce((s, c) => s + (gastado.get(c.id) ?? 0), 0), 0)} este mes</span></div>
-            <div className="caja lista">{fijos.map(fila)}</div>
-          </>}
+          {activas.length > 0 && <div className="caja lista">{activas.map(fila)}</div>}
         </>
       ) : (
         <>
@@ -112,7 +105,6 @@ export function EditorCategoria({ id, tipo }: { id?: string; tipo?: Tipo }) {
     if (existente) { setC(existente); setObjTxt(existente.objetivo != null ? String(existente.objetivo) : ""); }
   }, [d.listo]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = <K extends keyof typeof c>(k: K, v: (typeof c)[K]) => setC(x => ({ ...x, [k]: v }));
-  const sug = existente ? sugerirClase(existente, d.movimientos) : null;
   const sugObj = existente && c.tipo === "gasto" ? sugerirObjetivo(existente, d.movimientos) : null;
   const usada = existente && d.movimientos.some(m => m.categoriaId === existente.id);
   const iconos = Object.keys(ICONOS);
@@ -131,7 +123,6 @@ export function EditorCategoria({ id, tipo }: { id?: string; tipo?: Tipo }) {
     nav.volver();
   }
 
-  const claseVal = c.clase ?? sug?.clase ?? "variable";
   return (
     <div className="pantalla sin-tabs">
       <div className="enc">
@@ -145,7 +136,6 @@ export function EditorCategoria({ id, tipo }: { id?: string; tipo?: Tipo }) {
         <Punto icono={c.icono} color={c.color} grande />
         <input value={c.nombre} onChange={e => set("nombre", e.target.value)} placeholder="Nombre de la categoría" autoFocus={!existente}
           style={{ fontSize: 20, textAlign: "center", width: "100%", borderBottom: "1px solid var(--linea)", padding: "4px 0" }} />
-        {c.tipo === "gasto" && <div className="mini tenue">gasto · {claseVal}</div>}
       </div>
       {/* Gasto o ingreso se puede cambiar mientras nada la use. */}
       {!usada && !d.recurrentes.some(r => r.categoriaId === existente?.id)
@@ -165,9 +155,6 @@ export function EditorCategoria({ id, tipo }: { id?: string; tipo?: Tipo }) {
             {sugObj && <button className="mini viol" onClick={() => setObjTxt(String(sugObj.objetivo))}>Sugerido: {num(sugObj.objetivo)} · tu promedio es {num(sugObj.promedio)}, 10% menos</button>}
             <div className="mini tenue">No te frena: solo marca en rojo si te pasás.</div>
           </div>
-          <div className="grupo-t"><span>¿El monto cambia de un mes a otro?</span></div>
-          <Seg opciones={[["fijo", "Fijo"], ["variable", "Variable"]] as [Clase, string][]} valor={claseVal} cambiar={v => setC(x => ({ ...x, clase: v, claseConfirmada: true }))} />
-          {sug && !c.claseConfirmada && <div className="mini viol" style={{ marginTop: 4 }}>Sugerencia: {sug.clase} · {sug.porque}</div>}
         </>
       )}
 

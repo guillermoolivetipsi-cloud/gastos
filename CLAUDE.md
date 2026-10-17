@@ -37,15 +37,14 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Guardar:** un botón grande fijo abajo, como estaba.
   - **"Repetir con un toque":** debajo de las categorías.
   - **Piezas compartidas** en `src/ui/formulario.tsx`: `MontoConMoneda`, `GrillaCategorias` y `FechaEnTitulo`. Las usan "Nuevo gasto", el recurrente ("· desde hoy ▾") y la proyección ("· oct ▾"); cualquier formulario nuevo las usa también.
-- **Resumen y pantallas de números** (decididas en octubre 2026; valen también para Cómo venís, Proyecciones y la tarjeta):
-  - **Período:** dos filas: vistas (Día · Semana · Mes · Año · Período, siempre a la vista, nunca en un desplegable) y «‹ Octubre 2026 ›». Gastos, Ingresos y Proyecciones ya no son solapas de arriba: son pestañas de abajo. Se probó el desplegable «Mes ▾» y se volvió a la fila (octubre 2026): el mes tiene que estar a un toque.
+- **Resumen y pantallas de números** (decididas en octubre 2026; valen también para Proyecciones y la tarjeta):
+  - **Período:** dos filas: vistas (Día · Semana · Mes · Año, siempre a la vista, nunca en un desplegable; «Período» a medida se sacó en octubre 2026 porque no se usaba) y «‹ Octubre 2026 ›». Gastos, Ingresos y Proyecciones ya no son solapas de arriba: son pestañas de abajo. Se probó el desplegable «Mes ▾» y se volvió a la fila (octubre 2026): el mes tiene que estar a un toque.
   - **Al abrir:** Resumen arranca en Mes (antes en Semana). La vista Día queda como estaba.
   - **Números de arriba:** las cajas Fijos y Variables con su barra y «te quedan X para N días». Los dos números grandes suman lo gastado en el mes (el total de la torta): Fijos muestra lo pagado («1.013 / 2.348», lo que falta rayado en la barra y «faltan 1.335»); Variables, todo lo variable («1.770»), con la barra y «669 / 1.000 con objetivo» abajo. Antes no sumaban (Fijos incluía lo que falta y Variables solo lo que tiene objetivo) y confundía.
   - **Gráfico del mes:** la torta chica (120 px) con el total grande al lado (30 px), y debajo del total lo previsto y lo proyectado. Nunca una torta grande centrada.
   - **Lista por categoría:** como estaba, con el porcentaje.
   - **Aire entre bloques** (octubre 2026; distinto del espacio entre filas, que no se cambia): 12 px entre el mes y la caja de líneas, 16 antes de Fijos y Variables, 10 antes de «Te quedan…», 24 antes de la torta y 28 antes de «Por categoría».
-  - **«Cómo venís» y «Lo que viene»:** juntas en una caja, separadas por una línea fina (`.lineas-arriba`).
-  - **«Cómo venís»:** una sola línea arriba ("✦ Cómo venís: tarjeta 22% · noviembre ~1.982 · suscripciones 57 ›"), con textos cortos; se toca para el detalle.
+  - **Una sola línea arriba** (simplificar, octubre 2026), en su caja (`.lineas-arriba`): en Gastos «Lo que viene»; en Ingresos el Plan. «Cómo venís» se sacó: la tarjeta está en Lo que viene, el mes que viene en Proyecciones y las suscripciones en Recurrentes (`src/lib/insights.ts` quedó sin pantalla).
   - **Botones de arriba:** la lupa (abre Movimientos buscando), la nube (Mandar a Finanzas) y la bandeja (Para revisar).
 - **Movimientos** (decididas en octubre 2026; valen para cualquier lista de movimientos, como el detalle de una categoría):
   - **Buscar y filtrar:** como estaba, tres filas (buscador · Todos/Gastos/Ingresos · medio de pago y categoría).
@@ -81,12 +80,6 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Los meses anteriores:** barritas de los últimos 6 meses, con el monto cuando cambia.
   - **Acciones:** una sola grande abajo («Cargar el pago», «Cargar lo que falta», «+ Agregar otro pago»), con «¿Ya lo cargaste? Elegilo» como enlace arriba.
   - **«⋯» arriba:** Editar el recurrente · Fue 0 este mes · Dejar de pedirlo · Saltear solo este mes · Eliminarlo del todo. Sin tacho ni botones sueltos abajo.
-- **Cómo venís** (decididas en octubre 2026, el detalle que se abre desde Resumen):
-  - **Orden:** como estaba, igual que la línea de Resumen: Tarjeta, el mes que viene, Suscripciones y Qué cambió. Sin resumen arriba (la línea de Resumen ya lo muestra).
-  - **Títulos:** afuera de la caja (`.grupo-t`), sin número de orden, con el número principal a la derecha («Tarjeta … 565 USD»).
-  - **Datos:** cada uno en su fila alineada (nombre a la izquierda, número a la derecha), separadas por una línea (`.filas`).
-  - **Suscripciones:** como en Recurrentes: el día, el puntito de color, con qué tarjeta y el monto; lo más caro arriba.
-  - **Aclaraciones:** detrás de un «?» en el título (`.ayuda`), que las muestra al tocarlo; nunca a la vista todo el tiempo.
 - **Tarjetas** (decididas en octubre 2026, la solapa TARJETAS de Lo que viene y el detalle de una tarjeta):
   - **Cada tarjeta en la solapa:** caja corta: el total grande y una línea («vence ~5 nov · 12 consumos ›», que abre el detalle), los recurrentes del resumen como estaban, y un solo botón, «Subir resumen».
   - **Arriba del detalle:** un número y una línea («cierra 28 oct ▾ (estimado) · vence ~5 nov»); la fecha de cierre se toca para cambiarla. «Subir el resumen» grande y fijo abajo.
@@ -101,15 +94,15 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Cambios de moneda o de cuenta:** «55 USD → 55 EUR» (o «Revolut → Visa») a la derecha, alineado con los montos; abajo en gris qué cambia.
 - **Categorías** (decididas en octubre 2026, Más → Categorías y objetivos):
   - **Lista:** filas como en el resto de la app (círculo, nombre y lo gastado este mes a la derecha), no una grilla. La grilla de 5 queda solo para elegir al cargar.
-  - **Objetivos:** se ponen acá, no en una pantalla aparte. Variables y Fijos por separado; cada fila con objetivo muestra «gastado / objetivo» y la barra con la marca del 80% (como en Resumen). Sin objetivo, el botón «usar X de objetivo (promedio Y)».
+  - **Objetivos:** se ponen acá, no en una pantalla aparte. Una sola lista de gastos (las categorías no son fijas ni variables); cada fila con objetivo muestra «gastado / objetivo» y la barra con la marca del 80% (como en Resumen). Sin objetivo, el botón «usar X de objetivo (promedio Y)».
   - **Archivadas:** plegadas al final, «Archivadas (N) ›».
-  - **Editor:** arriba el círculo y el nombre, después el objetivo como monto grande, después fijo o variable; el ícono y el color al final.
+  - **Editor:** arriba el círculo y el nombre, después el objetivo como monto grande; el ícono y el color al final. Sin fijo o variable.
   - **Sugerencias:** como estaban, el texto violeta («Sugerido: 405 · tu promedio es 450, 10% menos») y «No te frena…» a la vista.
   - **Archivar o eliminar:** en «⋯» arriba, no un botón abajo.
 - **Más y Ajustes** (decididas en octubre 2026):
-  - **Más, grupos:** Para revisar arriba en su caja (como estaba), después grupos con título: «Ordenar» (Categorías y objetivos, Etiquetas, Recurrentes, Cuentas y tarjetas), «Archivos y Finanzas» (Subir resumen, Exportar a Finanzas, Copia de seguridad) y «La app» (Ajustes, Actualizar).
+  - **Más, grupos** (siete ítems desde la simplificación de octubre 2026): Para revisar arriba en su caja, después «Ordenar» (Categorías y objetivos, Plan, Etiquetas, Recurrentes, Cuentas y tarjetas), «Archivos» (Copia de seguridad e importar, que adentro tiene el Excel para Finanzas) y «La app» (Ajustes). Subir el resumen se hace desde cada tarjeta (Lo que viene); actualizar, tocando la versión al pie (si hay una nueva, aparece arriba).
   - **Más, estado:** cada ítem con una línea gris de cómo está («última copia: hace 12 días», en amarillo si pasaron más de 30 o nunca; «último envío: 8 oct»; «13 activos»; «9 cuentas · 2 tarjetas»; el resumen que falta subir, en amarillo).
-  - **Más, pie:** solo la versión («Gastos 1.0.31 · app de Android»).
+  - **Más, pie:** la versión y «buscar actualización» («Gastos 1.0.52 · app de Android · buscar actualización»).
   - **Ajustes, avisos:** una fila con el interruptor y el estado en gris («activados · probar un aviso», «bloqueados…» en rojo, «apagados»).
   - **Ajustes, recordatorios:** una lista de tres filas; el cuándo («desde las 21:00 ▾», «desde el día 5 ▾») se toca para cambiarlo. Las explicaciones, detrás del «?».
 - **Ingresos** (decididas en octubre 2026, la solapa INGRESOS de Resumen en la vista Mes):
@@ -139,12 +132,12 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
 - **Pestañas** (decididas en octubre 2026):
   - **Abajo:** Gastos · Ingresos · Proyecciones · Más (antes: Resumen · Movimientos · Lo que viene · Más). Lo que más se usa, a un toque.
   - **Movimientos:** ya no es pestaña. En Gastos e Ingresos, abajo de las categorías, «Últimos movimientos» (los 5 últimos del período) y «Ver todos ›», que abre la lista con «←», ya filtrada; la lupa de arriba la abre buscando.
-  - **Lo que viene:** ya no es pestaña ni va en Más. Una línea arriba de Gastos, debajo de «Cómo venís» («◷ Lo que viene: 1.100 por pagar · tarjetas ~980 ›»), que abre la pantalla de siempre.
+  - **Lo que viene:** ya no es pestaña ni va en Más. La línea de arriba de Gastos («◷ Lo que viene: 1.100 por pagar · tarjetas ~980 ›»), que abre la pantalla de siempre.
 - **Plan** (decidido en octubre 2026): cómo se reparte lo que entra. Arranca en Vivir 40% (de Vivir: fijos 50 · variables 40 · libre de culpa 5 · eventuales 5) · Liquidez 15% · Inversión 40% · Deuda 5% (`src/lib/plan.ts`, `PLAN`).
   - **Configurar:** Más → Ordenar → «Plan» (con el reparto en gris). Los % se escriben; Guardar queda apagado hasta que las cuatro partes sumen 100 y las de Vivir también («suman 95%: faltan 5» en amarillo). Se guarda en el ajuste `plan`.
-  - **Acceso:** una línea «◎ Plan: vivir 49% de 40 · inversión 41% de 40 ›» en la caja de arriba de Gastos, debajo de «Lo que viene». Abre `src/pantallas/Plan.tsx`.
+  - **Acceso:** una línea «◎ Plan: vivir 49% de 40 · inversión 41% de 40 ›» en la caja de arriba de **Ingresos** (antes en Gastos). Abre `src/pantallas/Plan.tsx`.
   - **La pantalla:** el mes con flechas, «4.865 USD entraron» y cuánto se repartió; cada parte con lo real (% y USD), el plan en gris y una barra con la meta marcada (la meta a 2/3 del ancho); Vivir abierta en sus cuatro. Abajo «Mes a mes»: se elige una parte y cada uno de los últimos 6 meses muestra debería · fue · diferencia.
-  - **Cómo se cuenta:** Vivir son los gastos de la app, salvo la categoría «Deuda» (cuenta en Deuda). Fijos/variables por la clase (la del recurrente si es su pago); libre de culpa, la categoría «Sin culpa»; eventuales, los gastos cargados desde una proyección (`eventual: true`). Lo que entró: los ingresos de la app más los de Psicología que manda Finanzas. Inversión (Nexo, Invertir Online y lo que Finanzas llama inversión) y deuda (préstamos, sin el pago de la tarjeta): lo que manda Finanzas (sin eso, «—»; la deuda cae a la categoría «Deuda»). **Liquidez: lo que quedó** (entró − Vivir − Inversión − Deuda), no la variación de saldos, que se corre un mes con la tarjeta; cuando haya una cuenta aparte para la liquidez, Finanzas manda lo transferido y lo que sobra se muestra como «quedó en las cuentas».
+  - **Cómo se cuenta:** Vivir son los gastos de la app, salvo la categoría «Deuda» (cuenta en Deuda). Fijos/variables como en toda la app (ver «Fijo, variable y recurrente»); libre de culpa, la categoría «Sin culpa»; eventuales, los gastos cargados desde una proyección (`eventual: true`). Lo que entró: los ingresos de la app más los de Psicología que manda Finanzas. Inversión (Nexo, Invertir Online y lo que Finanzas llama inversión) y deuda (préstamos, sin el pago de la tarjeta): lo que manda Finanzas (sin eso, «—»; la deuda cae a la categoría «Deuda»). **Liquidez: lo que quedó** (entró − Vivir − Inversión − Deuda), no la variación de saldos, que se corre un mes con la tarjeta; cuando haya una cuenta aparte para la liquidez, Finanzas manda lo transferido y lo que sobra se muestra como «quedó en las cuentas».
   - **Quién carga qué:** Psicología (PsicoTracker) solo en Finanzas; el resto de los ingresos, solo en la app. Los préstamos, solo en Finanzas (la categoría «Deuda» de la app se archiva).
   - **Pendiente, con maqueta:** la etapa de la cascada y la pregunta de ingresos repetidos. La proyección de la clínica no va en el Plan: va en Proyecciones (abajo).
 - **Proyección de ingresos** (decidida en octubre 2026, en Proyecciones → Ingresos):
@@ -153,6 +146,10 @@ Se van sumando a medida que él decide. Antes de cambiar algo que se ve, igual m
   - **Mes a mes:** debajo del gráfico, un grupo «Mes a mes · se espera»: cada mes con el total «~X» en verde y abajo en gris de dónde sale («clínica ~3.784 (agenda) · Alquiler Lomas ~480 · Alquiler Barcelona ~1.240»: cada recurrente de ingreso y cada proyección por su nombre; si en el mes en curso ya entró más que eso, «otros ingresos 1.106 (ya entraron)»); el mes actual dice «en curso». Sin cotización, la proyección en su moneda.
   - **Varios meses:** una proyección puede durar varios meses (`hasta`). En el formulario, «Nueva proyección · dic ▾ – mar ▾» («un mes» si no se elige). En la lista, «dic – mar · 4 meses» y el monto «/mes».
   - **Mes por mes:** al terminar cada mes pregunta «¿Entró Alquiler Barcelona de diciembre?» (en los gastos, «¿Pasó…?») con No y «Sí, cargarlo». Las dos siguen con el mes que viene; en el último mes, la proyección se borra. «Deshacer» la vuelve atrás.
+- **Fijo, variable y recurrente** (decidido en octubre 2026; son tres cosas distintas):
+  - **Fijo:** se paga siempre igual (alquiler, seguros, suscripciones). **Variable:** el monto cambia (luz, expensas, super, salidas).
+  - **Recurrente:** se repite; cada recurrente es fijo o variable (los variables con «~»).
+  - Un gasto es fijo o variable según su recurrente (`claseDeGasto`); un gasto suelto, que no se repite, es variable. **La categoría no decide**: ni el editor de categorías ni Para revisar preguntan fijo o variable (el campo `clase` de las categorías viejas queda sin uso).
 - **Archivar o eliminar** (en toda la app): en el «⋯» de arriba, nunca un botón abajo.
 - **Avisos y acciones de un toque:** el resultado va en el aviso de abajo, sin cambiar de pantalla (como la nube de Mandar a Finanzas).
 

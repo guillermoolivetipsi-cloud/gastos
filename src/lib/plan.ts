@@ -1,5 +1,5 @@
-import type { Categoria, Clase, Movimiento, Recurrente } from "../tipos";
-import { usdDe } from "./analisis";
+import type { Categoria, Movimiento, Recurrente } from "../tipos";
+import { claseDeGasto, usdDe } from "./analisis";
 import { leerAjuste } from "../db";
 
 /* El Plan: cómo se reparte lo que entra. Lo decidió Guillermo (octubre 2026):
@@ -44,7 +44,7 @@ export interface PlanDelMes {
 
 const nombre = (c: Categoria | undefined) => (c?.nombre ?? "").trim().toLowerCase();
 
-export function planDelMes(periodo: string, movs: Movimiento[], cats: Categoria[], recs: Recurrente[], destinos: Destinos | undefined, clase: (c: Categoria | undefined) => Clase): PlanDelMes {
+export function planDelMes(periodo: string, movs: Movimiento[], cats: Categoria[], recs: Recurrente[], destinos: Destinos | undefined): PlanDelMes {
   const porId = new Map(cats.map(c => [c.id, c]));
   const recPorId = new Map(recs.map(r => [r.id, r]));
   const delMes = movs.filter(m => m.fecha.slice(0, 7) === periodo);
@@ -59,7 +59,7 @@ export function planDelMes(periodo: string, movs: Movimiento[], cats: Categoria[
     vivir.real += u;
     if (m.eventual) vivir.eventuales += u;
     else if (nombre(cat) === "sin culpa") vivir.sinCulpa += u;
-    else if ((recPorId.get(m.recurrenteId ?? "")?.clase ?? clase(cat)) === "fijo") vivir.fijos += u;
+    else if (claseDeGasto(m, recPorId) === "fijo") vivir.fijos += u;
     else vivir.variables += u;
   }
   const deuda = destinos ? destinos.deuda : deudaApp;

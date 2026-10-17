@@ -2,22 +2,22 @@ import { useMemo, useState } from "react";
 import { useDatos, usePendientes } from "../datos";
 import { useNav } from "../nav";
 import type { Movimiento, Tipo } from "../tipos";
-import { aPagarTarjeta, bloques, claseProvisoria, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
+import { aPagarTarjeta, bloques, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { enUsdDe, fechaDePago } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
 import { BotonMandar } from "./Finanzas";
 import { DIAS_CORTOS, aFecha, fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
 import { num } from "../lib/formato";
-import { Barra, BotonAgregar, Dia, Dona, Hoja, Puntito, Punto, useToast } from "../ui/piezas";
+import { Barra, BotonAgregar, Dia, Dona, Puntito, Punto, useToast } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
-import { useInsights } from "./ComoVenis";
 import { LineaPlan } from "./Plan";
 import { T } from "../ui/Icono";
 
 /** La marca de las barras con objetivo: avisa que ya vas por el 80%. */
 const ALERTA = 0.8;
-const VISTAS: [Vista, string][] = [["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"], ["anio", "Año"], ["periodo", "Período"]];
+// Sin «Período» a medida: no se usaba (regla de simplificar, octubre 2026).
+const VISTAS: [Vista, string][] = [["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"], ["anio", "Año"]];
 
 /** La pestaña Gastos o la pestaña Ingresos (regla de las pestañas). */
 export function Resumen({ tipo }: { tipo: Tipo }) {
@@ -28,9 +28,8 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
   // Abre en el mes (regla de las vistas de Resumen).
   const [vista, setVista] = useState<Vista>("mes");
   const [ancla, setAncla] = useState(hoy());
-  const [hasta, setHasta] = useState(hoy());
-  const [elegirPeriodo, setElegirPeriodo] = useState(false);
-  // El mes se ve en torta; la semana, el año y un período, en barras por día (o por mes).
+  const hasta = hoy();
+  // El mes se ve en torta; la semana y el año, en barras por día (o por mes).
   const grafico: "torta" | "dia" = vista === "mes" || vista === "dia" ? "torta" : "dia";
 
   const [desde, fin] = rango(vista, ancla, hasta);
@@ -45,8 +44,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
   // Lo que va con tarjeta llega con el resumen: no se pide cargar a mano. Se avisa
   // solo si algo ya venció; el número es el mismo que en "Lo que viene".
   const { todos: porCargar, vencidos } = porCargarDelMes(instancias, d.cuentas);
-  const clase = useMemo(() => claseProvisoria(d.categorias, d.movimientos), [d.categorias, d.movimientos]);
-  const b = esMes && tipo === "gasto" ? bloques(periodo, movs, d.categorias, d.recurrentes, instancias.filter(i => i.estado !== "cargado"), tasa, clase) : null;
+  const b = esMes && tipo === "gasto" ? bloques(periodo, movs, d.categorias, d.recurrentes, instancias.filter(i => i.estado !== "cargado"), tasa) : null;
   const revisar = usePendientes()?.total ?? 0;
 
   const tasaProy = useMemo(() => tasaDeProyecciones(d), [d]);
@@ -123,15 +121,14 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         {VISTAS.map(([v, t]) => (
           <button key={v} className={vista === v ? "on" : ""} onClick={() => {
             setVista(v);
-            if (v === "periodo") { setAncla(`${periodoHoy()}-01`); setHasta(hoy()); setElegirPeriodo(true); }
-            else setAncla(hoy());
+            setAncla(hoy());
           }}>{t}</button>
         ))}
       </div>
       <div className="navega">
-        <button aria-label="Anterior" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, -1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronLeft size={20} /></button>
-        <button onClick={() => vista === "periodo" ? setElegirPeriodo(true) : setAncla(hoy())}><span style={{ color: "var(--tinta)" }}>{tituloRango(vista, desde, fin)}</span></button>
-        <button aria-label="Siguiente" disabled={vista === "periodo"} onClick={() => setAncla(moverAncla(vista, ancla, 1))} style={{ opacity: vista === "periodo" ? 0 : 1 }}><T.IconChevronRight size={20} /></button>
+        <button aria-label="Anterior" onClick={() => setAncla(moverAncla(vista, ancla, -1))}><T.IconChevronLeft size={20} /></button>
+        <button onClick={() => setAncla(hoy())}><span style={{ color: "var(--tinta)" }}>{tituloRango(vista, desde, fin)}</span></button>
+        <button aria-label="Siguiente" onClick={() => setAncla(moverAncla(vista, ancla, 1))}><T.IconChevronRight size={20} /></button>
       </div>
 
       {vencidos.length > 0 && (
@@ -153,15 +150,10 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         </button>
       )}
 
-      {/* "Cómo venís" arriba de todo en el mes, antes de los números. */}
-      {/* Cómo venís y Lo que viene juntas en una caja, con aire arriba (regla de aire entre bloques). */}
-      {tipo === "gasto" && (
-        <div className="caja lineas-arriba" style={{ padding: "4px 12px", margin: "12px 0 0" }}>
-          {esMes && <TarjetaComoVenis periodo={periodo} />}
-          <LineaLoQueViene />
-          <LineaPlan periodo={esMes ? periodo : periodoHoy()} />
-        </div>
-      )}
+      {/* Una sola línea arriba: en Gastos, Lo que viene; en Ingresos, el Plan (cómo se reparte lo que entra). Regla de simplificar. */}
+      <div className="caja lineas-arriba" style={{ padding: "4px 12px", margin: "12px 0 0" }}>
+        {tipo === "gasto" ? <LineaLoQueViene /> : <LineaPlan periodo={esMes ? periodo : periodoHoy()} />}
+      </div>
       {esIng && (
         // Entró y Gastaste, y debajo cuánto te quedó (regla de Ingresos).
         <>
@@ -345,13 +337,6 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
 
       {<BotonAgregar tipo={tipo} abrir={t => nav.abrir({ p: "editor", tipo: t, fecha: fechaParaCargar(desde, fin) })} />}
 
-      <Hoja abierta={elegirPeriodo} cerrar={() => setElegirPeriodo(false)}>
-        <h2>Elegir período</h2>
-        <div className="campo"><label>Desde</label><input type="date" value={ancla} max={hasta} onChange={e => e.target.value && setAncla(e.target.value)} /></div>
-        <div className="campo"><label>Hasta</label><input type="date" value={hasta} min={ancla} onChange={e => e.target.value && setHasta(e.target.value)} /></div>
-        <div className="espacio" />
-        <button className="btn" onClick={() => setElegirPeriodo(false)}>Listo</button>
-      </Hoja>
 
     </div>
   );
@@ -587,27 +572,6 @@ export function DetalleCategoria({ id, desde, hasta, vista }: { id: string; desd
         </div>
       ))}
     </div>
-  );
-}
-
-/** La tarjeta "Cómo venís" al pie del mes: tres datos y se abre al tocarla. No avisa nada. */
-function TarjetaComoVenis({ periodo }: { periodo: string }) {
-  const nav = useNav();
-  const x = useInsights(periodo);
-  if (!x) return null;
-  const partes = [
-    x.tarjeta.total > 0 && `tarjeta ${x.tarjeta.pct}%`,
-    x.comprometido.total > 0 && `${nombreMes(x.comprometido.periodo, false)} ~${num(x.comprometido.total, 0)}`,
-    x.suscripciones.total > 0 && `suscripciones ${num(x.suscripciones.total, 0)}`,
-  ].filter(Boolean);
-  if (!partes.length) return null;
-  return (
-    // Una sola línea arriba (regla de Resumen); se toca para ver el detalle.
-    <button style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 6, padding: "4px 2px" }} onClick={() => nav.abrir({ p: "como-venis", periodo })}>
-      <span className="viol chico" style={{ flex: "none" }}>✦ Cómo venís:</span>
-      <span className="mini tenue" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{partes.join(" · ")}</span>
-      <T.IconChevronRight size={16} className="tenue" style={{ flex: "none" }} />
-    </button>
   );
 }
 

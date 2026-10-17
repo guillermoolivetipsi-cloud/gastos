@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
-import { claseProvisoria } from "../lib/analisis";
 import { leerDestinos } from "../lib/finanzas";
 import { PLAN, leerReparto, planDelMes, repartoValido, type PlanDelMes, type Reparto } from "../lib/plan";
 import { guardarAjuste } from "../db";
@@ -28,9 +27,8 @@ const real = (p: PlanDelMes, k: Clave) => (k === "vivir" ? p.vivir.real : p[k]);
 export function usePlanes(meses: string[]) {
   const d = useDatos();
   const destinos = useLiveQuery(leerDestinos, []);
-  const clase = useMemo(() => claseProvisoria(d.categorias, d.movimientos), [d.categorias, d.movimientos]);
-  return useMemo(() => (!d.listo || !destinos ? null : meses.map(p => planDelMes(p, d.movimientos, d.categorias, d.recurrentes, destinos[p], clase))),
-    [d, destinos, clase, meses.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  return useMemo(() => (!d.listo || !destinos ? null : meses.map(p => planDelMes(p, d.movimientos, d.categorias, d.recurrentes, destinos[p]))),
+    [d, destinos, meses.join()]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /** El reparto guardado (Más → Ordenar → Plan) o el de arranque. */

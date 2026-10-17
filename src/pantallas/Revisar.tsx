@@ -2,12 +2,11 @@ import { useState } from "react";
 import { useDatos, usePendientes } from "../datos";
 import { db } from "../db";
 import { useNav } from "../nav";
-import type { Categoria, Clase } from "../tipos";
+import type { Categoria } from "../tipos";
 import { crearDesdeSugerencia, descartar, pausar, vincular } from "../lib/acciones";
-import { claseDe, sugerirClase } from "../lib/analisis";
 import { fechaCorta, nombreMes } from "../lib/fecha";
 import { num } from "../lib/formato";
-import { Hoja, Punto, Seg, useToast } from "../ui/piezas";
+import { Hoja, Punto, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
 /* "Para revisar": lo que la app te propone. Nada se aplica sin que lo confirmes.
@@ -67,11 +66,6 @@ export function Revisar() {
       no: { texto: "No", hacer: () => descartar(`rec|${x.clave}`) },
       mas: [{ texto: "Otra cosa…", hacer: () => nav.abrir({ p: "recurrente", desdeSugerencia: x.clave }) }, ahoraNo(`rec|${x.clave}`)],
     })) },
-    { id: "clases", titulo: "Fijas o variables", urgente: false, preguntas: p.clases.length ? [{
-      id: "clases", titulo: "¿Qué categorías son fijas?", dato: `${p.clases.length} para revisar en una lista`,
-      si: { texto: "Revisar", hacer: () => nav.abrir({ p: "clases" }) },
-      mas: [ahoraNo("clases")],
-    }] : [] },
   ].filter(g => g.preguntas.length);
   // Lo urgente primero (lo que tiene fecha); el resto, después.
   grupos.sort((a, b) => Number(b.urgente) - Number(a.urgente));
@@ -117,44 +111,6 @@ export function Revisar() {
           </>
         )}
       </Hoja>
-    </div>
-  );
-}
-
-/** Todas las categorías de gastos en una lista: fijo o variable, con la propuesta marcada. */
-export function Clases() {
-  const d = useDatos();
-  const nav = useNav();
-  const toast = useToast();
-  const [elegido, setElegido] = useState<Record<string, Clase>>({});
-  if (!d.listo) return <div className="pantalla sin-tabs" />;
-  const cats = d.categorias.filter(c => c.tipo === "gasto" && !c.archivada);
-  const propuesta = (id: string): Clase => {
-    const c = cats.find(x => x.id === id)!;
-    return c.claseConfirmada ? claseDe(c) : sugerirClase(c, d.movimientos)?.clase ?? claseDe(c);
-  };
-  const valor = (id: string) => elegido[id] ?? propuesta(id);
-  const orden = [...cats].sort((a, b) => Number(!!a.claseConfirmada) - Number(!!b.claseConfirmada) || a.orden - b.orden);
-
-  async function guardar() {
-    await db.categorias.bulkUpdate(cats.map(c => ({ key: c.id, changes: { clase: valor(c.id), claseConfirmada: true } })));
-    toast({ texto: "Categorías guardadas" });
-    nav.volver();
-  }
-
-  return (
-    <div className="pantalla sin-tabs">
-      <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Tus categorías</h1></div>
-      <div className="chico tenue" style={{ marginBottom: 10 }}>Fijo: el monto casi no cambia de un mes a otro. Variable: cambia, o hay meses sin nada. Lo que cargues como recurrente fijo (alquiler, gym) cuenta como fijo aunque su categoría sea variable.</div>
-      <div className="caja lista">
-        {orden.map(c => (
-          <div key={c.id} className="fila">
-            <span className="izq"><Punto cat={c} chico /><span>{c.nombre}{!c.claseConfirmada && <span className="mini viol"> · propuesta</span>}</span></span>
-            <div style={{ width: 150 }}><Seg opciones={[["fijo", "Fijo"], ["variable", "Variable"]] as [Clase, string][]} valor={valor(c.id)} cambiar={v => setElegido(x => ({ ...x, [c.id]: v }))} /></div>
-          </div>
-        ))}
-      </div>
-      <div className="pie-fijo"><button className="btn" onClick={guardar}>Guardar todo</button></div>
     </div>
   );
 }
