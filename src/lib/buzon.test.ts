@@ -38,7 +38,7 @@ it("deja el envío en envios/<fecha>.json, y lee la respuesta cuando Finanzas la
   const r = await mandar("tok");
   expect(r).toMatchObject({ tipo: "dejado", envio: { nombre: "2026-09-29T12-40-05Z.json", meses: ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"], cantidad: 3 } });
   const envio = JSON.parse(repo["envios/2026-09-29T12-40-05Z.json"]);
-  expect([envio.app, envio.contrato, envio.desde, envio.hasta, envio.movimientos.map((m: { id: string }) => m.id)]).toEqual(["gastos", "1.0", "2026-04", "2026-09", ["julio", "a", "b"]]);
+  expect([envio.app, envio.contrato, envio.desde, envio.hasta, envio.movimientos.map((m: { id: string }) => m.id)]).toEqual(["gastos", "1.1", "2026-04", "2026-09", ["julio", "a", "b"]]);
   expect(envio.movimientos[0]).toMatchObject({ monto: 2.4, moneda: "EUR", cuenta: "Revolut", comentario: "cortado con leche ñ" });
 
   // Finanzas todavía no lo levantó.

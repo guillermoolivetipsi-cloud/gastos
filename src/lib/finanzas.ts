@@ -1,5 +1,5 @@
 import { db, guardarAjuste, leerAjuste, nuevoId } from "../db";
-import type { Categoria, Cuenta, Moneda, Movimiento } from "../tipos";
+import type { Categoria, Cuenta, Moneda, Movimiento, Proyeccion } from "../tipos";
 import type { Destinos } from "./plan";
 import { periodoDe, periodoHoy, sumarMeses } from "./fecha";
 
@@ -14,7 +14,7 @@ import { periodoDe, periodoHoy, sumarMeses } from "./fecha";
    tenga cuenta: es el medio de pago, y las tarjetas se llaman "Visa" y "Mastercard"
    (Finanzas las reconoce por el nombre). Sin borrados, sin recurrentes. */
 
-export const CONTRATO = "1.0";
+export const CONTRATO = "1.1";
 export const REPO = "guillermoolivetipsi-cloud/gastos-buzon";
 const API = `https://api.github.com/repos/${REPO}`;
 
@@ -22,10 +22,31 @@ export interface MovimientoEnviado {
   id: string; tipo: "gasto" | "ingreso"; fecha: string; monto: number; moneda: string;
   cuenta?: string; categoria?: string; etiquetas: string[]; comentario?: string; cuotas?: number;
 }
+/** Lo pactado a futuro (contrato 1.1): algo que ya está acordado y todavía no pasó, como
+ *  el alquiler de Barcelona de dic a mar. Finanzas lo usa solo para proyectar; cuando se
+ *  cobra de verdad, llega como movimiento. */
+export interface Compromiso {
+  id: string; tipo: "gasto" | "ingreso"; concepto: string; monto: number; moneda: string;
+  desde: string; hasta: string | null; cada: "mes"; comentario?: string;
+}
 export interface Envio {
   app: "gastos"; contrato: string; generado: string; desde: string; hasta: string;
   movimientos: MovimientoEnviado[];
+  compromisos: Compromiso[];
 }
+
+/** Qué proyecciones son compromisos: las de varios meses y «seguro». Lo de una sola vez
+ *  (una venta, un encargo) y lo opcional no: no se sabe si va a pasar. Van todas en cada
+ *  envío; la que deja de venir, Finanzas la da de baja. `desde` es el próximo mes que
+ *  falta (la proyección avanza a medida que pasan). */
+export const armarCompromisos = (proys: Proyeccion[]): Compromiso[] => proys
+  .filter(p => p.clase === "seguro" && !!p.hasta && p.hasta > p.periodo)
+  .sort((a, b) => a.periodo.localeCompare(b.periodo) || a.creado.localeCompare(b.creado))
+  .map(p => ({
+    id: `compromiso:${p.id}`, tipo: p.tipo, concepto: p.nombre, monto: p.monto, moneda: p.moneda,
+    desde: p.periodo, hasta: p.hasta!, cada: "mes",
+    comentario: p.montoMax && p.montoMax > p.monto ? `entre ${p.monto} y ${p.montoMax} ${p.moneda}` : undefined,
+  }));
 
 export interface Aviso { nivel: "error" | "atencion" | "info"; texto: string }
 export type PorMes = { periodo: string; nuevos: number; cambian: number; iguales: number }[];
@@ -68,7 +89,7 @@ export function seManda(m: Movimiento, cat: Categoria | undefined, cuenta?: Cuen
 }
 
 /** El envío: todos los movimientos de esos meses, completos, en su moneda. */
-export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[], cuentas: Cuenta[], ahora = new Date()): Envio {
+export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[], cuentas: Cuenta[], ahora = new Date(), proys: Proyeccion[] = []): Envio {
   const cat = new Map(cats.map(c => [c.id, c]));
   const cta = new Map(cuentas.map(c => [c.id, c]));
   const movimientos = movs
@@ -84,7 +105,7 @@ export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[
       };
     });
   const orden = [...meses].sort();
-  return { app: "gastos", contrato: CONTRATO, generado: ahora.toISOString(), desde: orden[0], hasta: orden[orden.length - 1], movimientos };
+  return { app: "gastos", contrato: CONTRATO, generado: ahora.toISOString(), desde: orden[0], hasta: orden[orden.length - 1], movimientos, compromisos: armarCompromisos(proys) };
 }
 
 /** Lee el archivo de respuesta de Finanzas. `ok: false` = no se escribió nada. */
@@ -133,10 +154,10 @@ export async function probarToken(token: string): Promise<"ok" | "token" | "sin-
 
 /** Deja el envío en envios/<fecha>.json. */
 export async function mandar(token: string): Promise<Subida> {
-  const [movs, cats, cuentas] = await Promise.all([db.movimientos.toArray(), db.categorias.toArray(), db.cuentas.toArray()]);
+  const [movs, cats, cuentas, proys] = await Promise.all([db.movimientos.toArray(), db.categorias.toArray(), db.cuentas.toArray(), db.proyecciones.toArray()]);
   const ahora = new Date();
   const meses = mesesAMandar();
-  const envio = armarEnvio(meses, movs, cats, cuentas, ahora);
+  const envio = armarEnvio(meses, movs, cats, cuentas, ahora, proys);
   const nombre = nombreDeEnvio(ahora);
   try {
     const r = await fetch(`${API}/contents/envios/${nombre}`, {
