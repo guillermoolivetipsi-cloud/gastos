@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
 import { leerDestinos, leerEtapa, type Etapa } from "../lib/finanzas";
-import { PLAN, leerReparto, planDelMes, repartoValido, type PlanDelMes, type Reparto } from "../lib/plan";
+import { PLAN, deDondeEntro, leerReparto, planDelMes, repartoValido, vivirPorCategoria, type PlanDelMes, type Reparto } from "../lib/plan";
 import { guardarAjuste } from "../db";
-import { useToast } from "../ui/piezas";
+import { Puntito, useToast } from "../ui/piezas";
 import { nombreMes, periodoHoy, sumarMeses, mesCorto } from "../lib/fecha";
 import { num } from "../lib/formato";
 import { T } from "../ui/Icono";
@@ -65,109 +65,166 @@ function BarraMeta({ valor, meta, color, fina }: { valor: number; meta: number; 
   );
 }
 
+/** Bien, corto o pasado contra el plan: a menos del 10% del plan es bien; en lo que es
+ *  gasto (Vivir, Deuda) pasarse es rojo; en lo que se guarda, quedarse corto es amarillo. */
+function estado(r: number, meta: number, gasto: boolean): "" | "mal" | "ambar" {
+  if (Math.abs(r - meta) <= meta * 0.1 + 0.5) return "";
+  return gasto ? (r > meta ? "mal" : "") : r < meta ? "ambar" : "";
+}
+
+/* El Plan (reglas del Plan, simplificado en octubre 2026): arriba lo que entró y el
+   reparto en una sola barra con las marcas del plan; cada parte en una fila cerrada que
+   se abre ahí mismo para ver de qué está hecha y sus últimos 6 meses; la etapa abajo. */
 export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
   const nav = useNav();
+  const d = useDatos();
   const R = useReparto();
   const [periodo, setPeriodo] = useState(inicial ?? periodoHoy());
-  const [parte, setParte] = useState<Clave>("vivir");
+  const [abierta, setAbierta] = useState<Clave | "entro" | null>(null);
+  const [verEtapa, setVerEtapa] = useState(false);
+  const etapa = useLiveQuery(leerEtapa, []);
   const seis = useMemo(() => Array.from({ length: 6 }, (_, k) => sumarMeses(periodo, k - 5)), [periodo]);
   const planes = usePlanes(seis);
   if (!planes) return <div className="pantalla sin-tabs" />;
   const p = planes[planes.length - 1];
-  const faltaFinanzas = p.inversion == null;
-  const elegida = PARTES.find(x => x.clave === parte)!;
+  const tocar = (k: Clave | "entro") => setAbierta(abierta === k ? null : k);
+  const irA = (q: string) => { setPeriodo(q); setAbierta(null); };
+
+  // La barra del reparto: cada parte por lo que fue (lo que falta de Finanzas no se dibuja).
+  const partesBarra = PARTES.map(x => ({ x, v: Math.max(0, real(p, x.clave) ?? 0) }));
+  const base = Math.max(p.entro, partesBarra.reduce((t, y) => t + y.v, 0));
+  let acum = 0;
+  const marcas = (["vivir", "liquidez", "inversion"] as Clave[]).map(k => (acum += R[k]));
+
+  const detalle = (k: Clave) => {
+    if (k === "vivir") {
+      const meta = (p.entro * R.vivir) / 100;
+      return <>
+        <div className="sub" style={{ marginLeft: 0 }}>
+          {SUB.map(([sk, n]) => {
+            const m = (meta * R.vivirPartes[sk]) / 100, v = p.vivir[sk], ps = v > m;
+            return (
+              <div key={sk}>
+                <div className="fila" style={{ padding: 0 }}><span className="chico">{n} <span className="mini tenue">· plan {R.vivirPartes[sk]}%</span></span><span className={`num chico ${ps ? "mal" : ""}`}>{num(v, 0)}</span></div>
+                <BarraMeta valor={v} meta={m} color={ps ? "var(--mal)" : "#6D5BB8"} fina />
+              </div>
+            );
+          })}
+        </div>
+        <div className="mini tenue" style={{ margin: "12px 0 4px" }}>Lo que más pesa</div>
+        <div className="calc">
+          {vivirPorCategoria(periodo, d.movimientos, d.categorias).map(c => <Fragment key={c.cat?.id ?? "?"}><span><Puntito cat={c.cat ?? { color: "var(--tenue)" }} /> {c.cat?.nombre ?? "Sin categoría"}</span><span className="num">{num(c.usd, 0)}</span></Fragment>)}
+        </div>
+      </>;
+    }
+    if (k === "liquidez") {
+      if (p.inversion == null) return <div className="mini tenue">Se calcula cuando Finanzas manda la inversión y la deuda del mes.</div>;
+      return p.liquidezCalculada
+        ? <>
+          <div className="calc">
+            <span className="tenue">Entró</span><span className="num">{num(p.entro, 0)}</span>
+            <span className="tenue">− Vivir</span><span className="num">{num(p.vivir.real, 0)}</span>
+            <span className="tenue">− Inversión</span><span className="num">{num(p.inversion, 0)}</span>
+            <span className="tenue">− Deuda</span><span className="num">{num(p.deuda ?? 0, 0)}</span>
+            <span className="r">Lo que quedó</span><span className="num r">{num(p.liquidez ?? 0, 0)}</span>
+          </div>
+          <div className="mini tenue" style={{ marginTop: 6 }}>Mientras no tengas una cuenta aparte para la liquidez, es lo que quedó.</div>
+        </>
+        : <div className="calc">
+          <span className="tenue">A la cuenta de liquidez (Finanzas)</span><span className="num">{num(p.liquidez ?? 0, 0)}</span>
+          {p.quedo != null && <><span className="tenue">Quedó en las cuentas</span><span className="num">{num(p.quedo, 0)}</span></>}
+        </div>;
+    }
+    if (k === "inversion") return p.inversion == null
+      ? <div className="mini tenue">Todavía no llegó de Finanzas.</div>
+      : <><div className="calc"><span className="tenue">Lo que mandó Finanzas</span><span className="num">{num(p.inversion, 0)}</span></div><div className="mini tenue" style={{ marginTop: 6 }}>Nexo, Invertir Online y lo que Finanzas llama inversión. El detalle está en Finanzas.</div></>;
+    return <><div className="calc"><span className="tenue">{p.inversion == null ? "Categoría «Deuda» (app)" : "Préstamos (Finanzas)"}</span><span className="num">{num(p.deuda ?? 0, 0)}</span></div><div className="mini tenue" style={{ marginTop: 6 }}>Sin el pago de la tarjeta: esas compras ya cuentan en Vivir.</div></>;
+  };
+
+  // Los últimos 6 meses de una parte, en barritas con la marca del plan; tocar un mes va a ese mes.
+  const meses = (k: Clave, color: string) => {
+    const pcts = planes.map(q => { const r = real(q, k); return q.entro > 0 && r != null ? Math.max(0, (r / q.entro) * 100) : null; });
+    const max = Math.max(R[k], ...pcts.map(x => x ?? 0)) * 1.25 || 1;
+    const cerca = pcts.filter(x => x != null && Math.abs(x - R[k]) <= R[k] * 0.1 + 0.5).length, con = pcts.filter(x => x != null).length;
+    return <>
+      <div className="mini tenue" style={{ marginTop: 12 }}>Los últimos 6 meses</div>
+      <div className="plan-meses">
+        <em style={{ bottom: (R[k] / max) * 52 + 20 }} />
+        {planes.map((q, i) => (
+          <button key={q.periodo} onClick={() => irA(q.periodo)} aria-label={`Ir a ${nombreMes(q.periodo)}`}>
+            {pcts[i] == null ? <b style={{ height: 2, background: "var(--linea-2)" }} /> : <b style={{ height: Math.max(2, (pcts[i]! / max) * 52), background: color, opacity: q.periodo === periodo ? 1 : 0.55 }} />}
+            <span style={q.periodo === periodo ? { color: "var(--tinta)" } : undefined}>{mesCorto(q.periodo)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mini tenue" style={{ marginTop: 4 }}>la línea es el plan ({R[k]}%){con ? ` · ${cerca} de ${con} meses cerca` : ""}</div>
+    </>;
+  };
 
   return (
     <div className="pantalla sin-tabs">
       <div className="enc"><button className="accion" aria-label="Volver" onClick={nav.volver}><T.IconArrowLeft size={22} /></button><h1>Plan</h1></div>
       <div className="navega">
-        <button aria-label="Mes anterior" onClick={() => setPeriodo(sumarMeses(periodo, -1))}><T.IconChevronLeft size={20} /></button>
-        <button onClick={() => setPeriodo(periodoHoy())}><span style={{ color: "var(--tinta)" }}>{nombreMes(periodo)}</span></button>
-        <button aria-label="Mes siguiente" onClick={() => setPeriodo(sumarMeses(periodo, 1))}><T.IconChevronRight size={20} /></button>
+        <button aria-label="Mes anterior" onClick={() => irA(sumarMeses(periodo, -1))}><T.IconChevronLeft size={20} /></button>
+        <button onClick={() => irA(periodoHoy())}><span style={{ color: "var(--tinta)" }}>{nombreMes(periodo)}</span></button>
+        <button aria-label="Mes siguiente" onClick={() => irA(sumarMeses(periodo, 1))}><T.IconChevronRight size={20} /></button>
       </div>
 
-      <div style={{ margin: "12px 2px 6px" }}>
-        <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(p.entro, 0)} <span className="chico tenue">USD entraron</span></div>
-        <div className="mini tenue" style={{ marginTop: 4 }}>
-          {faltaFinanzas ? "inversión y deuda llegan de Finanzas"
-            : p.entro <= 0 ? "sin ingresos este mes"
-            : p.liquidezCalculada ? "la liquidez es lo que te quedó"
-            : p.repartido == null ? "sin ingresos este mes"
-            : p.repartido > 1.005 ? <>repartiste el <span className="ambar">{Math.round(p.repartido * 100)}%</span>: salió {num(p.entro * (p.repartido - 1), 0)} más de lo que entró</>
-            : <>repartiste el {Math.round(p.repartido * 100)}%{p.repartido < 0.995 ? ` · quedan ${num(p.entro * (1 - p.repartido), 0)} sin repartir` : ""}</>}
+      {/* Lo que entró: se toca para ver de dónde vino. */}
+      <button style={{ margin: "12px 2px 6px", width: "100%", textAlign: "left" }} onClick={() => tocar("entro")}>
+        <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(p.entro, 0)} <span className="chico tenue">USD entraron ›</span></div>
+      </button>
+      {abierta === "entro" && (
+        <div className="caja" style={{ marginTop: 4 }}>
+          {p.entro > 0
+            ? <div className="calc">
+              {deDondeEntro(periodo, d.movimientos, d.recurrentes).map(x => <Fragment key={x.nombre}><span className="tenue">{x.nombre}</span><span className="num">{num(x.usd, 0)}</span></Fragment>)}
+              <span className="r">Entró</span><span className="num r">{num(p.entro, 0)}</span>
+            </div>
+            : <div className="mini tenue">Sin ingresos este mes.</div>}
+          <div className="mini tenue" style={{ marginTop: 6 }}>La clínica llega de Finanzas; el resto lo cargás en la app.</div>
         </div>
-      </div>
+      )}
 
-      <CajaEtapa />
+      {/* El reparto en una sola barra, con las marcas blancas del plan. */}
+      {p.entro > 0 && (
+        <div style={{ margin: "2px 0 4px" }}>
+          <div className="plan-marcas">{marcas.map(m => <s key={m} style={{ left: `calc(${(m * p.entro) / base}% - 1px)` }} />)}</div>
+          <div className="plan-apilada">{partesBarra.filter(y => y.v > 0).map(y => <i key={y.x.clave} style={{ width: `${(y.v / base) * 100}%`, background: y.x.color }} />)}</div>
+          <div className="plan-ley">{PARTES.map(x => { const r = real(p, x.clave); return <span key={x.clave}><i style={{ background: x.color }} />{x.nombre} {r == null ? "—" : `${pct(r, p.entro)}%`}</span>; })}</div>
+          <div className="mini tenue" style={{ marginTop: 6 }}>las marcas blancas son tu plan: {R.vivir} · {R.liquidez} · {R.inversion} · {R.deuda}</div>
+        </div>
+      )}
 
-      <div className="caja lista" style={{ marginTop: 14 }}>
+      {/* Cada parte, cerrada; se abre ahí mismo. */}
+      <div className="caja lista" style={{ marginTop: 12 }}>
         {PARTES.map(x => {
-          const meta = (p.entro * R[x.clave]) / 100, r = real(p, x.clave);
-          const pasa = x.gasto && r != null && r > meta;
+          const r = real(p, x.clave), meta = (p.entro * R[x.clave]) / 100, abre = abierta === x.clave;
+          const est = r == null || p.entro <= 0 ? "" : estado(r, meta, x.gasto);
           return (
-            <div key={x.clave} style={{ padding: "10px 0", borderTop: x.clave === "vivir" ? undefined : "1px solid #1A1A24" }}>
-              <div className="fila" style={{ padding: 0 }}>
-                <span><div>{x.nombre}</div><div className="mini tenue">plan {R[x.clave]}% · {num(meta, 0)}{x.clave === "liquidez" && p.liquidezCalculada ? " · lo que quedó" : ""}</div></span>
-                <span className="derecha">
-                  {r == null ? <div className="tenue">—</div> : <>
-                    <div className={`num ${pasa ? "mal" : ""}`}>{pct(r, p.entro)}%</div>
-                    <div className="mini tenue num">{num(r, 0)}</div>
-                  </>}
+            <div key={x.clave} className={abre ? "plan-abierta" : undefined}>
+              <button className="fila" style={{ width: "100%", textAlign: "left", padding: "11px 0" }} onClick={() => tocar(x.clave)}>
+                <span className="izq"><Puntito cat={{ color: x.color }} /><span><div>{x.nombre}</div><div className="mini tenue">{r == null ? "—" : <span className={est}>{pct(r, p.entro)}%</span>} · plan {R[x.clave]}</div></span></span>
+                <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span className="num">{r == null ? "—" : num(r, 0)}</span>
+                  <T.IconChevronRight size={16} className="tenue" style={{ transform: abre ? "rotate(90deg)" : undefined }} />
                 </span>
-              </div>
-              {r != null && <BarraMeta valor={r} meta={meta} color={pasa ? "var(--mal)" : x.color} />}
-              {x.clave === "vivir" && (
-                <div style={{ margin: "8px 0 0 14px", paddingLeft: 10, borderLeft: "1px solid var(--linea-2)", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {SUB.map(([k, n]) => {
-                    const m = (meta * R.vivirPartes[k]) / 100, v = p.vivir[k], ps = v > m;
-                    return (
-                      <div key={k}>
-                        <div className="fila" style={{ padding: 0 }}>
-                          <span className="chico">{n} <span className="mini tenue">· plan {R.vivirPartes[k]}% · {num(m, 0)}</span></span>
-                          <span className={`num chico ${ps ? "mal" : ""}`}>{num(v, 0)}</span>
-                        </div>
-                        <BarraMeta valor={v} meta={m} color={ps ? "var(--mal)" : "#6D5BB8"} fina />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              </button>
+              {abre && <div style={{ paddingBottom: 12 }}>{detalle(x.clave)}{meses(x.clave, x.color)}</div>}
             </div>
           );
         })}
       </div>
-      <div className="mini tenue" style={{ margin: "2px 2px 0" }}>La marca blanca es la meta del plan.</div>
+      {p.inversion == null && p.entro > 0 && <div className="mini tenue" style={{ margin: "2px 2px 0" }}>Inversión y deuda llegan de Finanzas.</div>}
 
-      {/* Mes a mes, de a una parte: cuánto debería haber sido y cuánto fue. */}
-      <div className="grupo-t" style={{ marginTop: 28 }}><span>Mes a mes</span><span className="num">{elegida.nombre}: plan {R[parte]}%</span></div>
-      <div className="pills" style={{ marginBottom: 8 }}>
-        {PARTES.map(x => <button key={x.clave} className={`pill${x.clave === parte ? " on" : ""}`} onClick={() => setParte(x.clave)}>{x.nombre}</button>)}
-      </div>
-      <div className="caja">
-        <table className="tabla-plan">
-          <thead><tr><th>mes</th><th>debería</th><th>fue</th><th>diferencia</th></tr></thead>
-          <tbody>
-            {planes.map(q => {
-              // Sin ingresos ese mes no hay contra qué comparar.
-              if (q.entro <= 0) return <tr key={q.periodo}><td>{mesCorto(q.periodo)}</td><td colSpan={3} className="tenue">sin ingresos cargados</td></tr>;
-              const deb = (q.entro * R[parte]) / 100, fue = real(q, parte);
-              const dif = fue == null ? null : fue - deb;
-              const color = dif == null ? "tenue" : Math.abs(dif) < deb * 0.1 ? "ok" : (elegida.gasto ? dif > 0 : dif < 0) ? (elegida.gasto ? "mal" : "ambar") : "ok";
-              return (
-                <tr key={q.periodo}>
-                  <td>{mesCorto(q.periodo)}</td>
-                  <td className="tenue">{num(deb, 0)}</td>
-                  <td>{fue == null ? <span className="tenue">—</span> : <>{num(fue, 0)} <span className="mini tenue">({pct(fue, q.entro)}%)</span></>}</td>
-                  <td className={color}>{dif == null ? "—" : `${dif >= 0 ? "+" : "−"}${num(Math.abs(dif), 0)}`}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <div className="mini tenue" style={{ marginTop: 8 }}>
-          «Debería» es el {R[parte]}% de lo que entró ese mes. {elegida.gasto ? "Rojo: te pasaste." : "Amarillo: pusiste menos de lo planeado."} Verde: a menos del 10% del plan.{!elegida.gasto && " «—»: Finanzas todavía no lo mandó."}{parte === "liquidez" && " Mientras no haya cuenta aparte, la liquidez es lo que quedó."}
-        </div>
-      </div>
+      {/* La etapa, abajo y chica; se toca para ver la barra (regla de la etapa). */}
+      {etapa && <>
+        <button className="fila" style={{ width: "100%", textAlign: "left", marginTop: 10, padding: "10px 2px" }} onClick={() => setVerEtapa(!verEtapa)}>
+          <span className="mini"><span className="azul">◆</span> <span className="tenue">Etapa:</span> {etapa.nombre.toLowerCase()}{etapa.meses != null && etapa.objetivo ? ` · ${num(etapa.meses, 1)} de ${num(etapa.objetivo, 0)} meses de vida` : ""}</span>
+          <T.IconChevronRight size={16} className="tenue" style={{ transform: verEtapa ? "rotate(90deg)" : undefined }} />
+        </button>
+        {verEtapa && <CajaEtapa />}
+      </>}
     </div>
   );
 }
@@ -182,7 +239,7 @@ function CajaEtapa() {
   const conMeses = meses != null && objetivo != null && objetivo > 0;
   const barritas = conMeses ? Math.min(12, Math.ceil(objetivo!)) : 0;
   return (
-    <div className="caja" style={{ marginTop: 14 }}>
+    <div className="caja" style={{ marginTop: 4 }}>
       <div className="fila" style={{ padding: 0, alignItems: "flex-start" }}>
         <span><div className="mini tenue">Etapa de la cascada</div><div>{nombre}</div></span>
         {conMeses && <span className="derecha"><div className="num">{num(meses!, 1)} <span className="tenue chico">de {num(objetivo!, 0)}</span></div><div className="mini tenue">meses de vida</div></span>}

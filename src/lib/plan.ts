@@ -70,3 +70,28 @@ export function planDelMes(periodo: string, movs: Movimiento[], cats: Categoria[
   const repartido = explicita && entro > 0 ? (vivir.real + destinos!.liquidez! + destinos!.inversion + destinos!.deuda) / entro : null;
   return { periodo, entro, vivir, liquidez, liquidezCalculada: !!destinos && !explicita, quedo, inversion: destinos?.inversion ?? null, deuda, repartido };
 }
+
+/** De dónde vino lo que entró ese mes (al tocar «entraron» en el Plan): la clínica (lo que
+ *  manda Finanzas), cada recurrente de ingreso por su nombre, y el resto como «Otros
+ *  ingresos». Lo más grande primero. */
+export function deDondeEntro(periodo: string, movs: Movimiento[], recs: Recurrente[]) {
+  const rec = new Map(recs.map(r => [r.id, r.nombre]));
+  const t = new Map<string, number>();
+  for (const m of movs) {
+    if (m.tipo !== "ingreso" || m.fecha.slice(0, 7) !== periodo) continue;
+    const n = m.origen === "finanzas" ? "Clínica (Finanzas)" : rec.get(m.recurrenteId ?? "") ?? "Otros ingresos";
+    t.set(n, (t.get(n) ?? 0) + usdDe(m));
+  }
+  return [...t.entries()].map(([nombre, usd]) => ({ nombre, usd })).sort((a, b) => b.usd - a.usd);
+}
+
+/** Las categorías que más pesan en Vivir ese mes (sin «Deuda», que no es vivir). */
+export function vivirPorCategoria(periodo: string, movs: Movimiento[], cats: Categoria[], cuantas = 4) {
+  const porId = new Map(cats.map(c => [c.id, c]));
+  const t = new Map<string, number>();
+  for (const m of movs) {
+    if (m.tipo !== "gasto" || m.fecha.slice(0, 7) !== periodo || nombre(porId.get(m.categoriaId)) === "deuda") continue;
+    t.set(m.categoriaId, (t.get(m.categoriaId) ?? 0) + usdDe(m));
+  }
+  return [...t.entries()].map(([id, usd]) => ({ cat: porId.get(id), usd })).sort((a, b) => b.usd - a.usd).slice(0, cuantas);
+}

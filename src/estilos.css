@@ -231,12 +231,26 @@ select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); b
 .lineas-arriba > * + * { border-top: 1px solid #1A1A24; }
 .lineas-arriba > button { padding: 7px 2px !important; }
 /* El Plan: la tabla «mes a mes» (debería · fue · diferencia). */
-.tabla-plan { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
-.tabla-plan th { font-weight: 400; color: var(--tenue); text-align: right; padding: 4px; }
-.tabla-plan td { padding: 6px 4px; text-align: right; border-top: 1px solid #1A1A24; }
-.tabla-plan th:first-child, .tabla-plan td:first-child { text-align: left; }
 
 /* La etapa de la cascada (Plan): una barrita por mes de vida a juntar. */
 .etapa-meses { display: flex; gap: 4px; margin-top: 8px; }
 .etapa-meses i { flex: 1; height: 7px; border-radius: 3px; background: var(--linea); position: relative; overflow: hidden; }
 .etapa-meses b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--azul); }
+
+/* El Plan (simplificado, octubre 2026): el reparto en una barra con las marcas del plan,
+   las partes que se abren y sus 6 meses en barritas. */
+.plan-marcas { position: relative; height: 10px; }
+.plan-marcas s { position: absolute; top: 0; width: 2px; height: 8px; background: #fff; border-radius: 1px; opacity: .8; }
+.plan-apilada { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; background: var(--linea); }
+.plan-apilada i { display: block; height: 100%; }
+.plan-ley { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; }
+.plan-ley span { display: inline-flex; gap: 5px; align-items: center; font-size: 14px; color: var(--tenue); }
+.plan-ley i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.plan-abierta { background: #11111A; margin: 0 -14px; padding: 0 14px; }
+.calc { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 15px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.calc .r { border-top: 1px solid var(--linea-2); padding-top: 4px; }
+.plan-meses { position: relative; display: flex; align-items: flex-end; gap: 8px; height: 76px; margin-top: 8px; }
+.plan-meses em { position: absolute; left: 0; right: 0; border-top: 1px dashed #fff; opacity: .7; pointer-events: none; }
+.plan-meses button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+.plan-meses b { width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; display: block; }
+.plan-meses span { font-size: 12px; color: var(--tenue); }

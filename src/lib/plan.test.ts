@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Categoria, Movimiento, Recurrente } from "../tipos";
-import { PLAN, planDelMes, repartoValido } from "./plan";
+import { PLAN, deDondeEntro, planDelMes, repartoValido, vivirPorCategoria } from "./plan";
 
 const cat = (id: string, nombre: string, tipo: "gasto" | "ingreso", clase?: "fijo" | "variable") => ({ id, nombre, tipo, icono: "", color: "", orden: 0, clase }) as Categoria;
 const cats = [cat("casa", "Casa", "gasto", "fijo"), cat("ocio", "Ocio", "gasto", "variable"), cat("culpa", "Sin culpa", "gasto", "variable"), cat("deuda", "Deuda", "gasto", "fijo"), cat("psico", "Psicología", "ingreso"), cat("alq", "Alquiler", "ingreso")];
@@ -44,4 +44,16 @@ it("el reparto vale solo si las partes suman 100, y las de Vivir también", () =
   expect(repartoValido(PLAN)).toBe(true);
   expect(repartoValido({ ...PLAN, liquidez: 10 })).toBe(false);
   expect(repartoValido({ ...PLAN, vivirPartes: { ...PLAN.vivirPartes, fijos: 45 } })).toBe(false);
+});
+
+it("de dónde entró: la clínica, cada recurrente por su nombre y el resto junto", () => {
+  const movs = [mov("ingreso", "psico", 3000, { origen: "finanzas" }), mov("ingreso", "alq", 470, { recurrenteId: "lomas" }), mov("ingreso", "alq", 100), mov("ingreso", "alq", 50), mov("ingreso", "alq", 999, { fecha: "2026-09-01" })];
+  expect(deDondeEntro("2026-10", movs, [{ id: "lomas", nombre: "Alquiler Lomas" } as Recurrente])).toEqual([
+    { nombre: "Clínica (Finanzas)", usd: 3000 }, { nombre: "Alquiler Lomas", usd: 470 }, { nombre: "Otros ingresos", usd: 150 },
+  ]);
+});
+
+it("lo que más pesa en Vivir, sin la categoría Deuda", () => {
+  const movs = [mov("gasto", "casa", 900), mov("gasto", "ocio", 300), mov("gasto", "ocio", 50), mov("gasto", "deuda", 500)];
+  expect(vivirPorCategoria("2026-10", movs, cats).map(x => [x.cat?.id, x.usd])).toEqual([["casa", 900], ["ocio", 350]]);
 });
