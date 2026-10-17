@@ -288,10 +288,23 @@ export async function aplicarDesdeFinanzas(d: DesdeFinanzas) {
     for (const p of d.meses) delete antes[p];
     await guardarAjuste("destinosFinanzas", { ...antes, ...destinos });
     await guardarAjuste("ultimoDeFinanzas", { generado: d.generado, ingresos: movs.length, meses: d.meses });
+    // Si cambió de etapa (llenaste un balde), queda un aviso para mostrar una vez.
+    const etapaAntes = await leerAjuste<Etapa | null>("etapaFinanzas", null);
+    if (cambioDeEtapa(etapaAntes, d.etapa ?? null)) await guardarAjuste("etapaCambio", { antes: etapaAntes!.nombre, ahora: d.etapa!.nombre });
     await guardarAjuste("etapaFinanzas", d.etapa ?? null);
     await guardarAjuste("estimadosFinanzas", d.estimados ?? []);
   });
   return movs.length;
+}
+
+/** Hubo cambio de etapa si había una y llegó otra con otro nombre. */
+export const cambioDeEtapa = (antes: Etapa | null, ahora: Etapa | null) => !!antes && !!ahora && antes.nombre.trim().toLowerCase() !== ahora.nombre.trim().toLowerCase();
+export const leerEtapa = () => leerAjuste<Etapa | null>("etapaFinanzas", null);
+/** El aviso de cambio de etapa, una sola vez: lo devuelve y lo borra. */
+export async function tomarCambioDeEtapa() {
+  const c = await leerAjuste<{ antes: string; ahora: string } | null>("etapaCambio", null);
+  if (c) await guardarAjuste("etapaCambio", null);
+  return c;
 }
 
 export const leerDestinos = () => leerAjuste<Record<string, Destinos>>("destinosFinanzas", {});

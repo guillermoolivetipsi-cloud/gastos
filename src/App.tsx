@@ -25,8 +25,9 @@ import { SubirResumen } from "./pantallas/SubirResumen";
 import { Etiquetas } from "./pantallas/Etiquetas";
 import { EditorProyeccion } from "./pantallas/Proyecciones";
 import { AvisoRespuesta, ConectarFinanzas, MandarFinanzas, RespuestaFinanzas } from "./pantallas/Finanzas";
-import { buscarRespuestas, marcarVisto, recibirDeFinanzas, type EnvioHecho } from "./lib/finanzas";
+import { buscarRespuestas, marcarVisto, recibirDeFinanzas, tomarCambioDeEtapa, type EnvioHecho } from "./lib/finanzas";
 import { T } from "./ui/Icono";
+import { useToast } from "./ui/piezas";
 
 function Encima({ p }: { p: Pantalla }) {
   switch (p.p) {
@@ -68,6 +69,7 @@ const SOLAPAS: [Solapa, string, typeof T.IconHome][] = [
 
 export function App() {
   const nav = useNav();
+  const toast = useToast();
 
   const d = useDatos();
   // La navegación de ahora, para los avisos de Android (que llegan fuera de React).
@@ -132,7 +134,13 @@ export function App() {
   // los recurrentes automáticos que ya vencieron.
   useEffect(() => {
     // También lo que manda Finanzas (cobros de Psicología y destinos del Plan).
-    const ponerAlDia = async () => { await sembrar(); await cargarAutomaticos(); await completarPendientes(); traerRespuestas(); recibirDeFinanzas(); };
+    // Si con eso cambiaste de etapa de la cascada, un aviso abajo, una sola vez (regla de la etapa).
+    const ponerAlDia = async () => {
+      await sembrar(); await cargarAutomaticos(); await completarPendientes(); traerRespuestas();
+      await recibirDeFinanzas();
+      const c = await tomarCambioDeEtapa();
+      if (c) toast({ texto: `Llenaste: ${c.antes.toLowerCase()} · ahora: ${c.ahora.toLowerCase()}` });
+    };
     ponerAlDia();
     // Si los avisos están activados, se reprograman.
     leerAjuste<boolean>("notificaciones", false).then(on => { if (on) registrar(); });

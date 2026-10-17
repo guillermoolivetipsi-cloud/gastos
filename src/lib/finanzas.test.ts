@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Categoria, Cuenta, Movimiento, Proyeccion } from "../tipos";
-import { armarDesdeFinanzas, armarEnvio, interpretar, mesesAMandar, nombreDeEnvio, validarDesdeFinanzas } from "./finanzas";
+import { armarDesdeFinanzas, armarEnvio, cambioDeEtapa, interpretar, mesesAMandar, nombreDeEnvio, validarDesdeFinanzas } from "./finanzas";
 
 const cuentas: Cuenta[] = [
   { id: "rev", nombre: "Revolut", moneda: "EUR", dolar: "blue", esTarjeta: false, orden: 0 },
@@ -111,4 +111,11 @@ it("si no cumple el contrato, no se aplica nada", () => {
   expect(validarDesdeFinanzas({ ...desde, ingresos: [desde.ingresos[0], desde.ingresos[0]] })).toBeNull();
   // Un ingreso de un mes que no viene en «meses» rompería el reemplazo por mes.
   expect(validarDesdeFinanzas({ ...desde, ingresos: [{ ...desde.ingresos[0], fecha: "2026-08-01" }] })).toBeNull();
+});
+
+it("avisa el cambio de etapa solo si había una y llegó otra distinta", () => {
+  const e = (nombre: string) => ({ nombre, texto: "" });
+  expect(cambioDeEtapa(e("Fondo de liquidez"), e("Libertad"))).toBe(true);
+  expect(cambioDeEtapa(e("Fondo de liquidez"), e("fondo de liquidez "))).toBe(false);
+  expect([cambioDeEtapa(null, e("Libertad")), cambioDeEtapa(e("Libertad"), null)]).toEqual([false, false]);
 });

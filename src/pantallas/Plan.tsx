@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useDatos } from "../datos";
 import { useNav } from "../nav";
-import { leerDestinos } from "../lib/finanzas";
+import { leerDestinos, leerEtapa, type Etapa } from "../lib/finanzas";
 import { PLAN, leerReparto, planDelMes, repartoValido, type PlanDelMes, type Reparto } from "../lib/plan";
 import { guardarAjuste } from "../db";
 import { useToast } from "../ui/piezas";
@@ -98,6 +98,8 @@ export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
         </div>
       </div>
 
+      <CajaEtapa />
+
       <div className="caja lista" style={{ marginTop: 14 }}>
         {PARTES.map(x => {
           const meta = (p.entro * R[x.clave]) / 100, r = real(p, x.clave);
@@ -166,6 +168,31 @@ export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
           «Debería» es el {R[parte]}% de lo que entró ese mes. {elegida.gasto ? "Rojo: te pasaste." : "Amarillo: pusiste menos de lo planeado."} Verde: a menos del 10% del plan.{!elegida.gasto && " «—»: Finanzas todavía no lo mandó."}{parte === "liquidez" && " Mientras no haya cuenta aparte, la liquidez es lo que quedó."}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** La etapa de la cascada que manda Finanzas, en su caja arriba de las partes (regla de
+ *  la etapa): el nombre, cuántos meses de vida llevás de los que pide, y una barrita por
+ *  mes. Si Finanzas no la manda, no se muestra. */
+function CajaEtapa() {
+  const etapa = useLiveQuery(leerEtapa, []);
+  if (!etapa) return null;
+  const { nombre, texto, meses, objetivo } = etapa as Etapa;
+  const conMeses = meses != null && objetivo != null && objetivo > 0;
+  const barritas = conMeses ? Math.min(12, Math.ceil(objetivo!)) : 0;
+  return (
+    <div className="caja" style={{ marginTop: 14 }}>
+      <div className="fila" style={{ padding: 0, alignItems: "flex-start" }}>
+        <span><div className="mini tenue">Etapa de la cascada</div><div>{nombre}</div></span>
+        {conMeses && <span className="derecha"><div className="num">{num(meses!, 1)} <span className="tenue chico">de {num(objetivo!, 0)}</span></div><div className="mini tenue">meses de vida</div></span>}
+      </div>
+      {conMeses && (
+        <div className="etapa-meses" aria-hidden="true">
+          {Array.from({ length: barritas }, (_, k) => <i key={k}><b style={{ width: `${Math.max(0, Math.min(1, (meses! / objetivo!) * barritas - k)) * 100}%` }} /></i>)}
+        </div>
+      )}
+      <div className="mini tenue" style={{ marginTop: 8 }}>{conMeses ? "Lo que guardás llena primero este balde." : texto}</div>
     </div>
   );
 }

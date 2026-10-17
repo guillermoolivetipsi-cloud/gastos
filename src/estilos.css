@@ -235,3 +235,8 @@ select.pill { appearance: none; -webkit-appearance: none; color: var(--tinta); b
 .tabla-plan th { font-weight: 400; color: var(--tenue); text-align: right; padding: 4px; }
 .tabla-plan td { padding: 6px 4px; text-align: right; border-top: 1px solid #1A1A24; }
 .tabla-plan th:first-child, .tabla-plan td:first-child { text-align: left; }
+
+/* La etapa de la cascada (Plan): una barrita por mes de vida a juntar. */
+.etapa-meses { display: flex; gap: 4px; margin-top: 8px; }
+.etapa-meses i { flex: 1; height: 7px; border-radius: 3px; background: var(--linea); position: relative; overflow: hidden; }
+.etapa-meses b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--azul); }
