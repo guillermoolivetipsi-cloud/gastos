@@ -59,6 +59,7 @@ export function Proyecciones() {
         <div className="mini tenue" style={{ display: "flex", gap: 12 }}>
           <span><span style={{ color: "var(--tenue)" }}>━</span> normal</span>
           <span><span className="viol">┅</span> con proyecciones</span>
+          {puntos.length > 1 && <span><span className="tenue">┈</span> promedio {num(puntos.slice(1).reduce((t, p) => t + p.medio, 0) / (puntos.length - 1), 0)}</span>}
         </div>
         <GraficoLinea puntos={puntos} />
         <div className="mini tenue" style={{ marginTop: 4 }}>
@@ -114,7 +115,7 @@ export function Proyecciones() {
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <span className="derecha">{(() => {
                     // Dólares primero; la moneda original abajo.
-                    const rango = (a: number, b?: number) => `${num(a)}${b && b > a ? `–${num(b)}` : ""}`;
+                    const rango = (a: number, b?: number) => `${num(a, 0)}${b && b > a ? `–${num(b, 0)}` : ""}`;
                     const t = tasa(p.moneda), clase = `num chico${p.activa ? (ing ? " ok" : "") : " tenue"}`;
                     const porMes = p.hasta && p.hasta > p.periodo ? " /mes" : "";
                     const original = `${ing ? "+" : ""}${rango(p.monto, p.montoMax)} ${p.moneda}${porMes}`;
@@ -141,9 +142,12 @@ export function Proyecciones() {
 }
 
 /** Línea gris: el normal. Línea violeta punteada: con lo proyectado. Franja: del mínimo
- *  al máximo si hay rangos. El número de cada mes va arriba del punto. */
+ *  al máximo si hay rangos. El número de cada mes va arriba del punto, con un borde del
+ *  color del fondo para que la línea no lo tape; sin escala a la izquierda (se pisaba) y
+ *  con el promedio de los meses que vienen punteado; su número va en la leyenda (regla
+ *  del gráfico de Proyecciones). */
 function GraficoLinea({ puntos }: { puntos: PuntoMes[] }) {
-  const W = 320, H = 170, izq = 26, der = 12, arriba = 18, abajo = 22;
+  const W = 320, H = 170, izq = 20, der = 20, arriba = 26, abajo = 22;
   const valores = puntos.flatMap(p => [p.normal, p.min, p.max]);
   // No arranca en 0: las diferencias entre meses son lo que importa.
   const minV = Math.min(...valores), maxV = Math.max(...valores);
@@ -153,16 +157,14 @@ function GraficoLinea({ puntos }: { puntos: PuntoMes[] }) {
   const X = (i: number) => izq + (i * (W - izq - der)) / Math.max(1, puntos.length - 1);
   const Y = (v: number) => arriba + ((hi - v) * (H - arriba - abajo)) / (hi - lo || 1);
   const linea = (k: keyof PuntoMes) => puntos.map((p, i) => `${X(i)},${Y(p[k] as number)}`).join(" ");
-  // Unas 3 líneas guía en números redondos (100, 200, 500, 1000…).
-  const crudo = (hi - lo) / 3, mag = Math.pow(10, Math.floor(Math.log10(crudo || 1)));
-  const paso = ([1, 2, 5, 10].find(m => m * mag >= crudo) ?? 10) * mag;
-  const guias: number[] = [];
-  for (let v = Math.ceil(lo / paso) * paso; v <= hi; v += paso) guias.push(v);
-  const k = (v: number) => (Math.abs(v) >= 1000 ? `${num(v / 1000, 1)}k` : num(v, 0));
+  const siguientes = puntos.slice(1), prom = siguientes.length ? siguientes.reduce((t, p) => t + p.medio, 0) / siguientes.length : null;
   const hayRango = puntos.some(p => p.max - p.min > 0.5);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label="Gasto por mes, normal y con proyecciones">
-      {guias.map(v => <g key={v}><line x1={izq - 4} x2={W - der} y1={Y(v)} y2={Y(v)} stroke="var(--linea)" /><text x={0} y={Y(v) + 3} fill="var(--tenue)" fontSize="9">{k(v)}</text></g>)}
+      <line x1={6} x2={W - 6} y1={H - abajo + 4} y2={H - abajo + 4} stroke="var(--linea)" />
+      {prom != null && <g>
+        <line x1={6} x2={W - 6} y1={Y(prom)} y2={Y(prom)} stroke="var(--tenue)" strokeOpacity={0.6} strokeDasharray="3 4" />
+      </g>}
       {hayRango && <polygon points={`${linea("max")} ${puntos.map((p, i) => `${X(i)},${Y(p.min)}`).reverse().join(" ")}`} fill="var(--viol)" fillOpacity={0.18} />}
       <polyline points={linea("normal")} fill="none" stroke="var(--tenue)" strokeWidth={2} />
       <polyline points={linea("medio")} fill="none" stroke="var(--viol)" strokeWidth={2} strokeDasharray="4 3" />
@@ -171,7 +173,7 @@ function GraficoLinea({ puntos }: { puntos: PuntoMes[] }) {
         return (
           <g key={p.periodo}>
             <circle cx={X(i)} cy={Y(p.medio)} r={3} fill={cambia ? "var(--viol)" : "var(--tenue)"} />
-            <text x={X(i)} y={Y(Math.max(p.max, p.medio, p.normal)) - 7} textAnchor="middle" fill={cambia ? "var(--viol-claro)" : "var(--tenue)"} fontSize="10">{num(p.medio, 0)}</text>
+            <text x={X(i)} y={Y(Math.max(p.max, p.medio, p.normal)) - 10} textAnchor="middle" fill={cambia ? "var(--viol-claro)" : "var(--tenue)"} fontSize="11" stroke="var(--panel)" strokeWidth={3} paintOrder="stroke">{num(p.medio, 0)}</text>
             <text x={X(i)} y={H - 6} textAnchor="middle" fill="var(--tenue)" fontSize="10">{mesCorto(p.periodo)}</text>
           </g>
         );

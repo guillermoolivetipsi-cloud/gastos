@@ -217,7 +217,7 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
           {r.items.map(q => {
             const queFue = q.mov.comentario || q.mov.etiquetas.join(", ");
             const nombreCat = cat.get(q.mov.categoriaId) ?? "Sin categoría";
-            const abajo = [queFue ? nombreCat : "", q.de > 1 ? `cuota ${q.numero} de ${q.de}` : textoOriginal({ usd: q.mov.usd, monto: q.mov.monto, moneda: q.mov.moneda }).replace(/^ · /, "")].filter(Boolean).join(" · ");
+            const abajo = [queFue ? nombreCat : "", q.de > 1 ? `cuota ${q.numero} de ${q.de}` : textoOriginal({ usd: q.mov.usd, monto: q.mov.monto, moneda: q.mov.moneda, centavos: true }).replace(/^ · /, "")].filter(Boolean).join(" · ");
             return (
               <button key={q.mov.id + q.numero} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: q.mov.id })}>
                 <span className="izq"><Dia dia={Number(q.mov.fecha.slice(8))} abajo={mesCorto(q.mov.fecha.slice(0, 7))} /><span style={{ minWidth: 0 }}>
@@ -228,7 +228,7 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
                   <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
                     {q.mov.recurrenteId && <T.IconRepeat size={13} className="viol" aria-label="Pago de un recurrente" />}
                     {q.de > 1 && <span className="mini" style={{ color: "var(--azul)" }}>{q.de}×</span>}
-                    {q.de > 1 ? <span className="num">{num(q.usd)}</span> : <Montos usd={q.mov.usd} monto={q.mov.monto} moneda={q.mov.moneda} />}
+                    {q.de > 1 ? <span className="num">{num(q.usd)}</span> : <Montos centavos usd={q.mov.usd} monto={q.mov.monto} moneda={q.mov.moneda} />}
                   </div>
                 </span>
               </button>
@@ -239,12 +239,12 @@ export function Tarjeta({ id, periodo: inicial }: { id: string; periodo?: string
 
       {porCompra.size > 0 && (
         <>
-          <div className="grupo-t"><span>Cuotas que siguen</span><span className="num">{num(futuras.reduce((s, q) => s + q.usd, 0))} USD</span></div>
+          <div className="grupo-t"><span>Cuotas que siguen</span><span className="num">{num(futuras.reduce((s, q) => s + q.usd, 0), 0)} USD</span></div>
           <div className="caja lista">
             {[...porCompra.values()].map(qs => (
               <div key={qs[0].mov.id} className="fila">
                 <span>{cat.get(qs[0].mov.categoriaId)}{qs[0].mov.comentario ? ` · ${qs[0].mov.comentario}` : ""} <span className="tenue mini">· faltan {qs.length} de {qs[0].de}</span></span>
-                <span className="num">{num(qs[0].usd)}/mes</span>
+                <span className="num">{num(qs[0].usd, 0)}/mes</span>
               </div>
             ))}
           </div>

@@ -43,6 +43,7 @@ export const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "ju
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 export const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+export const DIAS_LARGOS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 export const nombreMes = (periodo: string, conAnio = true) => {
   const [a, m] = periodo.split("-").map(Number);

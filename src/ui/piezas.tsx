@@ -166,18 +166,20 @@ export function Dia({ dia, abajo, vencido }: { dia: string | number; abajo: stri
 
 /** Regla de los montos: a la derecha, un solo número en dólares (como los totales);
  *  la moneda original va en la línea gris de la fila (`textoOriginal`). Si no hay
- *  cotización, el monto en su moneda. `estimado`: con "~". `signo`: "+" en ingresos. */
-export function Montos({ usd, monto, moneda, estimado, signo = "", clase = "" }: { usd: number | null; monto: number | string; moneda: string; estimado?: boolean; signo?: string; clase?: string }) {
+ *  cotización, el monto en su moneda. `estimado`: con "~". `signo`: "+" en ingresos.
+ *  Redondo, salvo `centavos` (regla de los decimales: solo en movimientos y al cargar). */
+export function Montos({ usd, monto, moneda, estimado, signo = "", clase = "", centavos }: { usd: number | null; monto: number | string; moneda: string; estimado?: boolean; signo?: string; clase?: string; centavos?: boolean }) {
   const t = estimado ? "~" : "";
   const enUsd = moneda === "USD" || usd != null;
   const valor = moneda === "USD" ? (typeof monto === "number" ? monto : null) : usd;
-  return <div className={`num ${clase}`}>{enUsd && valor != null ? `${t}${signo}${num(valor, valor >= 100 ? 0 : 2)}` : `${t}${signo}${typeof monto === "number" ? num(monto) : monto} ${moneda}`}</div>;
+  const d = centavos ? undefined : 0;
+  return <div className={`num ${clase}`}>{enUsd && valor != null ? `${t}${signo}${num(valor, centavos ? (valor >= 100 ? 0 : 2) : 0)}` : `${t}${signo}${typeof monto === "number" ? num(monto, d) : monto} ${moneda}`}</div>;
 }
 
 /** La moneda original para la línea gris (" · 55 EUR"); vacío si es USD o no hay cotización. */
-export function textoOriginal({ usd, monto, moneda, estimado, signo = "" }: { usd: number | null; monto: number | string; moneda: string; estimado?: boolean; signo?: string }) {
+export function textoOriginal({ usd, monto, moneda, estimado, signo = "", centavos }: { usd: number | null; monto: number | string; moneda: string; estimado?: boolean; signo?: string; centavos?: boolean }) {
   if (moneda === "USD" || usd == null) return "";
-  return ` · ${estimado ? "~" : ""}${signo}${typeof monto === "number" ? num(monto) : monto} ${moneda}`;
+  return ` · ${estimado ? "~" : ""}${signo}${typeof monto === "number" ? num(monto, centavos ? undefined : 0) : monto} ${moneda}`;
 }
 
 /** En las listas que ya llevan el día a la izquierda, la categoría va como un puntito de color. */

@@ -7,7 +7,7 @@ import { enUsdDe, fechaDePago } from "../lib/recurrentes";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
 import { BotonMandar } from "./Finanzas";
-import { DIAS_CORTOS, aFecha, fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
+import { DIAS_CORTOS, DIAS_LARGOS, aFecha, fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarDias, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
 import { num } from "../lib/formato";
 import { Barra, BotonAgregar, Dia, Dona, Puntito, Punto, useToast } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
@@ -30,7 +30,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
   const [ancla, setAncla] = useState(hoy());
   const hasta = hoy();
   // El mes se ve en torta; la semana y el año, en barras por día (o por mes).
-  const grafico: "torta" | "dia" = vista === "mes" || vista === "dia" ? "torta" : "dia";
+  const grafico: "torta" | "dia" = vista === "mes" ? "torta" : "dia";
 
   const [desde, fin] = rango(vista, ancla, hasta);
   const movs = useMemo(() => d.movimientos.filter(m => m.tipo === tipo && m.fecha >= desde && m.fecha <= fin), [d.movimientos, tipo, desde, fin]);
@@ -174,13 +174,13 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
             <span className="etiq e-fijo">Fijos</span>
             {/* Lo pagado grande, de lo que es el mes; lo que falta, rayado (regla de Fijos y Variables:
                 los dos números grandes suman lo gastado en el mes). */}
-            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.fijos.pagado)}{b.fijos.falta > 0 && <span className="tenue chico"> / {num(b.fijos.total)}</span>}</div>
+            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.fijos.pagado, 0)}{b.fijos.falta > 0 && <span className="tenue chico"> / {num(b.fijos.total, 0)}</span>}</div>
             <Barra valor={b.fijos.total ? b.fijos.pagado / b.fijos.total : 0} previsto={b.fijos.total ? b.fijos.falta / b.fijos.total : 0} color="#60A5FA" colorPrevisto="#60A5FA" />
-            <div className="mini tenue">{b.fijos.falta > 0 ? `faltan ${num(b.fijos.falta)}` : "todo pagado"}</div>
+            <div className="mini tenue">{b.fijos.falta > 0 ? `faltan ${num(b.fijos.falta, 0)}` : "todo pagado"}</div>
           </div>
           <div className="caja">
             <span className="etiq e-variable">Variables</span>
-            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.variables.todo)}</div>
+            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.variables.todo, 0)}</div>
             {b.variables.objetivo > 0 && <Barra valor={b.variables.gastado / b.variables.objetivo} color={b.variables.queda < 0 ? "var(--mal)" : b.variables.gastado >= b.variables.objetivo * ALERTA ? "var(--ambar)" : "var(--viol)"} marca={ALERTA} />}
             <div className="mini tenue">
               {b.variables.objetivo > 0 ? `${num(b.variables.gastado, 0)} / ${num(b.variables.objetivo)} con objetivo` : "sin objetivos"}
@@ -190,7 +190,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
       )}
       {b && b.variables.porDia != null && (
         <div className="mini tenue" style={{ margin: "10px 2px 0" }}>
-          {b.variables.queda >= 0 ? `Te quedan ${num(b.variables.queda)} USD para ${b.variables.dias} ${b.variables.dias === 1 ? "día" : "días"}` : `Te pasaste ${num(-b.variables.queda)} USD de tus objetivos`}
+          {b.variables.queda >= 0 ? `Te quedan ${num(b.variables.queda, 0)} USD para ${b.variables.dias} ${b.variables.dias === 1 ? "día" : "días"}` : `Te pasaste ${num(-b.variables.queda, 0)} USD de tus objetivos`}
         </div>
       )}
 
@@ -210,7 +210,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
                       <div key={p} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                         <small className="num mini tenue" style={{ fontSize: 12 }}>{v > 0 ? num(v, 0) : ""}</small>
                         <div style={{ position: "relative", height: H, width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
-                          {promedio != null && <div style={{ position: "absolute", left: 0, right: 0, bottom: Math.round(promedio / max * H), borderTop: "1px dashed #8E8BA3", zIndex: 1 }} />}
+                          {promedio != null && <div style={{ position: "absolute", left: 0, right: 0, bottom: Math.round(promedio / max * H), borderTop: "1px dashed var(--tenue)", zIndex: 1 }} />}
                           {ahora && faltaUsd >= 1 && <i style={{ width: "62%", height: Math.round(faltaUsd / max * H), background: "repeating-linear-gradient(-45deg, var(--ok) 0 3px, transparent 3px 6px)", borderRadius: "4px 4px 0 0", display: "block", opacity: .7 }} />}
                           <i style={{ width: "62%", height: Math.max(v > 0 ? 2 : 0, Math.round(v / max * H)), background: ahora ? "var(--ok)" : "#1E5A48", borderRadius: ahora && faltaUsd >= 1 ? 0 : "4px 4px 0 0", display: "block", position: "relative" }} />
                         </div>
@@ -263,19 +263,22 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
             {hayProy && <button className={`pill${verProy ? " on" : ""}`} style={{ marginTop: 8, width: "fit-content" }} onClick={() => setConProy(!conProy)}>Con proyecciones{verProy ? " ✓" : ""}</button>}
           </div>
         </div>
+      ) : vista === "dia" ? (
+        // La vista Día: lo de ese día, sin torta (regla de la vista Día).
+        <DiaResumen tipo={tipo} dia={desde} movs={movs} total={total} vacio={vacio} />
       ) : vista === "anio" ? (
         <Anio tipo={tipo} anio={desde.slice(0, 4)} total={total} abrirMes={p => { setVista("mes"); setAncla(`${p}-01`); }} />
       ) : (
         <div className="fila" style={{ padding: "4px 2px 10px" }}>
           <span className="tenue chico">{total ? `Total ${enEsto}` : `${vacio} ${enEsto}`}</span>
-          {total > 0 && <span className="mediano num">{num(total)} <span className="chico tenue">USD</span></span>}
+          {total > 0 && <span className="mediano num">{num(total, 0)} <span className="chico tenue">USD</span></span>}
         </div>
       )}
       {sinCotizar > 0 && <div className="mini ambar centro" style={{ marginBottom: 6 }}>{sinCotizar} sin cotizar: se suman al tener conexión</div>}
       {grafico === "dia" && vista !== "dia" && vista !== "anio" && total > 0 && <PorTiempo movs={movs} desde={desde} hasta={fin} />}
 
-      {catsVer.length > 0 && <div className="grupo-t" style={{ marginTop: 28 }}><span>Por categoría</span>{total > 0 && <span className="num">{num(total, 0)}</span>}</div>}
-      {catsVer.length > 0 && (
+      {vista !== "dia" && catsVer.length > 0 && <div className="grupo-t" style={{ marginTop: 28 }}><span>Por categoría</span>{total > 0 && <span className="num">{num(total, 0)}</span>}</div>}
+      {vista !== "dia" && catsVer.length > 0 && (
         <div className="caja lista">
           {catsVer.map(c => {
             const proy = verProy ? proyPorCat.get(c.cat.id) : undefined;
@@ -320,7 +323,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
           })}
         </div>
       )}
-      {movs.length > 0 && <>
+      {vista !== "dia" && movs.length > 0 && <>
         <div className="grupo-t"><span>Últimos movimientos</span><span className="num">{tituloRango(vista, desde, fin).toLowerCase()}</span></div>
         <div className="caja lista">
           {[...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado)).slice(0, 5).map(m => <FilaMovimiento key={m.id} m={m} />)}
@@ -407,7 +410,7 @@ function Anio({ tipo, anio, total, abrirMes }: { tipo: Tipo; anio: string; total
           <span><i style={{ display: "inline-block", width: 12, height: 2, background: VERDE, verticalAlign: 3, marginRight: 5 }} />entró</span>
         </div>
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible" }} role="img" aria-label={`${tipo === "gasto" ? "Gastos" : "Ingresos"} e ingresos de ${anio}, mes a mes`}>
-          {guias.map(v => <g key={v}><line x1={pad} x2={W - pad} y1={y(v)} y2={y(v)} stroke="#1F1F2A" /><text x={W - pad} y={y(v) - 3} textAnchor="end" fontSize="10" fill="#8E8BA3">{num(v, 0)}</text></g>)}
+          {guias.map(v => <g key={v}><line x1={pad} x2={W - pad} y1={y(v)} y2={y(v)} stroke="#1F1F2A" /><text x={W - pad} y={y(v) - 3} textAnchor="end" fontSize="10" fill="var(--tenue)">{num(v, 0)}</text></g>)}
           <line x1={x(sel)} x2={x(sel)} y1={8} y2={H - 14} stroke="#2F2F3C" strokeDasharray="3 3" />
           <path d={camino(entro)} fill="none" stroke={VERDE} strokeWidth={2} strokeLinejoin="round" />
           <path d={camino(gastos)} fill="none" stroke={VIOL} strokeWidth={2} strokeLinejoin="round" />
@@ -415,7 +418,7 @@ function Anio({ tipo, anio, total, abrirMes }: { tipo: Tipo; anio: string; total
             <circle key={`${col}${i}`} cx={x(i)} cy={y(v)} r={i === sel ? 4.5 : 2.5} fill={i === sel ? col as string : "#07070B"} stroke={col as string} strokeWidth={1.6} />))}
           {meses.map((p, i) => (
             <g key={p}>
-              <text x={x(i)} y={H} textAnchor="middle" fontSize="10" fill={i === sel ? "#EDEBF5" : "#8E8BA3"}>{mesCorto(p)}</text>
+              <text x={x(i)} y={H} textAnchor="middle" fontSize="10" fill={i === sel ? "#EDEBF5" : "var(--tenue)"}>{mesCorto(p)}</text>
               {gastos[i] != null && <rect x={x(i) - 13} y={0} width={26} height={H} fill="transparent" style={{ cursor: "pointer" }} onClick={() => setSel(i)} />}
             </g>
           ))}
@@ -550,7 +553,7 @@ export function DetalleCategoria({ id, desde, hasta, vista }: { id: string; desd
                 <div key={p} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                   <small className="num tenue" style={{ fontSize: 12 }}>{v > 0 ? num(v, 0) : ""}</small>
                   <div style={{ position: "relative", height: H, width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
-                    {linea != null && <div style={{ position: "absolute", left: 0, right: 0, bottom: Math.round(linea / max * H), borderTop: "1px dashed #8E8BA3", zIndex: 1 }} />}
+                    {linea != null && <div style={{ position: "absolute", left: 0, right: 0, bottom: Math.round(linea / max * H), borderTop: "1px dashed var(--tenue)", zIndex: 1 }} />}
                     {ahora && previsto >= 1 && <i style={{ width: "62%", height: Math.round(previsto / max * H), background: `repeating-linear-gradient(-45deg, ${cat.color} 0 3px, transparent 3px 6px)`, borderRadius: "4px 4px 0 0", display: "block" }} />}
                     <i style={{ width: "62%", height: Math.max(v > 0 ? 2 : 0, Math.round(v / max * H)), background: ahora ? cat.color : "#3a3156", borderRadius: ahora && previsto >= 1 ? 0 : "4px 4px 0 0", display: "block" }} />
                   </div>
@@ -573,6 +576,33 @@ export function DetalleCategoria({ id, desde, hasta, vista }: { id: string; desd
       ))}
     </div>
   );
+}
+
+/** La vista Día: el total grande, una línea contra un día típico (el promedio del mismo
+ *  día de la semana en las 8 semanas anteriores, contando los que no hubo nada) y todo
+ *  lo del día como en Movimientos. */
+function DiaResumen({ tipo, dia, movs, total, vacio }: { tipo: Tipo; dia: string; movs: Movimiento[]; total: number; vacio: string }) {
+  const d = useDatos();
+  const tipico = useMemo(() => {
+    const dias = Array.from({ length: 8 }, (_, k) => sumarDias(dia, -7 * (k + 1)));
+    const porDia = new Map(dias.map(x => [x, 0]));
+    for (const m of d.movimientos) if (m.tipo === tipo && porDia.has(m.fecha)) porDia.set(m.fecha, porDia.get(m.fecha)! + usdDe(m));
+    return [...porDia.values()].reduce((a, b) => a + b, 0) / dias.length;
+  }, [d.movimientos, tipo, dia]);
+  const dif = total - tipico, nombreDia = DIAS_LARGOS[aFecha(dia).getDay()];
+  const orden = [...movs].sort((a, b) => b.creado.localeCompare(a.creado));
+  return <>
+    <div style={{ margin: "24px 2px 0" }}>
+      {total > 0
+        ? <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(total, 0)} <span className="chico tenue">USD</span></div>
+        : <div className="chico tenue">{vacio} este día</div>}
+      {tipico >= 1 && <div className="mini tenue">un {nombreDia} típico: {num(tipico, 0)}{total > 0 && Math.abs(dif) >= 1 ? <> · <span className={tipo === "gasto" ? (dif > 0 ? "ambar" : "ok") : dif > 0 ? "ok" : "ambar"}>{dif > 0 ? "+" : "−"}{num(Math.abs(dif), 0)}</span></> : ""} · {movs.length} {movs.length === 1 ? (tipo === "gasto" ? "gasto" : "ingreso") : tipo === "gasto" ? "gastos" : "ingresos"}</div>}
+    </div>
+    {movs.length > 0 && <>
+      <div className="grupo-t" style={{ marginTop: 24 }}><span>{tipo === "gasto" ? "Lo que gastaste" : "Lo que entró"}</span><span className="num">{tipo === "gasto" ? "−" : "+"}{num(total, 2)}</span></div>
+      <div className="caja lista">{orden.map(m => <FilaMovimiento key={m.id} m={m} />)}</div>
+    </>}
+  </>;
 }
 
 /** Al cargar mirando otro día, semana o mes, el gasto va ahí: hoy si cae adentro,

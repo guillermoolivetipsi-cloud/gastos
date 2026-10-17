@@ -8,7 +8,7 @@
   --linea: #1F1F2A;
   --linea-2: #2F2F3C;
   --tinta: #EDEBF5;
-  --tenue: #8E8BA3;
+  --tenue: #A3A0B8; /* un poco más claro que el de antes (#8E8BA3): regla de Pulir, octubre 2026 */
   --viol: #8B5CF6;
   --viol-claro: #A78BFA;
   --viol-fondo: #2A1F4A;
@@ -33,7 +33,7 @@
 html, body { margin: 0; background: var(--bg); color: var(--tinta); }
 body {
   font-family: "Outfit Variable", system-ui, sans-serif;
-  font-size: 15px; line-height: 1.4;
+  font-size: 16px; line-height: 1.4;
   overscroll-behavior-y: none;
 }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -80,8 +80,8 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 .fila .izq { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
 .fila .izq > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tenue { color: var(--tenue); }
-.chico { font-size: 14px; }
-.mini { font-size: 13px; }
+.chico { font-size: 15px; }
+.mini { font-size: 14px; }
 .viol { color: var(--viol-claro); }
 .ok { color: var(--ok); }
 .mal { color: var(--mal); }
@@ -118,14 +118,14 @@ input, select, textarea { background: transparent; border: 0; outline: 0; }
 .seg button { flex: 1; padding: 7px 0; border-radius: 99px; color: var(--tenue); font-size: 14px; }
 .seg button.on { background: var(--viol); color: #fff; }
 .solapas { display: flex; gap: 22px; border-bottom: 1px solid var(--linea); margin-bottom: 12px; }
-.solapas button { padding: 6px 0 9px; color: var(--tenue); font-size: 15px; letter-spacing: .3px; }
+.solapas button { padding: 6px 0 9px; color: var(--tenue); font-size: 16px; letter-spacing: .3px; }
 .solapas button.on { color: var(--tinta); box-shadow: inset 0 -2px var(--viol); }
 .vistas { display: flex; justify-content: space-between; margin-bottom: 4px; }
-.vistas button { color: var(--tenue); padding: 6px 4px; font-size: 14px; }
+.vistas button { color: var(--tenue); padding: 6px 4px; font-size: 15px; }
 .vistas button.on { color: var(--viol-claro); box-shadow: inset 0 -2px var(--viol); }
 .navega { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
 .navega button { color: var(--tenue); padding: 6px; }
-.navega span { font-size: 15px; }
+.navega span { font-size: 16px; }
 
 .btn { display: block; width: 100%; background: var(--viol); color: #fff; border-radius: 99px; padding: 13px; text-align: center; font-size: 15px; }
 .btn:disabled { opacity: .4; }

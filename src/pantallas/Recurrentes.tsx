@@ -59,12 +59,12 @@ export function ListaRecurrentes() {
       <button key={r.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "recurrente", id: r.id })}>
         <span className="izq"><Dia dia={dia} abajo={abajo} /><Puntito cat={cat.get(r.categoriaId)} /><span style={{ minWidth: 0 }}>
           <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nombre}</div>
-          <div className="mini tenue">{d.cuentaPorId.get(r.cuentaId)?.nombre}{r.moneda !== "USD" && u != null ? ` · ${aprox}${ing}${num(habitual)} ${r.moneda}` : ""}</div>
+          <div className="mini tenue">{d.cuentaPorId.get(r.cuentaId)?.nombre}{r.moneda !== "USD" && u != null ? ` · ${aprox}${ing}${num(habitual, 0)} ${r.moneda}` : ""}</div>
         </span></span>
         <span className="derecha">
           {r.moneda !== "USD" && u != null
             ? <div className={`num ${ing ? "ok" : ""}`}>{aprox}{ing}{num(u, 0)}{r.frecuencia !== "mensual" ? "/mes" : ""}</div>
-            : <div className={`num ${ing ? "ok" : ""}`}>{aprox}{ing}{num(habitual)}{r.moneda !== "USD" ? ` ${r.moneda}` : ""}</div>}
+            : <div className={`num ${ing ? "ok" : ""}`}>{aprox}{ing}{num(habitual, 0)}{r.moneda !== "USD" ? ` ${r.moneda}` : ""}</div>}
         </span>
       </button>
     );
@@ -98,7 +98,7 @@ export function ListaRecurrentes() {
       {partes.length > 0 && <><div className="grupo-t"><span>Lo que debés en partes</span>{partesUsd > 0 && <span className="num">~{num(partesUsd, 0)}</span>}</div><div className="caja lista">{partes.map(e => (
         <button key={e.rec.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "instancia", id: e.rec.id, clave: e.clave })}>
           <span className="izq"><Dia dia={Number(e.rec.inicio.slice(8))} abajo={mesCorto(e.rec.inicio.slice(0, 7))} /><Puntito cat={cat.get(e.rec.categoriaId)} /><span style={{ minWidth: 0 }}><div>{e.rec.nombre}</div><div className="mini tenue">{d.cuentaPorId.get(e.rec.cuentaId)?.nombre}</div></span></span>
-          <span className="derecha"><div className="num ambar">faltan {num(e.falta)} {e.rec.moneda}</div></span>
+          <span className="derecha"><div className="num ambar">faltan {num(e.falta, 0)} {e.rec.moneda}</div></span>
         </button>
       ))}</div></>}
       {!lista.length && <div className="vacio">{pestana === "gasto" ? "Todavía no hay gastos recurrentes." : "Todavía no hay ingresos recurrentes."}</div>}
@@ -341,7 +341,7 @@ export function Instancia({ id, clave }: { id: string; clave: string }) {
             {e.pagos.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(p => (
               <button key={p.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => nav.abrir({ p: "editor", id: p.id })}>
                 <span className="izq"><Dia dia={Number(p.fecha.slice(8))} abajo={mesCorto(p.fecha.slice(0, 7))} /><span className="chico">{cta.get(p.cuentaId)}<span className="tenue">{textoOriginal({ usd: p.usd, monto: p.monto, moneda: p.moneda })}</span></span></span>
-                <span className="derecha"><Montos usd={p.usd} monto={p.monto} moneda={p.moneda} /></span>
+                <span className="derecha"><Montos usd={p.usd} monto={p.monto} moneda={p.moneda} centavos /></span>
               </button>
             ))}
           </div>
