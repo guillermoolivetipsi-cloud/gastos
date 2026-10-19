@@ -107,7 +107,8 @@ function CajaNoRecurrentes({ periodo }: { periodo: string }) {
   const recPorId = useMemo(() => new Map(d.recurrentes.map(r => [r.id, r])), [d.recurrentes]);
   const delMes = useMemo(() => d.movimientos.filter(m => m.tipo === "gasto" && m.fecha.slice(0, 7) === periodo), [d.movimientos, periodo]);
   const sueltos = delMes.filter(m => !recPorId.has(m.recurrenteId ?? ""));
-  const b = bloques(periodo, delMes, d.categorias, d.recurrentes, [], d.tasaRec).noRecurrentes;
+  const pendientes = useMemo(() => recurrentesDelMes(d.recurrentes, d.movimientos, periodo, d.tasaRec).filter(i => i.estado !== "cargado"), [d.recurrentes, d.movimientos, periodo, d.tasaRec]);
+  const b = bloques(periodo, delMes, d.categorias, d.recurrentes, pendientes, d.tasaRec).noRecurrentes;
   const sugerencias = useMemo(() => detectarRecurrentes(d.movimientos, d.categorias, d.recurrentes, descartesSet(d.descartes)), [d.movimientos, d.categorias, d.recurrentes, d.descartes]);
   const parece = useMemo(() => pareceRecurrente(sueltos, sugerencias, d.recurrentes), [sueltos, sugerencias, d.recurrentes]);
   const seRepite = sueltos.filter(m => parece.has(m.id));
@@ -148,8 +149,20 @@ function CajaNoRecurrentes({ periodo }: { periodo: string }) {
   return <>
     <div style={{ margin: "4px 2px 6px" }}>
       <div className="num" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.1 }}>{num(b.todo, 0)}</div>
-      <div className="mini tenue" style={{ marginTop: 2 }}>{sueltos.length} {sueltos.length === 1 ? "gasto" : "gastos"}{b.objetivo > 0 ? ` · ${num(b.gastado, 0)} / ${num(b.objetivo)} con objetivo` : ""}</div>
+      <div className="mini tenue" style={{ marginTop: 2 }}>{sueltos.length} {sueltos.length === 1 ? "gasto" : "gastos"}{b.objetivo > 0 ? ` · llevás ${num(b.gastado, 0)} de ${num(b.objetivo, 0)} en objetivos` : ""}</div>
     </div>
+    {/* De dónde sale el objetivo: cada categoría con lo que queda después de sus recurrentes. */}
+    {b.porCategoria.length > 0 && <>
+      <div className="grupo-t"><span>Objetivos</span><span className="num">{num(b.gastado, 0)} / {num(b.objetivo, 0)}</span></div>
+      <div className="caja lista">
+        {b.porCategoria.map(x => (
+          <div key={x.cat.id} className="fila">
+            <span className="izq"><Puntito cat={x.cat} /><span><div>{x.cat.nombre}</div>{x.objetivo < (x.cat.objetivo ?? 0) - 0.5 && <div className="mini tenue">de {num(x.cat.objetivo!, 0)}, sin lo recurrente</div>}</span></span>
+            <span className={`num${x.gastado > x.objetivo ? " mal" : ""}`}>{num(x.gastado, 0)} <span className="tenue chico">/ {num(x.objetivo, 0)}</span></span>
+          </div>
+        ))}
+      </div>
+    </>}
     {!sueltos.length && <div className="vacio">Sin gastos no recurrentes este mes.</div>}
 
     {seRepite.length > 0 && <>

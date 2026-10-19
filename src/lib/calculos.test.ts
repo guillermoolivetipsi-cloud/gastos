@@ -80,12 +80,12 @@ it("para revisar: un pago en partes de este mes no es un cambio de precio; una s
   expect(cambiosDePrecio([alq], [sep, mov({ recurrenteId: "alq", periodo: "2026-10", monto: 1100 })], new Set())).toHaveLength(1);
 });
 
-it("no recurrentes: contra el objetivo va solo lo que no se repite; lo que falta de la luz va en Recurrentes", () => {
+it("no recurrentes: al objetivo de Casa se le descuenta la luz que falta (va en Recurrentes)", () => {
   const luz = rec({ id: "luz", nombre: "Luz", categoriaId: "casa", cuentaId: "rev", clase: "variable", monto: 80, dia: 20 });
   const pend = recurrentesDelMes([luz], [], "2026-10", uno).filter(i => i.estado !== "cargado");
   const gastos = [mov({ categoriaId: "super", usd: 400 }), mov({ categoriaId: "ocio", usd: 300 })];
   const b = bloques("2026-10", gastos, cats, [luz], pend, uno);
-  expect([b.noRecurrentes.objetivo, b.noRecurrentes.gastado, b.noRecurrentes.queda, b.recurrentes.falta]).toEqual([1500, 400, 1100, 80]);
+  expect([b.noRecurrentes.objetivo, b.noRecurrentes.gastado, b.noRecurrentes.queda, b.recurrentes.falta]).toEqual([1420, 400, 1020, 80]);
 });
 
 it("resumen: las devoluciones entran como ingreso de la tarjeta y no se duplican", async () => {

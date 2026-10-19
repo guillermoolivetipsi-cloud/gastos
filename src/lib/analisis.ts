@@ -36,30 +36,41 @@ export const esRecurrente = (m: Movimiento, recs: Map<string, Recurrente>) => re
 
 export interface Bloques {
   recurrentes: { total: number; pagado: number; falta: number };
-  /** `todo`: todo lo que no se repite; `gastado`: lo de eso en las categorías con objetivo. */
-  noRecurrentes: { todo: number; gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };
+  /** `todo`: todo lo que no se repite; `gastado`: lo de eso en las categorías con objetivo.
+   *  `objetivo`: lo que queda de los objetivos después de lo que cubren los recurrentes de
+   *  cada categoría; `porCategoria`, de dónde sale. */
+  noRecurrentes: { todo: number; gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number; porCategoria: { cat: Categoria; objetivo: number; gastado: number }[] };
 }
 
 /** Las dos cajas del mes. Recurrentes: lo pagado de tus recurrentes (fijos y variables) y
- *  lo que falta pagar de ellos. No recurrentes: todo lo demás, contra la suma de los
- *  objetivos (solo lo que no se repite: lo que se repite ya está en la otra caja), y
- *  cuánto te queda por día. Las dos suman lo gastado en el mes. */
+ *  lo que falta pagar de ellos. No recurrentes: todo lo demás, contra lo que queda de los
+ *  objetivos después de lo que cubren los recurrentes de cada categoría (Casa 1.200 con
+ *  alquiler y expensas por 1.220 no aporta nada; son cosas distintas), y cuánto te queda
+ *  por día. Las dos suman lo gastado en el mes. */
 export function bloques(periodo: string, gastos: Movimiento[], cats: Categoria[], recs: Recurrente[], pendientes: EstadoInstancia[], tasaUsd: (r: Recurrente) => number | null): Bloques {
   const recPorId = new Map(recs.map(r => [r.id, r]));
   const pagado = suma(gastos.filter(m => esRecurrente(m, recPorId)));
   const falta = redondear(pendientes
     .filter(e => e.rec.tipo === "gasto")
     .reduce((s, e) => { const t = tasaUsd(e.rec); return s + (t ? e.falta / t : 0); }, 0));
-  const conObjetivo = new Set(cats.filter(c => c.tipo === "gasto" && !c.archivada && (c.objetivo ?? 0) > 0).map(c => c.id));
-  const objetivo = cats.filter(c => conObjetivo.has(c.id)).reduce((s, c) => s + (c.objetivo ?? 0), 0);
+  // Lo que se llevan los recurrentes de cada categoría este mes: lo pagado y lo que falta.
+  const recPorCat = new Map<string, number>();
+  for (const m of gastos) if (esRecurrente(m, recPorId)) recPorCat.set(m.categoriaId, (recPorCat.get(m.categoriaId) ?? 0) + usdDe(m));
+  for (const e of pendientes) if (e.rec.tipo === "gasto") { const t = tasaUsd(e.rec); if (t) recPorCat.set(e.rec.categoriaId, (recPorCat.get(e.rec.categoriaId) ?? 0) + e.falta / t); }
   const sueltos = gastos.filter(m => !esRecurrente(m, recPorId));
-  const gastado = suma(objetivo ? sueltos.filter(m => conObjetivo.has(m.categoriaId)) : sueltos);
-  const queda = redondear(objetivo - gastado);
+  const porCategoria = cats
+    .filter(c => c.tipo === "gasto" && !c.archivada && (c.objetivo ?? 0) > 0)
+    .map(c => ({ cat: c, objetivo: redondear(Math.max(0, c.objetivo! - (recPorCat.get(c.id) ?? 0))), gastado: suma(sueltos.filter(m => m.categoriaId === c.id)) }))
+    .filter(x => x.objetivo >= 1)
+    .sort((a, b) => b.objetivo - a.objetivo);
+  const objetivo = redondear(porCategoria.reduce((s, x) => s + x.objetivo, 0));
+  const gastado = objetivo ? redondear(porCategoria.reduce((s, x) => s + x.gastado, 0)) : suma(sueltos);
+  const queda = objetivo ? redondear(objetivo - gastado) : 0;
   const ph = periodoHoy();
   const dias = periodo === ph ? diasDelMes(periodo) - Number(hoy().slice(8)) + 1 : 0;
   return {
     recurrentes: { total: redondear(pagado + falta), pagado, falta },
-    noRecurrentes: { todo: suma(sueltos), gastado, objetivo, queda, dias, porDia: dias && objetivo ? redondear(Math.max(0, queda) / dias) : null },
+    noRecurrentes: { todo: suma(sueltos), gastado, objetivo, queda, dias, porDia: dias && objetivo ? redondear(Math.max(0, queda) / dias) : null, porCategoria },
   };
 }
 

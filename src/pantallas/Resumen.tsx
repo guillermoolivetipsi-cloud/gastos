@@ -185,7 +185,7 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
             <div className="mediano num" style={{ marginTop: 6 }}>{num(b.noRecurrentes.todo, 0)}</div>
             {b.noRecurrentes.objetivo > 0 && <Barra valor={b.noRecurrentes.gastado / b.noRecurrentes.objetivo} color={b.noRecurrentes.queda < 0 ? "var(--mal)" : b.noRecurrentes.gastado >= b.noRecurrentes.objetivo * ALERTA ? "var(--ambar)" : "var(--viol)"} marca={ALERTA} />}
             <div className="mini tenue">
-              {b.noRecurrentes.objetivo > 0 ? `${num(b.noRecurrentes.gastado, 0)} / ${num(b.noRecurrentes.objetivo)} con objetivo` : "sin objetivos"} ›
+              {b.noRecurrentes.objetivo > 0 ? `llevás ${num(b.noRecurrentes.gastado, 0)} de ${num(b.noRecurrentes.objetivo, 0)} en objetivos` : "sin objetivos"} ›
             </div>
           </button>
         </div>
