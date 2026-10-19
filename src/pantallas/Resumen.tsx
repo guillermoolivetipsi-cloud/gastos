@@ -173,20 +173,21 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
         <div className="dos" style={{ marginTop: 16 }}>
           {/* Recurrentes y No recurrentes (regla de octubre 2026): lo pagado grande; lo que falta,
               rayado. Los dos números grandes suman lo gastado en el mes. */}
-          <div className="caja">
-            <span className="etiq e-fijo">Recurrentes</span>
+          {/* Cada caja se toca para ver qué tiene y mover un gasto (regla de las cajas). */}
+          <button className="caja" style={{ textAlign: "left", width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={() => nav.abrir({ p: "caja", cual: "recurrentes", periodo })}>
+            <span style={{ alignSelf: "flex-start" }} className="etiq e-fijo">Recurrentes</span>
             <div className="mediano num" style={{ marginTop: 6 }}>{num(b.recurrentes.pagado, 0)}{b.recurrentes.falta > 0 && <span className="tenue chico"> / {num(b.recurrentes.total, 0)}</span>}</div>
             <Barra valor={b.recurrentes.total ? b.recurrentes.pagado / b.recurrentes.total : 0} previsto={b.recurrentes.total ? b.recurrentes.falta / b.recurrentes.total : 0} color="#60A5FA" colorPrevisto="#60A5FA" />
-            <div className="mini tenue">{b.recurrentes.falta > 0 ? `faltan ${num(b.recurrentes.falta, 0)}` : "todo pagado"}</div>
-          </div>
-          <div className="caja">
-            <span className="etiq e-variable">No recurrentes</span>
+            <div className="mini tenue">{b.recurrentes.falta > 0 ? `faltan ${num(b.recurrentes.falta, 0)}` : "todo pagado"} ›</div>
+          </button>
+          <button className="caja" style={{ textAlign: "left", width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={() => nav.abrir({ p: "caja", cual: "no-recurrentes", periodo })}>
+            <span style={{ alignSelf: "flex-start" }} className="etiq e-variable">No recurrentes</span>
             <div className="mediano num" style={{ marginTop: 6 }}>{num(b.noRecurrentes.todo, 0)}</div>
             {b.noRecurrentes.objetivo > 0 && <Barra valor={b.noRecurrentes.gastado / b.noRecurrentes.objetivo} color={b.noRecurrentes.queda < 0 ? "var(--mal)" : b.noRecurrentes.gastado >= b.noRecurrentes.objetivo * ALERTA ? "var(--ambar)" : "var(--viol)"} marca={ALERTA} />}
             <div className="mini tenue">
-              {b.noRecurrentes.objetivo > 0 ? `${num(b.noRecurrentes.gastado, 0)} / ${num(b.noRecurrentes.objetivo)} con objetivo` : "sin objetivos"}
+              {b.noRecurrentes.objetivo > 0 ? `${num(b.noRecurrentes.gastado, 0)} / ${num(b.noRecurrentes.objetivo)} con objetivo` : "sin objetivos"} ›
             </div>
-          </div>
+          </button>
         </div>
       )}
       {/* Lo que llevás de tarjeta en el resumen que se junta (es de cierre a cierre, no del mes). */}

@@ -10,6 +10,7 @@ import { AvisoVersion } from "./pantallas/Actualizaciones";
 import { completarPendientes } from "./lib/cotizaciones";
 import { cargarAutomaticos } from "./lib/recurrentes";
 import { DetalleCategoria, PantallaProyecciones, Resumen } from "./pantallas/Resumen";
+import { Caja } from "./pantallas/Cajas";
 import { Movimientos } from "./pantallas/Movimientos";
 import { LoQueViene } from "./pantallas/LoQueViene";
 import { Mas } from "./pantallas/Mas";
@@ -51,6 +52,7 @@ function Encima({ p }: { p: Pantalla }) {
     case "plan": return <PantallaPlan periodo={p.periodo} />;
     case "plan-config": return <EditorPlan />;
     case "detalle-categoria": return <DetalleCategoria {...p} />;
+    case "caja": return <Caja cual={p.cual} periodo={p.periodo} />;
     case "proyeccion": return <EditorProyeccion {...p} />;
     case "finanzas-conectar": return <ConectarFinanzas />;
     case "finanzas-mandar": return <MandarFinanzas />;

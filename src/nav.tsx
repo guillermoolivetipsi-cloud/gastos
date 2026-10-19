@@ -29,6 +29,7 @@ export type Pantalla =
   | { p: "plan"; periodo?: string }
   | { p: "plan-config" }
   | { p: "detalle-categoria"; id: string; desde: string; hasta: string; vista: Vista }
+  | { p: "caja"; cual: "recurrentes" | "no-recurrentes"; periodo: string }
   | { p: "proyeccion"; id?: string; periodo?: string }
   | { p: "finanzas-conectar" }
   | { p: "finanzas-mandar" }

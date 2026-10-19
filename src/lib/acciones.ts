@@ -121,3 +121,32 @@ export const pausar = (clave: string) => descartar(`pausa|${clave}`);
 export async function descartar(clave: string) {
   await db.descartes.put({ clave, fecha: new Date().toISOString() });
 }
+
+/** «No es de este recurrente»: el gasto deja de ser su pago (pasa a no recurrentes). */
+export async function desvincular(movIds: string[]) {
+  const antes = await db.movimientos.bulkGet(movIds);
+  await db.movimientos.bulkUpdate(movIds.map(id => ({ key: id, changes: { recurrenteId: undefined, periodo: undefined } })));
+  return async () => { await db.movimientos.bulkUpdate(antes.filter(Boolean).map(m => ({ key: m!.id, changes: { recurrenteId: m!.recurrenteId, periodo: m!.periodo } }))); };
+}
+
+/** «Crear un recurrente con este gasto», con un toque: mensual, el día del gasto, su monto,
+ *  su categoría y su cuenta; fijo (se cambia después en Recurrentes). El gasto queda como su
+ *  primer pago. */
+export async function crearDesdeMovimiento(m: Movimiento, nombre: string) {
+  const id = nuevoId(), periodo = m.fecha.slice(0, 7);
+  await db.recurrentes.add({
+    id, nombre, tipo: m.tipo, categoriaId: m.categoriaId, cuentaId: m.cuentaId, monto: m.monto, moneda: m.moneda,
+    clase: "fijo", frecuencia: "mensual", dia: Number(m.fecha.slice(8)), inicio: `${periodo}-01`, modo: "avisar", activo: true,
+  });
+  await db.movimientos.update(m.id, { recurrenteId: id, periodo });
+  return async () => {
+    await db.movimientos.update(m.id, { recurrenteId: m.recurrenteId, periodo: m.periodo });
+    await db.recurrentes.delete(id);
+  };
+}
+
+/** Cambiar la categoría de un gasto (cambia lo que va a Finanzas: marca `modificado`). */
+export async function cambiarCategoria(m: Movimiento, categoriaId: string) {
+  await db.movimientos.update(m.id, { categoriaId, modificado: new Date().toISOString() });
+  return async () => { await db.movimientos.update(m.id, { categoriaId: m.categoriaId, modificado: m.modificado }); };
+}
