@@ -6,7 +6,7 @@ import { MONEDAS, type Cuenta, type Dolar } from "../tipos";
 import { fechaCorta, hoy, mesCorto, nombreMes, periodoDe, periodoHoy, sumarMeses, ultimoDia } from "../lib/fecha";
 import { num, redondear } from "../lib/formato";
 import { aPagarTarjeta, usdDe } from "../lib/analisis";
-import { cuotasFuturas, esDudosa, resumen } from "../lib/tarjeta";
+import { cuotasFuturas, esDudosa, resumen, resumenQueSeJunta } from "../lib/tarjeta";
 import { Dia, GrupoT, Hoja, Montos, Seg, textoOriginal, useToast } from "../ui/piezas";
 import { T } from "../ui/Icono";
 
@@ -22,8 +22,7 @@ export function ListaCuentas() {
   const cuantos = (c: Cuenta) => delMes.filter(m => m.cuentaId === c.id).length;
   // El resumen que se está juntando: el que cierra este mes, o el del mes que viene si ya cerró.
   const proximo = (c: Cuenta) => {
-    let periodo = p, r = resumen(c, d.movimientos, periodo);
-    if (r.cierre < hoy()) { periodo = sumarMeses(p, 1); r = resumen(c, d.movimientos, periodo); }
+    const r = resumenQueSeJunta(c, d.movimientos, hoy()), periodo = r.periodo;
     const ap = aPagarTarjeta(c, d.movimientos, d.recurrentes, periodoDe(r.vence), d.tasaRec, d.resumenesCargados);
     const real = ap.resumen.periodo === periodo && ap.real;
     const previsto = ap.resumen.periodo === periodo && !real ? ap.previsto : 0;

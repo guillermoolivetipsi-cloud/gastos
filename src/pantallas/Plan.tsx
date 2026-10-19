@@ -20,7 +20,7 @@ const PARTES: { clave: Clave; nombre: string; color: string; gasto: boolean }[] 
   { clave: "inversion", nombre: "Inversión", color: "#5DD39E", gasto: false },
   { clave: "deuda", nombre: "Deuda", color: "#F08A8A", gasto: true },
 ];
-const SUB: [keyof typeof PLAN.vivirPartes, string][] = [["fijos", "Fijos"], ["variables", "Variables"], ["sinCulpa", "Libre de culpa"], ["eventuales", "Eventuales"]];
+const SUB: [keyof typeof PLAN.vivirPartes, string][] = [["fijos", "Recurrentes"], ["variables", "No recurrentes"], ["sinCulpa", "Libre de culpa"], ["eventuales", "Eventuales"]];
 const real = (p: PlanDelMes, k: Clave) => (k === "vivir" ? p.vivir.real : p[k]);
 
 /** Los planes de los meses, con lo que mandó Finanzas. */

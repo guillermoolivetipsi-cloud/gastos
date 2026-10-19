@@ -101,3 +101,11 @@ export function resumenQueVence(c: Cuenta, movs: Movimiento[], periodo: string):
   // no hay nada que pagar, en lugar de mostrar el del mes siguiente.
   return resumen(c, [], periodo);
 }
+
+/** El resumen que se está juntando hoy: el que cierra este mes, o el del mes que viene si
+ *  ya cerró. */
+export function resumenQueSeJunta(c: Cuenta, movs: Movimiento[], dia: string): Resumen {
+  const p = dia.slice(0, 7);
+  const r = resumen(c, movs, p);
+  return r.cierre < dia ? resumen(c, movs, sumarMeses(p, 1)) : r;
+}

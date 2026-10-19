@@ -2,14 +2,15 @@ import { useMemo, useState } from "react";
 import { useDatos, usePendientes } from "../datos";
 import { useNav } from "../nav";
 import type { Movimiento, Tipo } from "../tipos";
-import { aPagarTarjeta, bloques, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
+import { bloques, porCargarDelMes, porCategoria, recurrentesDelMes, suma, usdDe } from "../lib/analisis";
 import { enUsdDe, fechaDePago } from "../lib/recurrentes";
+import { resumenQueSeJunta } from "../lib/tarjeta";
 import { proyectadoPorCategoria } from "../lib/proyecciones";
 import { Proyecciones, tasaDeProyecciones } from "./Proyecciones";
 import { BotonMandar } from "./Finanzas";
 import { DIAS_CORTOS, DIAS_LARGOS, aFecha, fechaCorta, hoy, mesCorto, moverAncla, nombreMes, periodoDe, periodoHoy, rango, sumarDias, sumarMeses, tituloRango, type Vista } from "../lib/fecha";
 import { num } from "../lib/formato";
-import { Barra, BotonAgregar, Dia, Dona, Puntito, Punto, useToast } from "../ui/piezas";
+import { Barra, BotonAgregar, Dia, Dona, Hoja, Puntito, Punto, useToast } from "../ui/piezas";
 import { PorTiempo } from "../ui/Graficos";
 import { LineaPlan } from "./Plan";
 import { T } from "../ui/Icono";
@@ -170,27 +171,29 @@ export function Resumen({ tipo }: { tipo: Tipo }) {
 
       {b && (
         <div className="dos" style={{ marginTop: 16 }}>
+          {/* Recurrentes y No recurrentes (regla de octubre 2026): lo pagado grande; lo que falta,
+              rayado. Los dos números grandes suman lo gastado en el mes. */}
           <div className="caja">
-            <span className="etiq e-fijo">Fijos</span>
-            {/* Lo pagado grande, de lo que es el mes; lo que falta, rayado (regla de Fijos y Variables:
-                los dos números grandes suman lo gastado en el mes). */}
-            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.fijos.pagado, 0)}{b.fijos.falta > 0 && <span className="tenue chico"> / {num(b.fijos.total, 0)}</span>}</div>
-            <Barra valor={b.fijos.total ? b.fijos.pagado / b.fijos.total : 0} previsto={b.fijos.total ? b.fijos.falta / b.fijos.total : 0} color="#60A5FA" colorPrevisto="#60A5FA" />
-            <div className="mini tenue">{b.fijos.falta > 0 ? `faltan ${num(b.fijos.falta, 0)}` : "todo pagado"}</div>
+            <span className="etiq e-fijo">Recurrentes</span>
+            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.recurrentes.pagado, 0)}{b.recurrentes.falta > 0 && <span className="tenue chico"> / {num(b.recurrentes.total, 0)}</span>}</div>
+            <Barra valor={b.recurrentes.total ? b.recurrentes.pagado / b.recurrentes.total : 0} previsto={b.recurrentes.total ? b.recurrentes.falta / b.recurrentes.total : 0} color="#60A5FA" colorPrevisto="#60A5FA" />
+            <div className="mini tenue">{b.recurrentes.falta > 0 ? `faltan ${num(b.recurrentes.falta, 0)}` : "todo pagado"}</div>
           </div>
           <div className="caja">
-            <span className="etiq e-variable">Variables</span>
-            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.variables.todo, 0)}</div>
-            {b.variables.objetivo > 0 && <Barra valor={b.variables.gastado / b.variables.objetivo} color={b.variables.queda < 0 ? "var(--mal)" : b.variables.gastado >= b.variables.objetivo * ALERTA ? "var(--ambar)" : "var(--viol)"} marca={ALERTA} />}
+            <span className="etiq e-variable">No recurrentes</span>
+            <div className="mediano num" style={{ marginTop: 6 }}>{num(b.noRecurrentes.todo, 0)}</div>
+            {b.noRecurrentes.objetivo > 0 && <Barra valor={b.noRecurrentes.gastado / b.noRecurrentes.objetivo} color={b.noRecurrentes.queda < 0 ? "var(--mal)" : b.noRecurrentes.gastado >= b.noRecurrentes.objetivo * ALERTA ? "var(--ambar)" : "var(--viol)"} marca={ALERTA} />}
             <div className="mini tenue">
-              {b.variables.objetivo > 0 ? `${num(b.variables.gastado, 0)} / ${num(b.variables.objetivo)} con objetivo` : "sin objetivos"}
+              {b.noRecurrentes.objetivo > 0 ? `${num(b.noRecurrentes.gastado, 0)} / ${num(b.noRecurrentes.objetivo)} con objetivo` : "sin objetivos"}
             </div>
           </div>
         </div>
       )}
-      {b && b.variables.porDia != null && (
+      {/* Lo que llevás de tarjeta en el resumen que se junta (es de cierre a cierre, no del mes). */}
+      {b && <LineaTarjeta />}
+      {b && b.noRecurrentes.porDia != null && (
         <div className="mini tenue" style={{ margin: "10px 2px 0" }}>
-          {b.variables.queda >= 0 ? `Te quedan ${num(b.variables.queda, 0)} USD para ${b.variables.dias} ${b.variables.dias === 1 ? "día" : "días"}` : `Te pasaste ${num(-b.variables.queda, 0)} USD de tus objetivos`}
+          {b.noRecurrentes.queda >= 0 ? `Te quedan ${num(b.noRecurrentes.queda, 0)} USD para ${b.noRecurrentes.dias} ${b.noRecurrentes.dias === 1 ? "día" : "días"}` : `Te pasaste ${num(-b.noRecurrentes.queda, 0)} USD de tus objetivos`}
         </div>
       )}
 
@@ -442,10 +445,9 @@ function LineaLoQueViene() {
   const insts = useMemo(() => recurrentesDelMes(d.recurrentes, d.movimientos, p, tasa), [d.recurrentes, d.movimientos, p, tasa]);
   const { todos } = porCargarDelMes(insts, d.cuentas);
   const porPagar = todos.reduce((s, i) => { const t = tasa(i.rec); return s + (t ? (i.estado === "parcial" ? i.falta : i.esperado) / t : 0); }, 0);
-  const tarjetas = d.cuentas.filter(c => c.esTarjeta && !c.archivada).map(c => aPagarTarjeta(c, d.movimientos, d.recurrentes, p, tasa, d.resumenesCargados));
-  const totalTarjetas = tarjetas.reduce((s, x) => s + x.total, 0);
-  const estimado = tarjetas.some(x => !x.real);
-  const partes = [porPagar >= 1 && `${num(porPagar, 0)} por pagar`, totalTarjetas >= 1 && `tarjetas ${estimado ? "~" : ""}${num(totalTarjetas, 0)}`].filter(Boolean);
+  // La tarjeta: lo que llevás en el resumen que se está juntando (regla de la tarjeta).
+  const tarjeta = useTarjetas().reduce((s, r) => s + r.total, 0);
+  const partes = [porPagar >= 1 && `${num(porPagar, 0)} por pagar`, tarjeta >= 1 && `tarjeta ${num(tarjeta, 0)}`].filter(Boolean);
   return (
     <button style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 6, padding: "4px 2px" }} onClick={() => nav.abrir({ p: "viene" })}>
       <span className="ambar chico" style={{ flex: "none" }}>◷ Lo que viene:</span>
@@ -453,6 +455,42 @@ function LineaLoQueViene() {
       <T.IconChevronRight size={16} className="tenue" style={{ flex: "none" }} />
     </button>
   );
+}
+
+/** Los resúmenes que se están juntando, de cada tarjeta activa (lo que llevás). */
+function useTarjetas() {
+  const d = useDatos();
+  return useMemo(() => d.cuentas.filter(c => c.esTarjeta && !c.archivada).map(c => resumenQueSeJunta(c, d.movimientos, hoy())), [d.cuentas, d.movimientos]);
+}
+
+/** Debajo de las cajas: «▭ Con tarjeta: 642 · Visa cierra 28 oct ›»; se toca para ver cada
+ *  tarjeta en una hoja (regla de la tarjeta). */
+function LineaTarjeta() {
+  const nav = useNav();
+  const rs = useTarjetas();
+  const [abierta, setAbierta] = useState(false);
+  if (!rs.length) return null;
+  const total = rs.reduce((s, r) => s + r.total, 0);
+  const proxima = [...rs].sort((a, b) => a.cierre.localeCompare(b.cierre))[0];
+  return <>
+    <button className="fila" style={{ width: "100%", textAlign: "left", padding: "6px 2px", marginTop: 8 }} onClick={() => setAbierta(true)}>
+      <span className="mini"><span className="azul">▭</span> Con tarjeta: <span className="num" style={{ color: "var(--tinta)" }}>{num(total, 0)}</span> <span className="tenue">· {proxima.cuenta.nombre} cierra {proxima.confirmado ? "" : "~"}{fechaCorta(proxima.cierre, false)}</span></span>
+      <T.IconChevronRight size={16} className="tenue" />
+    </button>
+    <Hoja abierta={abierta} cerrar={() => setAbierta(false)}>
+      <div className="fila" style={{ padding: "0 0 4px" }}><h2 style={{ margin: 0 }}>Tarjetas</h2><span className="num" style={{ fontSize: 18 }}>{num(total, 0)}</span></div>
+      <div className="mini tenue" style={{ marginBottom: 8 }}>lo que llevás en el resumen que se está juntando</div>
+      <div className="caja lista">
+        {rs.map(r => (
+          <button key={r.cuenta.id} className="fila" style={{ width: "100%", textAlign: "left" }} onClick={() => { setAbierta(false); nav.abrir({ p: "tarjeta", id: r.cuenta.id, periodo: r.periodo }); }}>
+            <span><div>{r.cuenta.nombre}</div><div className="mini tenue">cierra {r.confirmado ? "" : "~"}{fechaCorta(r.cierre, false)} · vence ~{fechaCorta(r.vence, false)} · {r.items.length} {r.items.length === 1 ? "consumo" : "consumos"}{r.enCuotas >= 1 ? ` · ${num(r.enCuotas, 0)} en cuotas` : ""}</div></span>
+            <span style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="num">{num(r.total, 0)}</span><T.IconChevronRight size={16} className="tenue" /></span>
+          </button>
+        ))}
+      </div>
+      <div className="mini tenue">Las cuotas cuentan lo que entra en este resumen, no la compra entera.</div>
+    </Hoja>
+  </>;
 }
 
 /** La pestaña Proyecciones. */

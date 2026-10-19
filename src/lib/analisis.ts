@@ -29,42 +29,37 @@ export function porCategoria(movs: Movimiento[], cats: Categoria[]): PorCategori
     .sort((a, b) => b.total - a.total);
 }
 
-/** Fijo o variable de un gasto. Fijo: se paga siempre igual; variable: el monto cambia.
- *  Lo dice su recurrente (cada recurrente es fijo o variable); un gasto suelto, que no
- *  se repite, es variable. La categoría no decide. */
-export const claseDeGasto = (m: Movimiento, recs: Map<string, Recurrente>): Clase => recs.get(m.recurrenteId ?? "")?.clase ?? "variable";
+/** Si un gasto es el pago de un recurrente (algo que se repite). Las cajas de Gastos y el
+ *  Plan se parten así: recurrentes y no recurrentes (regla de octubre 2026). Fijo o
+ *  variable queda solo para el monto de cada recurrente (los variables con «~»). */
+export const esRecurrente = (m: Movimiento, recs: Map<string, Recurrente>) => recs.has(m.recurrenteId ?? "");
 
 export interface Bloques {
-  fijos: { total: number; pagado: number; falta: number };
-  /** `todo`: todo lo variable gastado (con y sin objetivo); `gastado`: solo lo de las categorías con objetivo. */
-  variables: { todo: number; gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };
+  recurrentes: { total: number; pagado: number; falta: number };
+  /** `todo`: todo lo que no se repite; `gastado`: lo de eso en las categorías con objetivo. */
+  noRecurrentes: { todo: number; gastado: number; objetivo: number; queda: number; porDia: number | null; dias: number };
 }
 
-/** Los dos bloques del resumen del mes. Fijos: lo pagado de los recurrentes fijos más
- *  lo que falta pagar de ellos. Variables: contra la suma de los
- *  objetivos, y cuánto te queda por día. */
+/** Las dos cajas del mes. Recurrentes: lo pagado de tus recurrentes (fijos y variables) y
+ *  lo que falta pagar de ellos. No recurrentes: todo lo demás, contra la suma de los
+ *  objetivos (solo lo que no se repite: lo que se repite ya está en la otra caja), y
+ *  cuánto te queda por día. Las dos suman lo gastado en el mes. */
 export function bloques(periodo: string, gastos: Movimiento[], cats: Categoria[], recs: Recurrente[], pendientes: EstadoInstancia[], tasaUsd: (r: Recurrente) => number | null): Bloques {
   const recPorId = new Map(recs.map(r => [r.id, r]));
-  const claseMov = (m: Movimiento) => claseDeGasto(m, recPorId);
-  const fijosPagado = suma(gastos.filter(m => claseMov(m) === "fijo"));
-  const faltaFijos = redondear(pendientes
-    .filter(e => e.rec.tipo === "gasto" && e.rec.clase === "fijo")
+  const pagado = suma(gastos.filter(m => esRecurrente(m, recPorId)));
+  const falta = redondear(pendientes
+    .filter(e => e.rec.tipo === "gasto")
     .reduce((s, e) => { const t = tasaUsd(e.rec); return s + (t ? e.falta / t : 0); }, 0));
   const conObjetivo = new Set(cats.filter(c => c.tipo === "gasto" && !c.archivada && (c.objetivo ?? 0) > 0).map(c => c.id));
   const objetivo = cats.filter(c => conObjetivo.has(c.id)).reduce((s, c) => s + (c.objetivo ?? 0), 0);
-  // Contra los objetivos se compara solo lo de las categorías que tienen objetivo, y se
-  // descuenta lo que falta pagar de sus recurrentes variables (la luz, las expensas).
-  const variables = gastos.filter(m => claseMov(m) === "variable");
-  const gastadoVar = suma(objetivo ? variables.filter(m => conObjetivo.has(m.categoriaId)) : variables);
-  const faltaVar = redondear(pendientes
-    .filter(e => e.rec.tipo === "gasto" && e.rec.clase === "variable" && conObjetivo.has(e.rec.categoriaId))
-    .reduce((s, e) => { const t = tasaUsd(e.rec); return s + (t ? e.falta / t : 0); }, 0));
-  const queda = redondear(objetivo - gastadoVar - faltaVar);
+  const sueltos = gastos.filter(m => !esRecurrente(m, recPorId));
+  const gastado = suma(objetivo ? sueltos.filter(m => conObjetivo.has(m.categoriaId)) : sueltos);
+  const queda = redondear(objetivo - gastado);
   const ph = periodoHoy();
   const dias = periodo === ph ? diasDelMes(periodo) - Number(hoy().slice(8)) + 1 : 0;
   return {
-    fijos: { total: redondear(fijosPagado + faltaFijos), pagado: fijosPagado, falta: faltaFijos },
-    variables: { todo: suma(variables), gastado: gastadoVar, objetivo, queda, dias, porDia: dias && objetivo ? redondear(Math.max(0, queda) / dias) : null },
+    recurrentes: { total: redondear(pagado + falta), pagado, falta },
+    noRecurrentes: { todo: suma(sueltos), gastado, objetivo, queda, dias, porDia: dias && objetivo ? redondear(Math.max(0, queda) / dias) : null },
   };
 }
 

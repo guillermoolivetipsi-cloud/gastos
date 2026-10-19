@@ -80,12 +80,12 @@ it("para revisar: un pago en partes de este mes no es un cambio de precio; una s
   expect(cambiosDePrecio([alq], [sep, mov({ recurrenteId: "alq", periodo: "2026-10", monto: 1100 })], new Set())).toHaveLength(1);
 });
 
-it("variables: descuenta lo que falta de los recurrentes variables y no mezcla categorías sin objetivo", () => {
+it("no recurrentes: contra el objetivo va solo lo que no se repite; lo que falta de la luz va en Recurrentes", () => {
   const luz = rec({ id: "luz", nombre: "Luz", categoriaId: "casa", cuentaId: "rev", clase: "variable", monto: 80, dia: 20 });
   const pend = recurrentesDelMes([luz], [], "2026-10", uno).filter(i => i.estado !== "cargado");
   const gastos = [mov({ categoriaId: "super", usd: 400 }), mov({ categoriaId: "ocio", usd: 300 })];
   const b = bloques("2026-10", gastos, cats, [luz], pend, uno);
-  expect([b.variables.objetivo, b.variables.gastado, b.variables.queda]).toEqual([1500, 400, 1020]);
+  expect([b.noRecurrentes.objetivo, b.noRecurrentes.gastado, b.noRecurrentes.queda, b.recurrentes.falta]).toEqual([1500, 400, 1100, 80]);
 });
 
 it("resumen: las devoluciones entran como ingreso de la tarjeta y no se duplican", async () => {
@@ -99,7 +99,7 @@ it("resumen: las devoluciones entran como ingreso de la tarjeta y no se duplican
   expect(c.filas.map(f => f.tipo)).toEqual(["credito", "coincide"]);
 });
 
-it("Fijos pagado y todo lo variable suman lo gastado en el mes", () => {
+it("Recurrentes pagado y todo lo no recurrente suman lo gastado en el mes", () => {
   const cats = [
     { id: "casa", nombre: "Casa", tipo: "gasto", icono: "", color: "", orden: 0, clase: "fijo", claseConfirmada: true },
     { id: "ocio", nombre: "Ocio", tipo: "gasto", icono: "", color: "", orden: 1, clase: "variable", claseConfirmada: true, objetivo: 400 },
@@ -108,6 +108,6 @@ it("Fijos pagado y todo lo variable suman lo gastado en el mes", () => {
   const g = (id: string, categoriaId: string, usd: number) => ({ id, tipo: "gasto", fecha: "2026-10-05", monto: usd, moneda: "USD", usd, cuentaId: "c", categoriaId, etiquetas: [], creado: "", modificado: "" }) as Movimiento;
   const gastos = [g("1", "casa", 1000), g("2", "ocio", 300), g("3", "culpa", 200)];
   const b = bloques("2026-10", gastos, cats, [], [], () => 1);
-  expect(b.fijos.pagado + b.variables.todo).toBe(1500);
-  expect(b.variables.gastado).toBe(300);
+  expect(b.recurrentes.pagado + b.noRecurrentes.todo).toBe(1500);
+  expect(b.noRecurrentes.gastado).toBe(300);
 });

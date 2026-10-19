@@ -34,10 +34,10 @@ it("con lo de Finanzas: liquidez, inversión y deuda de allá, y cuánto se repa
   expect(p.repartido).toBeCloseTo(1);
 });
 
-it("el pago de un recurrente toma la clase del recurrente", () => {
+it("el pago de un recurrente, aunque sea variable (la luz), cuenta en recurrentes", () => {
   const rec = { id: "luz", clase: "variable" } as Recurrente;
   const p = planDelMes("2026-10", [mov("gasto", "casa", 70, { recurrenteId: "luz" })], cats, [rec], undefined);
-  expect([p.vivir.fijos, p.vivir.variables]).toEqual([0, 70]);
+  expect([p.vivir.fijos, p.vivir.variables]).toEqual([70, 0]);
 });
 
 it("el reparto vale solo si las partes suman 100, y las de Vivir también", () => {
