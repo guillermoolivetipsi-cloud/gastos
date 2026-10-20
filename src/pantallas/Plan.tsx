@@ -103,12 +103,15 @@ export function PantallaPlan({ periodo: inicial }: { periodo?: string }) {
         <div className="sub" style={{ marginLeft: 0 }}>
           {SUB.map(([sk, n]) => {
             const m = (meta * R.vivirPartes[sk]) / 100, v = p.vivir[sk], ps = v > m;
-            return (
-              <div key={sk}>
-                <div className="fila" style={{ padding: 0 }}><span className="chico">{n} <span className="mini tenue">· plan {R.vivirPartes[sk]}%</span></span><span className={`num chico ${ps ? "mal" : ""}`}>{num(v, 0)}</span></div>
-                <BarraMeta valor={v} meta={m} color={ps ? "var(--mal)" : "#6D5BB8"} fina />
-              </div>
-            );
+            // Recurrentes y No recurrentes se tocan y abren su caja, con los gastos (como en Gastos).
+            const caja = sk === "fijos" ? "recurrentes" : sk === "variables" ? "no-recurrentes" : null;
+            const fila = <>
+              <div className="fila" style={{ padding: 0 }}><span className="chico">{n} <span className="mini tenue">· plan {R.vivirPartes[sk]}%</span></span><span className={`num chico ${ps ? "mal" : ""}`}>{num(v, 0)}{caja && <span className="tenue"> ›</span>}</span></div>
+              <BarraMeta valor={v} meta={m} color={ps ? "var(--mal)" : "#6D5BB8"} fina />
+            </>;
+            return caja
+              ? <button key={sk} style={{ width: "100%", textAlign: "left", display: "block" }} onClick={() => nav.abrir({ p: "caja", cual: caja, periodo })}>{fila}</button>
+              : <div key={sk}>{fila}</div>;
           })}
         </div>
         <div className="mini tenue" style={{ margin: "12px 0 4px" }}>Lo que más pesa</div>
