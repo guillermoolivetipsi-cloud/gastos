@@ -77,6 +77,13 @@ function CajaRecurrentes({ periodo }: { periodo: string }) {
         <h2>{elegida.rec.nombre} · {mesCorto(periodo)}</h2>
         <div className="mini tenue" style={{ marginBottom: 6 }}>{elegida.pagos.length ? elegida.pagos.map(m => `${fechaCorta(m.fecha, false)} · ${num(m.monto)} ${m.moneda}`).join(" · ") : "todavía sin pago este mes"}</div>
         {elegida.pagos.length > 0 ? <>
+          {/* Primero, el gasto mismo: se toca para abrirlo y ver qué es. */}
+          {elegida.pagos.map(m => (
+            <button key={m.id} className="opcion" onClick={() => { cerrar(); nav.abrir({ p: "editor", id: m.id }); }}>
+              <div>Abrir el gasto{elegida.pagos.length > 1 ? ` del ${fechaCorta(m.fecha, false)}` : ""}</div>
+              <div className="mini tenue">{[fechaCorta(m.fecha, false), m.comentario || m.etiquetas.join(", ") || d.catPorId.get(m.categoriaId)?.nombre, `${num(m.monto)} ${m.moneda}`, d.cuentaPorId.get(m.cuentaId)?.nombre].filter(Boolean).join(" · ")}</div>
+            </button>
+          ))}
           <button className="opcion" onClick={() => hacer(`Ya no es de ${elegida.rec.nombre}`, () => desvincular(elegida.pagos.map(m => m.id)))}>
             <div>No es de {elegida.rec.nombre}</div><div className="mini tenue">pasa a no recurrentes</div>
           </button>
