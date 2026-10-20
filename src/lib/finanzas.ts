@@ -14,7 +14,7 @@ import { periodoDe, periodoHoy, sumarMeses } from "./fecha";
    tenga cuenta: es el medio de pago, y las tarjetas se llaman "Visa" y "Mastercard"
    (Finanzas las reconoce por el nombre). Sin borrados, sin recurrentes. */
 
-export const CONTRATO = "1.1";
+export const CONTRATO = "1.2";
 export const REPO = "guillermoolivetipsi-cloud/gastos-buzon";
 const API = `https://api.github.com/repos/${REPO}`;
 
@@ -29,23 +29,42 @@ export interface Compromiso {
   id: string; tipo: "gasto" | "ingreso"; concepto: string; monto: number; moneda: string;
   desde: string; hasta: string | null; cada: "mes"; comentario?: string;
 }
+/** Lo opcional (contrato 1.2): lo que quizás pase (la notebook de diciembre). Finanzas no
+ *  lo proyecta: va a su pantalla de Gustos. `hasta: null` es un solo mes. */
+export interface Opcional {
+  id: string; tipo: "gasto" | "ingreso"; concepto: string; monto: number; moneda: string;
+  desde: string; hasta: string | null; comentario?: string;
+}
 export interface Envio {
   app: "gastos"; contrato: string; generado: string; desde: string; hasta: string;
   movimientos: MovimientoEnviado[];
   compromisos: Compromiso[];
+  opcionales: Opcional[];
 }
 
-/** Qué proyecciones son compromisos: las de varios meses y «seguro». Lo de una sola vez
- *  (una venta, un encargo) y lo opcional no: no se sabe si va a pasar. Van todas en cada
- *  envío; la que deja de venir, Finanzas la da de baja. `desde` es el próximo mes que
- *  falta (la proyección avanza a medida que pasan). */
+/** Qué proyecciones son compromisos: todas las «seguro», de uno o de varios meses, ingreso
+ *  o gasto (Finanzas las proyecta). Una de un mes va con `desde` y `hasta` iguales. Van
+ *  todas en cada envío; la que deja de venir, Finanzas la da de baja. `desde` es el
+ *  próximo mes que falta (la proyección avanza a medida que pasan). Lo que vino de
+ *  Finanzas no vuelve. */
+const cuentaComoTexto = (p: Proyeccion) => (p.montoMax && p.montoMax > p.monto ? `entre ${p.monto} y ${p.montoMax} ${p.moneda}` : undefined);
 export const armarCompromisos = (proys: Proyeccion[]): Compromiso[] => proys
-  .filter(p => p.clase === "seguro" && !!p.hasta && p.hasta > p.periodo)
+  .filter(p => p.clase === "seguro" && p.origen !== "finanzas")
   .sort((a, b) => a.periodo.localeCompare(b.periodo) || a.creado.localeCompare(b.creado))
   .map(p => ({
     id: `compromiso:${p.id}`, tipo: p.tipo, concepto: p.nombre, monto: p.monto, moneda: p.moneda,
-    desde: p.periodo, hasta: p.hasta!, cada: "mes",
-    comentario: p.montoMax && p.montoMax > p.monto ? `entre ${p.monto} y ${p.montoMax} ${p.moneda}` : undefined,
+    desde: p.periodo, hasta: p.hasta && p.hasta > p.periodo ? p.hasta : p.periodo, cada: "mes",
+    comentario: cuentaComoTexto(p),
+  }));
+
+/** Lo opcional, para los Gustos de Finanzas: todas en cada envío (la que deja de venir se
+ *  borra allá); `hasta: null` si es de un solo mes. Lo que vino de Finanzas no vuelve. */
+export const armarOpcionales = (proys: Proyeccion[]): Opcional[] => proys
+  .filter(p => p.clase === "opcional" && p.origen !== "finanzas")
+  .sort((a, b) => a.periodo.localeCompare(b.periodo) || a.creado.localeCompare(b.creado))
+  .map(p => ({
+    id: `proyeccion:${p.id}`, tipo: p.tipo, concepto: p.nombre, monto: p.monto, moneda: p.moneda,
+    desde: p.periodo, hasta: p.hasta && p.hasta > p.periodo ? p.hasta : null, comentario: cuentaComoTexto(p),
   }));
 
 export interface Aviso { nivel: "error" | "atencion" | "info"; texto: string }
@@ -105,7 +124,7 @@ export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[
       };
     });
   const orden = [...meses].sort();
-  return { app: "gastos", contrato: CONTRATO, generado: ahora.toISOString(), desde: orden[0], hasta: orden[orden.length - 1], movimientos, compromisos: armarCompromisos(proys) };
+  return { app: "gastos", contrato: CONTRATO, generado: ahora.toISOString(), desde: orden[0], hasta: orden[orden.length - 1], movimientos, compromisos: armarCompromisos(proys), opcionales: armarOpcionales(proys) };
 }
 
 /** Lee el archivo de respuesta de Finanzas. `ok: false` = no se escribió nada. */
@@ -226,7 +245,10 @@ export interface DesdeFinanzas {
   etapa?: Etapa;
   /** La proyección de la clínica para el mes en curso. */
   estimados?: Estimado[];
+  /** Los gustos cargados en Finanzas (uno por mes). */
+  opcionales?: OpcionalDeFinanzas[];
 }
+export interface OpcionalDeFinanzas { id: string; tipo: "gasto" | "ingreso"; concepto: string; monto: number; moneda: Moneda; usd: number; mes: string; comentario?: string }
 
 const esMes = (x: unknown) => typeof x === "string" && /^\d{4}-\d{2}$/.test(x);
 const esNum = (x: unknown) => typeof x === "number" && Number.isFinite(x);
@@ -242,6 +264,9 @@ export function validarDesdeFinanzas(x: unknown): DesdeFinanzas | null {
   if (!d.ingresos.every(okIngreso) || !d.destinos.every(okDestino)) return null;
   if (d.etapa != null && (typeof d.etapa.nombre !== "string" || typeof d.etapa.texto !== "string")) return null;
   if (d.estimados != null && (!Array.isArray(d.estimados) || !d.estimados.every(e => esMes(e?.periodo) && esNum(e.usd)))) return null;
+  const okOpcional = (o: OpcionalDeFinanzas) => typeof o?.id === "string" && o.id.startsWith("finanzas:") && ["gasto", "ingreso"].includes(o.tipo)
+    && typeof o.concepto === "string" && !!o.concepto.trim() && esNum(o.monto) && o.monto > 0 && ["ARS", "USD", "EUR"].includes(o.moneda) && esNum(o.usd) && esMes(o.mes);
+  if (d.opcionales != null && (!Array.isArray(d.opcionales) || !d.opcionales.every(okOpcional))) return null;
   if (new Set(d.ingresos.map(i => i.id)).size !== d.ingresos.length) return null;
   return d;
 }
@@ -275,10 +300,27 @@ export function armarDesdeFinanzas(d: DesdeFinanzas, cats: Categoria[], cuentas:
 }
 
 /** Guarda lo que llegó: reemplaza lo de Finanzas de esos meses. */
+/** Los gustos de Finanzas como proyecciones «opcional» con `origen: "finanzas"` (un mes
+ *  cada uno). Si ya estaba, conserva si estaba prendida en el gráfico. */
+export function armarGustos(ops: OpcionalDeFinanzas[], existentes: Proyeccion[]): Proyeccion[] {
+  const antes = new Map(existentes.filter(p => p.origen === "finanzas").map(p => [p.id, p]));
+  return ops.map(o => ({
+    id: o.id, nombre: o.concepto.trim(), tipo: o.tipo, clase: "opcional", monto: o.monto, moneda: o.moneda, usd: o.usd,
+    periodo: o.mes, categoriaId: "", activa: antes.get(o.id)?.activa ?? false, creado: antes.get(o.id)?.creado ?? new Date().toISOString(), origen: "finanzas",
+  }));
+}
+
 export async function aplicarDesdeFinanzas(d: DesdeFinanzas) {
   const [cats, cuentas] = await Promise.all([db.categorias.toArray(), db.cuentas.toArray()]);
   const { movs, catsNuevas, cuentasNuevas, destinos } = armarDesdeFinanzas(d, cats, cuentas);
-  await db.transaction("rw", [db.movimientos, db.categorias, db.cuentas, db.ajustes], async () => {
+  await db.transaction("rw", [db.movimientos, db.categorias, db.cuentas, db.ajustes, db.proyecciones], async () => {
+    // Los gustos de Finanzas: si la sección viene, el celular queda igual a la lista (vacía
+    // = ninguno); si no viene, no se toca nada.
+    if (d.opcionales) {
+      const todas = await db.proyecciones.toArray();
+      await db.proyecciones.bulkDelete(todas.filter(p => p.origen === "finanzas").map(p => p.id));
+      await db.proyecciones.bulkPut(armarGustos(d.opcionales, todas));
+    }
     if (catsNuevas.length) await db.categorias.bulkAdd(catsNuevas);
     if (cuentasNuevas.length) await db.cuentas.bulkAdd(cuentasNuevas);
     const viejos = await db.movimientos.filter(m => m.origen === "finanzas" && d.meses.includes(m.fecha.slice(0, 7))).primaryKeys();

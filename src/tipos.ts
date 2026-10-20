@@ -124,6 +124,11 @@ export interface Proyeccion {
   /** Si suma en el gráfico. Los seguros arrancan prendidos; los opcionales, apagados. */
   activa: boolean;
   creado: string;
+  /** Un gusto cargado en Finanzas (id `finanzas:gusto:<n>`): se ve, no se edita en el
+   *  celular y no vuelve a Finanzas. */
+  origen?: "finanzas";
+  /** El monto en USD que mandó Finanzas, con su cambio. */
+  usd?: number;
 }
 
 /** Sugerencias que descartaste, para no volver a mostrarlas. */

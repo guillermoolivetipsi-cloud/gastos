@@ -166,6 +166,30 @@ cada archivo.
 **No son cobros sueltos.** Finanzas tiene los ingresos de la clínica como **totales por mes
 y por moneda** (pesos, euros, USDT): llegan unos tres por mes, y la app los muestra así.
 
+### Los gustos cargados en Finanzas
+
+```json
+"opcionales": [
+  { "id": "finanzas:gusto:7", "tipo": "gasto", "concepto": "Notebook", "monto": 1800, "moneda": "USD", "usd": 1800, "mes": "2026-12", "comentario": "la del trabajo" }
+]
+```
+
+| campo | obligatorio | qué es |
+|---|---|---|
+| `opcionales[].id` | sí | `finanzas:gusto:<n>`, estable |
+| `opcionales[].tipo` | sí | `"gasto"` o `"ingreso"` |
+| `opcionales[].concepto` | sí | el nombre |
+| `opcionales[].monto` / `moneda` | sí | positivo, en su moneda (`ARS`, `USD`, `EUR`; USDT como USD) |
+| `opcionales[].usd` | sí | el mismo monto en dólares, con el cambio de Finanzas |
+| `opcionales[].mes` | sí | `AAAA-MM`, uno solo (los rangos ya vienen desarmados) |
+| `opcionales[].comentario` | no | texto libre |
+
+Solo los que nacieron en Finanzas, del mes en curso en adelante. La app los muestra como
+proyecciones «opcional» que vienen de Finanzas: no se editan en el celular y no vuelven.
+**Si la sección viene, la app queda igual a la lista (vacía = ninguno); si no viene, no
+toca nada.** Por eso, cuando no queda ningún gusto, Finanzas tiene que mandar
+`"opcionales": []` (no omitir la sección), o el celular conserva el último.
+
 ## 4 · Lo que hace la app con esto
 
 - Los ingresos entran como ingresos de su categoría, marcados como **de Finanzas**: se ven en Ingresos y en el Plan, no se editan en el celular (se corrigen en

@@ -16,6 +16,8 @@ export type Vista = Tipo | "queda";
 export interface EnUsd { min: number; max: number; medio: number }
 
 export function usdDeProyeccion(p: Proyeccion, tasa: TasaMoneda): EnUsd {
+  // Lo que vino de Finanzas trae su monto en USD: los dos lados muestran el mismo número.
+  if (p.usd != null && p.moneda !== "USD") return { min: redondear(p.usd), max: redondear(p.usd), medio: redondear(p.usd) };
   const t = tasa(p.moneda);
   if (!t) return { min: 0, max: 0, medio: 0 };
   const min = p.monto / t, max = (p.montoMax && p.montoMax > p.monto ? p.montoMax : p.monto) / t;

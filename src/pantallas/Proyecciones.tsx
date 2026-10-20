@@ -102,27 +102,29 @@ export function Proyecciones() {
         <div className="caja lista">
           {lista.map(p => {
             const cat = d.catPorId.get(p.categoriaId);
-            const termino = p.periodo < periodoHoy();
+            // Los gustos de Finanzas se ven, no se editan acá ni se preguntan (se cambian allá).
+            const deFinanzas = p.origen === "finanzas";
+            const termino = p.periodo < periodoHoy() && !deFinanzas;
             const ing = p.tipo === "ingreso";
             return (
               <div key={p.id} className="fila" style={{ flexWrap: "wrap" }}>
-                <button className="izq" style={{ textAlign: "left", flex: 1, minWidth: 0 }} onClick={() => nav.abrir({ p: "proyeccion", id: p.id })}>
+                <button className="izq" style={{ textAlign: "left", flex: 1, minWidth: 0 }} onClick={() => deFinanzas ? toast({ texto: "Viene de Finanzas: se cambia allá" }) : nav.abrir({ p: "proyeccion", id: p.id })}>
                   <span style={{ minWidth: 0 }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nombre}</div>
-                    <div className="mini tenue"><span className={`etiq ${p.clase === "seguro" ? "e-fijo" : "e-variable"}`}>{p.clase}</span> {cat?.nombre} · {p.hasta && p.hasta > p.periodo ? `${mesCorto(p.periodo)} – ${mesCorto(p.hasta)} · ${mesesQueQuedan(p)} meses` : nombreMes(p.periodo, false)}</div>
+                    <div className="mini tenue"><span className={`etiq ${p.clase === "seguro" ? "e-fijo" : "e-variable"}`}>{p.clase}</span> {deFinanzas ? "de Finanzas" : cat?.nombre} · {p.hasta && p.hasta > p.periodo ? `${mesCorto(p.periodo)} – ${mesCorto(p.hasta)} · ${mesesQueQuedan(p)} meses` : nombreMes(p.periodo, false)}</div>
                   </span>
                 </button>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <span className="derecha">{(() => {
                     // Dólares primero; la moneda original abajo.
                     const rango = (a: number, b?: number) => `${num(a, 0)}${b && b > a ? `–${num(b, 0)}` : ""}`;
-                    const t = tasa(p.moneda), clase = `num chico${p.activa ? (ing ? " ok" : "") : " tenue"}`;
+                    const t = p.usd != null && p.moneda !== "USD" ? p.monto / p.usd : tasa(p.moneda), clase = `num chico${p.activa ? (ing ? " ok" : "") : " tenue"}`;
                     const porMes = p.hasta && p.hasta > p.periodo ? " /mes" : "";
                     const original = `${ing ? "+" : ""}${rango(p.monto, p.montoMax)} ${p.moneda}${porMes}`;
                     if (p.moneda === "USD" || !t) return <div className={clase}>{original}</div>;
                     return <><div className={clase}>~{ing ? "+" : ""}{rango(Math.round(p.monto / t), p.montoMax ? Math.round(p.montoMax / t) : undefined)} USD{porMes}</div><div className="mini tenue num">{original}</div></>;
                   })()}</span>
-                  {!termino && <Interruptor on={p.activa} cambiar={v => db.proyecciones.update(p.id, { activa: v })} />}
+                  {!termino && p.periodo >= periodoHoy() && <Interruptor on={p.activa} cambiar={v => db.proyecciones.update(p.id, { activa: v })} />}
                 </span>
                 {termino && (
                   <div style={{ width: "100%", display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 4 }}>

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Categoria, Cuenta, Movimiento, Proyeccion } from "../tipos";
-import { armarDesdeFinanzas, armarEnvio, cambioDeEtapa, interpretar, mesesAMandar, nombreDeEnvio, validarDesdeFinanzas } from "./finanzas";
+import { armarDesdeFinanzas, armarEnvio, armarGustos, cambioDeEtapa, interpretar, mesesAMandar, nombreDeEnvio, validarDesdeFinanzas } from "./finanzas";
 
 const cuentas: Cuenta[] = [
   { id: "rev", nombre: "Revolut", moneda: "EUR", dolar: "blue", esTarjeta: false, orden: 0 },
@@ -19,22 +19,34 @@ it("manda los meses completos, en su moneda, con el id de la app; sin cobros de 
     mov({ id: "alq", tipo: "ingreso", categoriaId: "alq", monto: 400, moneda: "USD", exportado: "2026-09-01" }),
   ];
   const e = armarEnvio(["2026-08", "2026-09"], movs, cats, cuentas, new Date("2026-09-29T12:00:00Z"));
-  expect([e.app, e.contrato, e.desde, e.hasta, e.generado]).toEqual(["gastos", "1.1", "2026-08", "2026-09", "2026-09-29T12:00:00.000Z"]);
+  expect([e.app, e.contrato, e.desde, e.hasta, e.generado]).toEqual(["gastos", "1.2", "2026-08", "2026-09", "2026-09-29T12:00:00.000Z"]);
   expect(e.movimientos.map(m => m.id)).toEqual(["b", "a", "alq"]);
   expect(e.movimientos[0]).toEqual({ id: "b", tipo: "gasto", fecha: "2026-08-31", monto: 68000, moneda: "ARS", cuenta: "Visa", categoria: "Ocio", etiquetas: ["Vacaciones"], comentario: undefined, cuotas: 3 });
   expect(e.movimientos[1]).toMatchObject({ monto: 28.7, moneda: "EUR", cuenta: "Revolut", comentario: "Cena", cuotas: undefined });
   expect(JSON.stringify(e)).not.toContain("33.1"); // nunca en dólares convertidos
 });
 
-it("lo pactado a futuro va como compromiso: solo lo de varios meses y seguro", () => {
+it("lo seguro va como compromiso (de uno o de varios meses) y lo opcional como opcional; lo de Finanzas no vuelve", () => {
   const p = (x: Partial<Proyeccion>): Proyeccion => ({ id: "x", nombre: "x", tipo: "ingreso", clase: "seguro", monto: 1150, moneda: "EUR", periodo: "2026-12", categoriaId: "alq", activa: true, creado: "", ...x });
   const proys = [
     p({ id: "bcn", nombre: "Alquiler depto BCN", hasta: "2027-03" }),
-    p({ id: "venta", nombre: "Venta de la bici" }),                       // una sola vez: no
-    p({ id: "bono", nombre: "Bono", clase: "opcional", hasta: "2027-01" }), // opcional: no
+    p({ id: "trabajo", nombre: "Trabajo puntual", monto: 2000, periodo: "2027-01" }),     // seguro de un mes: desde = hasta
+    p({ id: "note", nombre: "Notebook", tipo: "gasto", clase: "opcional", monto: 1800, moneda: "USD" }), // opcional de un mes: hasta null
+    p({ id: "finanzas:gusto:7", nombre: "Viaje", tipo: "gasto", clase: "opcional", origen: "finanzas" }), // vino de Finanzas: no vuelve
   ];
   const e = armarEnvio(["2026-10"], [], cats, cuentas, new Date(), proys);
-  expect(e.compromisos).toEqual([{ id: "compromiso:bcn", tipo: "ingreso", concepto: "Alquiler depto BCN", monto: 1150, moneda: "EUR", desde: "2026-12", hasta: "2027-03", cada: "mes", comentario: undefined }]);
+  expect(e.compromisos.map(c => [c.id, c.desde, c.hasta])).toEqual([["compromiso:bcn", "2026-12", "2027-03"], ["compromiso:trabajo", "2027-01", "2027-01"]]);
+  expect(e.opcionales).toEqual([{ id: "proyeccion:note", tipo: "gasto", concepto: "Notebook", monto: 1800, moneda: "USD", desde: "2026-12", hasta: null, comentario: undefined }]);
+});
+
+it("los gustos de Finanzas llegan como proyecciones opcionales, sin pisar si estaban prendidas", () => {
+  const base = { app: "finanzas", contrato: "1.0", generado: "", meses: ["2026-10"], ingresos: [], destinos: [] };
+  const gusto = { id: "finanzas:gusto:7", tipo: "gasto", concepto: "Notebook", monto: 1800, moneda: "USD", usd: 1800, mes: "2026-12" };
+  const d = validarDesdeFinanzas({ ...base, opcionales: [gusto] })!;
+  expect(d).not.toBeNull();
+  expect(validarDesdeFinanzas({ ...base, opcionales: [{ ...gusto, id: "7" }] })).toBeNull(); // sin «finanzas:», no
+  const [g] = armarGustos(d.opcionales!, [{ id: "finanzas:gusto:7", activa: true, origen: "finanzas", creado: "x" } as Proyeccion]);
+  expect(g).toMatchObject({ id: "finanzas:gusto:7", nombre: "Notebook", clase: "opcional", periodo: "2026-12", origen: "finanzas", activa: true, usd: 1800 });
 });
 
 it("los meses: los últimos 6, el que corre incluido", () => {
@@ -60,7 +72,7 @@ it("cada movimiento lleva con qué se pagó; las tarjetas se llaman Visa y Maste
   expect(e.movimientos.map(m => m.cuenta)).toEqual(["Revolut", "Visa", "Mastercard", undefined]);
   // Sin cuenta conocida no se inventa: el campo no viaja.
   expect(JSON.parse(JSON.stringify(e.movimientos[3]))).not.toHaveProperty("cuenta");
-  expect(e.contrato).toBe("1.1");
+  expect(e.contrato).toBe("1.2");
 });
 
 it("lo de la cuenta «App anterior» no viaja: ya está en Finanzas", () => {
