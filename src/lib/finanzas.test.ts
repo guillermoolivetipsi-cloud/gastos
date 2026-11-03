@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import type { Categoria, Cuenta, Movimiento, Proyeccion } from "../tipos";
-import { armarDesdeFinanzas, armarEnvio, armarGustos, cambioDeEtapa, interpretar, mesesAMandar, nombreDeEnvio, validarDesdeFinanzas } from "./finanzas";
+import type { Categoria, Cuenta, Movimiento, Proyeccion, Recurrente } from "../tipos";
+import { armarDesdeFinanzas, armarEnvio, armarGustos, cambioDeEtapa, cuotaActual, interpretar, mesesAMandar, nombreDeEnvio, validarDesdeFinanzas } from "./finanzas";
 
 const cuentas: Cuenta[] = [
   { id: "rev", nombre: "Revolut", moneda: "EUR", dolar: "blue", esTarjeta: false, orden: 0 },
@@ -21,7 +21,7 @@ it("manda los meses completos, en su moneda, con el id de la app; sin cobros de 
   const e = armarEnvio(["2026-08", "2026-09"], movs, cats, cuentas, new Date("2026-09-29T12:00:00Z"));
   expect([e.app, e.contrato, e.desde, e.hasta, e.generado]).toEqual(["gastos", "1.2", "2026-08", "2026-09", "2026-09-29T12:00:00.000Z"]);
   expect(e.movimientos.map(m => m.id)).toEqual(["b", "a", "alq"]);
-  expect(e.movimientos[0]).toEqual({ id: "b", tipo: "gasto", fecha: "2026-08-31", monto: 68000, moneda: "ARS", cuenta: "Visa", categoria: "Ocio", etiquetas: ["Vacaciones"], comentario: undefined, cuotas: 3 });
+  expect(e.movimientos[0]).toEqual({ id: "b", tipo: "gasto", fecha: "2026-08-31", monto: 68000, moneda: "ARS", cuenta: "Visa", categoria: "Ocio", etiquetas: ["Vacaciones"], comentario: undefined, cuotas: 3, cuotaActual: 2 });
   expect(e.movimientos[1]).toMatchObject({ monto: 28.7, moneda: "EUR", cuenta: "Revolut", comentario: "Cena", cuotas: undefined });
   expect(JSON.stringify(e)).not.toContain("33.1"); // nunca en dólares convertidos
 });
@@ -130,4 +130,18 @@ it("avisa el cambio de etapa solo si había una y llegó otra distinta", () => {
   expect(cambioDeEtapa(e("Fondo de liquidez"), e("Libertad"))).toBe(true);
   expect(cambioDeEtapa(e("Fondo de liquidez"), e("fondo de liquidez "))).toBe(false);
   expect([cambioDeEtapa(null, e("Libertad")), cambioDeEtapa(e("Libertad"), null)]).toEqual([false, false]);
+});
+
+it("cuotas: el monto es el total; cuotaActual es la que entra en el resumen que se junta", () => {
+  // Visa: cierra entre el 5 y el 10 (por defecto); la compra del 20 sep cae en el resumen de octubre.
+  const compra = mov({ id: "tv", cuentaId: "visa", fecha: "2026-09-20", monto: 300, moneda: "ARS", cuotas: 3 });
+  const e = armarEnvio(["2026-09"], [compra], cats, cuentas, new Date("2026-11-03T12:00:00Z"));
+  expect(e.movimientos[0]).toMatchObject({ monto: 300, cuotas: 3, cuotaActual: 2 });
+  expect(cuotaActual(cuentas[1], compra, "2027-03-01")).toBe(3); // ya se facturaron todas
+});
+
+it("los recurrentes viajan con la cuenta en que se cobran", () => {
+  const r = { id: "spo", nombre: "Spotify", tipo: "gasto", categoriaId: "ocio", cuentaId: "visa", monto: 11.99, moneda: "EUR", clase: "fijo", frecuencia: "mensual", dia: 12, inicio: "2026-01-01", modo: "avisar", activo: true } as Recurrente;
+  const e = armarEnvio(["2026-10"], [], cats, cuentas, new Date(), [], [r, { ...r, id: "viejo", activo: false }]);
+  expect(e.recurrentes).toEqual([{ id: "recurrente:spo", tipo: "gasto", concepto: "Spotify", monto: 11.99, moneda: "EUR", cuenta: "Visa", frecuencia: "mensual", dia: 12, fijo: true, desde: "2026-01", hasta: null }]);
 });

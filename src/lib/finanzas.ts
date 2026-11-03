@@ -1,5 +1,7 @@
 import { db, guardarAjuste, leerAjuste, nuevoId } from "../db";
-import type { Categoria, Cuenta, Moneda, Movimiento, Proyeccion } from "../tipos";
+import type { Categoria, Cuenta, Moneda, Movimiento, Proyeccion, Recurrente } from "../tipos";
+import { cuotasDe, resumenQueSeJunta } from "./tarjeta";
+import { montoHabitual } from "./recurrentes";
 import type { Destinos } from "./plan";
 import { periodoDe, periodoHoy, sumarMeses } from "./fecha";
 
@@ -20,7 +22,24 @@ const API = `https://api.github.com/repos/${REPO}`;
 
 export interface MovimientoEnviado {
   id: string; tipo: "gasto" | "ingreso"; fecha: string; monto: number; moneda: string;
-  cuenta?: string; categoria?: string; etiquetas: string[]; comentario?: string; cuotas?: number;
+  cuenta?: string; categoria?: string; etiquetas: string[]; comentario?: string;
+  /** Solo tarjeta. `monto` es SIEMPRE el total de la compra; cada resumen lleva monto / cuotas. */
+  cuotas?: number;
+  /** Compras en cuotas: la cuota que entra en el resumen que se está juntando hoy (1..cuotas;
+   *  si ya se facturaron todas, `cuotas`). Quedan `cuotas − cuotaActual` para después. */
+  cuotaActual?: number;
+}
+
+/** Los recurrentes de verdad (Spotify, el gimnasio, el alquiler), con la cuenta en que se
+ *  cobran. Variables: el monto es lo habitual (estimado). Van todos en cada envío. */
+export interface RecurrenteEnviado {
+  id: string; tipo: "gasto" | "ingreso"; concepto: string; monto: number; moneda: string;
+  cuenta?: string; frecuencia: "mensual" | "semanal" | "anual";
+  /** mensual y anual: día del mes; semanal: 0 = domingo … 6. */
+  dia: number;
+  /** anual: el mes (1-12). */
+  mes?: number;
+  fijo: boolean; desde: string; hasta: string | null;
 }
 /** Lo pactado a futuro (contrato 1.1): algo que ya está acordado y todavía no pasó, como
  *  el alquiler de Barcelona de dic a mar. Finanzas lo usa solo para proyectar; cuando se
@@ -40,6 +59,7 @@ export interface Envio {
   movimientos: MovimientoEnviado[];
   compromisos: Compromiso[];
   opcionales: Opcional[];
+  recurrentes: RecurrenteEnviado[];
 }
 
 /** Qué proyecciones son compromisos: todas las «seguro», de uno o de varios meses, ingreso
@@ -108,7 +128,30 @@ export function seManda(m: Movimiento, cat: Categoria | undefined, cuenta?: Cuen
 }
 
 /** El envío: todos los movimientos de esos meses, completos, en su moneda. */
-export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[], cuentas: Cuenta[], ahora = new Date(), proys: Proyeccion[] = []): Envio {
+/** En qué cuota va una compra con tarjeta: la que entra en el resumen que se está juntando
+ *  ese día (1..n); si ya se facturaron todas, n. */
+export function cuotaActual(c: Cuenta, m: Movimiento, dia: string) {
+  const qs = cuotasDe(c, m), junta = resumenQueSeJunta(c, [], dia).periodo;
+  const i = qs.findIndex(q => q.periodo === junta);
+  return i >= 0 ? i + 1 : junta > qs[qs.length - 1].periodo ? qs.length : 1;
+}
+
+/** Los recurrentes activos, con la cuenta en que se cobran (contrato: sección `recurrentes`). */
+export const armarRecurrentes = (recs: Recurrente[], movs: Movimiento[], cuentas: Cuenta[]): RecurrenteEnviado[] => {
+  const cta = new Map(cuentas.map(c => [c.id, c]));
+  return recs
+    .filter(r => r.activo && r.frecuencia !== "una-vez")
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .map(r => ({
+      id: `recurrente:${r.id}`, tipo: r.tipo, concepto: r.nombre, monto: montoHabitual(r, movs, null), moneda: r.moneda,
+      cuenta: cta.get(r.cuentaId)?.nombre, frecuencia: r.frecuencia as RecurrenteEnviado["frecuencia"], dia: r.dia,
+      ...(r.frecuencia === "anual" && r.mes ? { mes: r.mes } : {}),
+      fijo: r.clase === "fijo", desde: r.inicio.slice(0, 7), hasta: r.fin ? r.fin.slice(0, 7) : null,
+    }));
+};
+
+export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[], cuentas: Cuenta[], ahora = new Date(), proys: Proyeccion[] = [], recs: Recurrente[] = []): Envio {
+  const dia = ahora.toISOString().slice(0, 10);
   const cat = new Map(cats.map(c => [c.id, c]));
   const cta = new Map(cuentas.map(c => [c.id, c]));
   const movimientos = movs
@@ -121,10 +164,11 @@ export function armarEnvio(meses: string[], movs: Movimiento[], cats: Categoria[
         cuenta: cuenta?.nombre, categoria: cat.get(m.categoriaId)?.nombre,
         etiquetas: m.etiquetas, comentario: m.comentario || undefined,
         cuotas: cuenta?.esTarjeta ? m.cuotas ?? 1 : undefined,
+        cuotaActual: cuenta?.esTarjeta && (m.cuotas ?? 1) > 1 ? cuotaActual(cuenta, m, dia) : undefined,
       };
     });
   const orden = [...meses].sort();
-  return { app: "gastos", contrato: CONTRATO, generado: ahora.toISOString(), desde: orden[0], hasta: orden[orden.length - 1], movimientos, compromisos: armarCompromisos(proys), opcionales: armarOpcionales(proys) };
+  return { app: "gastos", contrato: CONTRATO, generado: ahora.toISOString(), desde: orden[0], hasta: orden[orden.length - 1], movimientos, compromisos: armarCompromisos(proys), opcionales: armarOpcionales(proys), recurrentes: armarRecurrentes(recs, movs, cuentas) };
 }
 
 /** Lee el archivo de respuesta de Finanzas. `ok: false` = no se escribió nada. */
@@ -173,10 +217,10 @@ export async function probarToken(token: string): Promise<"ok" | "token" | "sin-
 
 /** Deja el envío en envios/<fecha>.json. */
 export async function mandar(token: string): Promise<Subida> {
-  const [movs, cats, cuentas, proys] = await Promise.all([db.movimientos.toArray(), db.categorias.toArray(), db.cuentas.toArray(), db.proyecciones.toArray()]);
+  const [movs, cats, cuentas, proys, recs] = await Promise.all([db.movimientos.toArray(), db.categorias.toArray(), db.cuentas.toArray(), db.proyecciones.toArray(), db.recurrentes.toArray()]);
   const ahora = new Date();
   const meses = mesesAMandar();
-  const envio = armarEnvio(meses, movs, cats, cuentas, ahora, proys);
+  const envio = armarEnvio(meses, movs, cats, cuentas, ahora, proys, recs);
   const nombre = nombreDeEnvio(ahora);
   try {
     const r = await fetch(`${API}/contents/envios/${nombre}`, {
